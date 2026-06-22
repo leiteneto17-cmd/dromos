@@ -1,0 +1,183 @@
+/**
+ * Catálogo de livros para o Explorar — MULTI-FONTE. CLAUDE.md §4.3: só acervo livre/
+ * sem DRM. Fontes verificadas (2026-06-20):
+ *  - **Project Gutenberg** (via API Gutendex): JSON aberto, 100% domínio público. PADRÃO.
+ *  - **Internet Archive** (advancedsearch): API aberta; EXCLUÍMOS as coleções de
+ *    empréstimo (inlibrary/printdisabled, que têm DRM) e avisamos que é acervo aberto
+ *    da comunidade — qualidade/direitos variam. Fica como fonte opcional.
+ * (Standard Ebooks passou a exigir login; Feedbooks bloqueia bots; BibliON usa DRM de
+ *  empréstimo; Senado não tem API — por isso não entram.)
+ */
+export type CatalogSource = 'gutenberg' | 'archive';
+export type CatalogLang = 'pt' | 'en' | 'all';
+
+export type CatalogBook = {
+  /** Único entre fontes (prefixado pela fonte). */
+  id: string;
+  source: CatalogSource;
+  title: string;
+  author: string;
+  language: string;
+  coverUrl: string | null;
+  /** Conhecido no Gutenberg; no Archive resolvemos na hora de baixar (resolveEpubUrl). */
+  epubUrl: string | null;
+  iaIdentifier?: string;
+};
+
+export type CatalogPage = { results: CatalogBook[]; hasNext: boolean };
+
+/**
+ * Fontes EXPOSTAS na interface. Só Gutenberg por enquanto: é 100% domínio público.
+ *
+ * ⚠️ Internet Archive ficou FORA de propósito (código abaixo permanece para o futuro):
+ * a verificação (2026-06-20) mostrou que, mesmo excluindo o acervo de empréstimo, a
+ * busca surge cheia de livro PIRATEADO e conteúdo OFENSIVO — ordenado por downloads, o
+ * topo em PT trazia "Halim" (Milton Hatoum, com copyright), quadrinho do Conan e
+ * "Mein Kampf". Expor isso violaria §4.3 (direitos) e §4.8 (moderação). Só reabilitar
+ * se houver um feed CURADO de domínio público.
+ */
+export const SOURCES: { id: CatalogSource; label: string; note?: string }[] = [
+  { id: 'gutenberg', label: 'Project Gutenberg' },
+];
+
+/** Atalhos de descoberta (busca pronta) — funciona bem em PT e EN no Gutenberg. */
+export const QUICK_SEARCHES: { label: string; query: string }[] = [
+  { label: 'Machado de Assis', query: 'Machado de Assis' },
+  { label: 'Eça de Queirós', query: 'Eça de Queirós' },
+  { label: 'Aventura', query: 'adventure' },
+  { label: 'Romance', query: 'romance' },
+  { label: 'Ficção científica', query: 'science fiction' },
+  { label: 'Poesia', query: 'poetry' },
+];
+
+// ----------------- Project Gutenberg (Gutendex) -----------------
+
+type GutendexBook = {
+  id: number;
+  title?: string;
+  authors?: { name?: string }[];
+  languages?: string[];
+  formats?: Record<string, string>;
+};
+
+function pickEpub(formats: Record<string, string>): string | null {
+  const direct = formats['application/epub+zip'];
+  if (direct) return direct;
+  const alt = Object.entries(formats).find(([k]) => k.startsWith('application/epub'));
+  return alt ? alt[1] : null;
+}
+
+async function searchGutenberg(query: string, lang: CatalogLang, page: number): Promise<CatalogPage> {
+  const params = new URLSearchParams();
+  if (query.trim()) params.set('search', query.trim());
+  if (lang !== 'all') params.set('languages', lang);
+  params.set('page', String(page));
+
+  const r = await fetch(`https://gutendex.com/books?${params.toString()}`);
+  if (!r.ok) throw new Error(`Erro ${r.status} ao buscar o catálogo.`);
+  const data = (await r.json()) as { results?: GutendexBook[]; next?: string | null };
+
+  const results: CatalogBook[] = (data.results ?? [])
+    .map((b): CatalogBook => {
+      const formats = b.formats ?? {};
+      return {
+        id: `gutenberg-${b.id}`,
+        source: 'gutenberg',
+        title: b.title ?? 'Sem título',
+        author: b.authors?.[0]?.name || 'Autor desconhecido',
+        language: b.languages?.[0] ?? '',
+        coverUrl: formats['image/jpeg'] ?? null,
+        epubUrl: pickEpub(formats),
+      };
+    })
+    .filter((b) => !!b.epubUrl);
+
+  return { results, hasNext: Boolean(data.next) };
+}
+
+// ----------------- Internet Archive (advancedsearch) -----------------
+
+type IADoc = {
+  identifier: string;
+  title?: string;
+  creator?: string | string[];
+  language?: string | string[];
+};
+
+const IA_ROWS = 20;
+
+function first(v: string | string[] | undefined, fallback: string): string {
+  if (Array.isArray(v)) return v[0] ?? fallback;
+  return v || fallback;
+}
+
+async function searchArchive(query: string, lang: CatalogLang, page: number): Promise<CatalogPage> {
+  // exclui o acervo de empréstimo (DRM) e exige derivativo EPUB
+  const clauses = [
+    'mediatype:texts',
+    'format:EPUB',
+    'NOT collection:(inlibrary)',
+    'NOT collection:(printdisabled)',
+  ];
+  if (lang !== 'all') clauses.push(`language:(${lang === 'pt' ? 'portuguese' : 'english'})`);
+  if (query.trim()) clauses.push(`(${query.trim()})`);
+
+  const params = new URLSearchParams();
+  params.set('q', clauses.join(' AND '));
+  ['identifier', 'title', 'creator', 'language'].forEach((f) => params.append('fl[]', f));
+  params.append('sort[]', 'downloads desc'); // mais baixados primeiro (clássicos conhecidos)
+  params.set('rows', String(IA_ROWS));
+  params.set('page', String(page));
+  params.set('output', 'json');
+
+  const r = await fetch(`https://archive.org/advancedsearch.php?${params.toString()}`);
+  if (!r.ok) throw new Error(`Erro ${r.status} ao buscar o catálogo.`);
+  const data = (await r.json()) as { response?: { numFound?: number; docs?: IADoc[] } };
+  const docs = data.response?.docs ?? [];
+  const numFound = data.response?.numFound ?? 0;
+
+  const results: CatalogBook[] = docs.map((d) => ({
+    id: `archive-${d.identifier}`,
+    source: 'archive',
+    title: d.title || 'Sem título',
+    author: first(d.creator, 'Autor desconhecido'),
+    language: first(d.language, ''),
+    coverUrl: `https://archive.org/services/img/${d.identifier}`,
+    epubUrl: null, // resolvido no download
+    iaIdentifier: d.identifier,
+  }));
+
+  return { results, hasNext: numFound > page * IA_ROWS };
+}
+
+// ----------------- API pública -----------------
+
+export async function searchCatalog(
+  source: CatalogSource,
+  query: string,
+  lang: CatalogLang,
+  page = 1,
+): Promise<CatalogPage> {
+  return source === 'archive'
+    ? searchArchive(query, lang, page)
+    : searchGutenberg(query, lang, page);
+}
+
+/** URL final do EPUB. No Archive, busca o nome do arquivo via metadata API. */
+export async function resolveEpubUrl(book: CatalogBook): Promise<string | null> {
+  if (book.epubUrl) return book.epubUrl;
+  if (book.source === 'archive' && book.iaIdentifier) {
+    const r = await fetch(`https://archive.org/metadata/${book.iaIdentifier}`);
+    if (!r.ok) return null;
+    const d = (await r.json()) as { files?: { name?: string; format?: string }[] };
+    const files = d.files ?? [];
+    const epub = files.find(
+      (f) =>
+        (f.format ?? '').toUpperCase().includes('EPUB') ||
+        (f.name ?? '').toLowerCase().endsWith('.epub'),
+    );
+    if (!epub?.name) return null;
+    return `https://archive.org/download/${book.iaIdentifier}/${encodeURIComponent(epub.name)}`;
+  }
+  return null;
+}
