@@ -167,8 +167,8 @@ export default function ReaderScreen() {
   // e lido na finalização da sessão (cleanup do useFocusEffect).
   sessionTitleRef.current = currentBook
     ? isEpub
-      ? epubBook?.data.title ?? currentBook.name
-      : currentBook.name
+      ? epubBook?.data.title ?? currentBook.title ?? currentBook.name
+      : currentBook.title ?? currentBook.name
     : '';
 
   // Prepara o EPUB inteiro uma vez (com progresso), depois a leitura é fluida.
@@ -385,7 +385,7 @@ export default function ReaderScreen() {
       else if (!epubBook) subtitle = 'Preparando…';
       else subtitle = ''; // capítulos aparecem inline no texto (leitura contínua)
     } else {
-      bookLabel = currentBook.name;
+      bookLabel = currentBook.title ?? currentBook.name;
       if (extracted !== undefined) subtitle = '';
       else if (extracting) subtitle = 'Convertendo PDF para leitura…';
       else if (extractError) subtitle = 'Não foi possível converter';

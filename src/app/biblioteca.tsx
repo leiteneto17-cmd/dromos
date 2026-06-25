@@ -11,6 +11,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import { deletePreparedCache, openEpub } from '@/services/epub-parser';
+import { readPdfTitle } from '@/services/pdf-metadata';
 import { useLibrary, type BookFormat, type ImportedBook } from '@/store/library';
 
 function detectFormat(name: string, mime?: string): BookFormat | null {
@@ -82,16 +83,15 @@ export async function importBookFlow(
     async function commit() {
       const dest = new File(Paths.document, `book-${Date.now()}.${fmt}`);
       await picked.copy(dest);
-      // Captura o título real do EPUB já na importação (metadado do OPF) — assim a
-      // biblioteca/comunidade mostram o nome certo, não "Documento EPUB". (PDF: o título
-      // só vem ao converter; fica com o nome do arquivo por enquanto.)
+      // Captura o título real já na importação — assim a biblioteca/comunidade mostram o
+      // nome do livro, não "Documento EPUB/PDF". EPUB: metadado do OPF. PDF: entrada
+      // /Title do dicionário Info. Em ambos, se não houver metadado, cai no nome do arquivo.
       let title: string | undefined;
-      if (fmt === 'epub') {
-        try {
-          title = (await openEpub(dest.uri)).title;
-        } catch {
-          // sem metadado legível → mantém o nome do arquivo
-        }
+      try {
+        if (fmt === 'epub') title = (await openEpub(dest.uri)).title;
+        else if (fmt === 'pdf') title = (await readPdfTitle(dest.uri)) ?? undefined;
+      } catch {
+        // sem metadado legível → mantém o nome do arquivo
       }
       const book: ImportedBook = {
         id: `${Date.now()}`,
