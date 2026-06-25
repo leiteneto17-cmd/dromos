@@ -168,6 +168,37 @@ export async function searchCatalog(
     : searchGutenberg(query, lang, page);
 }
 
+/**
+ * Vitrine de CLÁSSICOS BRASILEIROS (o Gutenberg só tem o código `pt` genérico, sem
+ * separar Brasil de Portugal). Em vez da popularidade crua do `pt` — que sobe obras de
+ * Portugal —, buscamos autores brasileiros conhecidos e intercalamos para dar variedade.
+ */
+const AUTORES_BR = ['Machado de Assis', 'José de Alencar', 'Lima Barreto', 'Aluísio Azevedo'];
+
+export async function featuredBrazilian(): Promise<CatalogBook[]> {
+  const listas = await Promise.all(
+    AUTORES_BR.map((a) =>
+      searchGutenberg(a, 'pt', 1)
+        .then((p) => p.results)
+        .catch(() => [] as CatalogBook[]),
+    ),
+  );
+  // Intercala (1º de cada autor, depois o 2º…) e remove repetidos.
+  const seen = new Set<string>();
+  const out: CatalogBook[] = [];
+  const maxLen = listas.reduce((m, l) => Math.max(m, l.length), 0);
+  for (let i = 0; i < maxLen; i++) {
+    for (const l of listas) {
+      const b = l[i];
+      if (b && !seen.has(b.id)) {
+        seen.add(b.id);
+        out.push(b);
+      }
+    }
+  }
+  return out;
+}
+
 /** URL final do EPUB. No Archive, busca o nome do arquivo via metadata API. */
 export async function resolveEpubUrl(book: CatalogBook): Promise<string | null> {
   if (book.epubUrl) return book.epubUrl;

@@ -23,6 +23,7 @@ import {
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import {
+  featuredBrazilian,
   QUICK_SEARCHES,
   resolveEpubUrl,
   searchCatalog,
@@ -34,9 +35,9 @@ import {
 import { useLibrary, type ImportedBook } from '@/store/library';
 
 const LANGS: { id: CatalogLang; label: string }[] = [
-  { id: 'pt', label: 'Português' },
-  { id: 'en', label: 'Inglês' },
-  { id: 'all', label: 'Todos' },
+  { id: 'pt', label: '🇧🇷 Português' },
+  { id: 'en', label: '🇺🇸 Inglês' },
+  { id: 'all', label: '🌐 Todos' },
 ];
 
 export default function ExplorarScreen() {
@@ -55,9 +56,12 @@ export default function ExplorarScreen() {
     setLoading(true);
     setError(null);
     try {
-      const page = await searchCatalog(src, q, l);
-      setResults(page.results);
-      if (page.results.length === 0)
+      // Vitrine padrão em PT (sem busca) = clássicos brasileiros curados; o resto usa o
+      // catálogo normal. O Gutenberg não separa pt-BR de pt-PT, então curamos por autor.
+      const isBrShelf = !q.trim() && src === 'gutenberg' && l === 'pt';
+      const results = isBrShelf ? await featuredBrazilian() : (await searchCatalog(src, q, l)).results;
+      setResults(results);
+      if (results.length === 0)
         setError('Nenhum livro encontrado. Tente outro termo, idioma ou fonte.');
     } catch (e) {
       setResults([]);
@@ -219,7 +223,11 @@ export default function ExplorarScreen() {
           ListHeaderComponent={
             results.length > 0 ? (
               <Text style={[styles.sectionLabel, { color: c.purple }]}>
-                {query.trim() ? '🔎 Resultados' : '🔥 Populares'}
+                {query.trim()
+                  ? '🔎 Resultados'
+                  : lang === 'pt'
+                    ? '🇧🇷 Clássicos brasileiros'
+                    : '🔥 Populares'}
               </Text>
             ) : null
           }
