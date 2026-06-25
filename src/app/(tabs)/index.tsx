@@ -4,9 +4,8 @@
  * Base neutra (60-30-10) com roxo+verde só como acento (CLAUDE.md §2.7).
  * Abrir um livro empurra o leitor (/reader) por cima das abas.
  */
-import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { MyShelf } from '@/components/my-shelf';
 import { ProfileHeader } from '@/components/profile-header';
@@ -49,26 +48,6 @@ export default function HubScreen() {
   function continueReading() {
     if (current) openBook(current.id);
     router.navigate('/reader');
-  }
-
-  // Exporta (compartilha) o arquivo do livro atual via share sheet do sistema.
-  async function exportCurrent() {
-    if (!current) {
-      Alert.alert('Nada para exportar', 'Importe ou abra um livro primeiro.');
-      return;
-    }
-    try {
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('Indisponível', 'Compartilhamento não está disponível neste aparelho.');
-        return;
-      }
-      await Sharing.shareAsync(current.uri, {
-        dialogTitle: `Exportar "${current.title ?? current.name}"`,
-        mimeType: current.format === 'pdf' ? 'application/pdf' : 'application/epub+zip',
-      });
-    } catch (e) {
-      Alert.alert('Falha ao exportar', e instanceof Error ? e.message : 'Tente novamente.');
-    }
   }
 
   return (
@@ -148,10 +127,10 @@ export default function HubScreen() {
               <Text style={[styles.tileHalfLabel, { color: c.green }]}>Importar</Text>
             </Pressable>
             <Pressable
-              onPress={exportCurrent}
+              onPress={() => router.navigate('/explorar')}
               style={[styles.tileHalf, { backgroundColor: c.cardElevated, borderColor: c.border }]}>
-              <Text style={[styles.tileHalfIcon, { color: c.purple }]}>↑</Text>
-              <Text style={[styles.tileHalfLabel, { color: c.purple }]}>Exportar</Text>
+              <Text style={styles.tileHalfIcon}>🔎</Text>
+              <Text style={[styles.tileHalfLabel, { color: c.purple }]}>Explorar</Text>
             </Pressable>
           </View>
         </ScrollView>
