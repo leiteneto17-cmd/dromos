@@ -5,7 +5,7 @@
  */
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProfileEditor } from '@/components/profile-editor';
@@ -16,7 +16,7 @@ import { useUI } from '@/hooks/use-ui';
 import { computeAchievements, deriveStats } from '@/services/progress';
 import { approveRequest, getFollowRequests, rejectRequest, type FollowRequest } from '@/services/social';
 import { useAI } from '@/store/ai';
-import { displayName, signOut, useAuth } from '@/store/auth';
+import { deleteAccount, displayName, signOut, useAuth } from '@/store/auth';
 import { useLibrary, type UITheme } from '@/store/library';
 import { updateProfile, useProfile } from '@/store/profile';
 import { PROVIDERS } from '@/services/ai/providers';
@@ -44,6 +44,7 @@ export default function ProfileScreen() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [savingPublic, setSavingPublic] = useState(false);
   const [requests, setRequests] = useState<FollowRequest[]>([]);
+  const [deleting, setDeleting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,6 +62,38 @@ export default function ProfileScreen() {
   async function respondRequest(followerId: string, accept: boolean) {
     setRequests((prev) => prev.filter((r) => r.follower_id !== followerId)); // otimista
     await (accept ? approveRequest(followerId) : rejectRequest(followerId));
+  }
+
+  // Exclusão de conta (Apple 5.1.1(v) + Google): dupla confirmação por ser irreversível.
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Excluir conta',
+      'Isso apaga PERMANENTEMENTE sua conta e todos os seus dados na nuvem: perfil, ' +
+        'atividades de leitura, estante, resenhas, recados, seguidores e curtidas. Esta ação não pode ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Continuar', style: 'destructive', onPress: askFinalConfirm },
+      ],
+    );
+  }
+
+  function askFinalConfirm() {
+    Alert.alert('Tem certeza?', 'Confirma a exclusão definitiva da sua conta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir minha conta', style: 'destructive', onPress: runDeleteAccount },
+    ]);
+  }
+
+  async function runDeleteAccount() {
+    setDeleting(true);
+    const res = await deleteAccount();
+    setDeleting(false);
+    if (!res.ok) {
+      Alert.alert('Não foi possível excluir', res.error);
+      return;
+    }
+    // Sucesso: a sessão caiu → o guard em _layout leva para /login automaticamente.
+    Alert.alert('Conta excluída', 'Sua conta e seus dados foram removidos.');
   }
 
   const derived = deriveStats(stats);
@@ -166,6 +199,18 @@ export default function ProfileScreen() {
               ))}
             </>
           ) : null}
+
+          <Pressable
+            onPress={confirmDeleteAccount}
+            disabled={deleting}
+            style={styles.deleteRow}
+            hitSlop={8}>
+            {deleting ? (
+              <ActivityIndicator size="small" color="#E5484D" />
+            ) : (
+              <Text style={styles.deleteText}>Excluir conta</Text>
+            )}
+          </Pressable>
         </>
       ) : null}
 
@@ -304,6 +349,8 @@ const styles = StyleSheet.create({
   reqReject: { fontSize: 13, fontWeight: '700' },
   shareCta: { marginTop: 14, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   shareCtaText: { fontSize: 15, fontWeight: '800' },
+  deleteRow: { marginTop: 16, alignItems: 'center', paddingVertical: 8, minHeight: 36, justifyContent: 'center' },
+  deleteText: { fontSize: 14, fontWeight: '700', color: '#E5484D' },
   segment: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, padding: 4, gap: 4 },
   segItem: { flex: 1, borderRadius: 999, paddingVertical: 9, alignItems: 'center' },
   segText: { fontSize: 14, fontWeight: '700' },

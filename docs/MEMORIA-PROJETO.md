@@ -1034,10 +1034,156 @@ lendo, recados).**
 - Service novo (ex.: estender `social.ts`): `getScraps(profileId)`, `sendScrap({recipientId, body, isPublic})`
   (filtro palavrão antes), `deleteScrap(id)`, `canScrap(profileId)` (checa permissão p/ habilitar o compose).
 
+===== FASE 4 INICIADA — PRIVACIDADE (2026-06-22) =====
+Usuário escolheu começar a Fase 4 pela **preparação de privacidade**.
+- **DECISÃO premium (revisa CLAUDE.md §6 pós-BYOK):** atrás do paywall = **IA/OCR gerida (chave NOSSA, via
+  Edge Function)** + **gráficos/estatísticas avançadas** + **feed social avançado**. **Sync na nuvem/backup
+  NÃO entrou no premium** (será grátis ou fica p/ depois — confirmar quando implementar o paywall).
+- **`docs/PRIVACIDADE.md` (novo):** doc de conformidade fiel ao código (auditado). Cobre: princípios (offline-
+  first, BYOK no device, SEM analytics/tracking — confirmado por grep, zero SDKs), tabela de dados tratados +
+  onde ficam, terceiros (Supabase; OpenAI/Anthropic/Gemini/ElevenLabs via BYOK; dictionaryapi.dev; catálogos),
+  mapeamento **Apple Nutrition Labels** (Data Linked: email/nome/User ID/User Content; Tracking: nenhum) e
+  **Google Data Safety**, permissões (notif + media-library; sem mic/câmera/localização), e o rascunho da ficha.
+- **PENDÊNCIAS OBRIGATÓRIAS p/ loja levantadas (no doc §6):** (1) **exclusão de conta** NÃO existe (Apple
+  5.1.1(v)+Google exigem; criar botão em Perfil) · (2) **Política de Privacidade pública (URL)** não existe
+  (redigir do doc + hospedar) · (3) login obrigatório × Apple 5.1.1(v) (avaliar "convidado") · (4) disclosure
+  BYOK · (5) moderação UGC já feita (confirmar na ficha).
+- **EXCLUSÃO DE CONTA — FEITO (2026-06-22, falta usuário rodar SQL + testar):** pendência #1 da loja resolvida.
+  - **`supabase/schema.sql`** (⚠️ RE-RODAR): função `public.delete_current_user()` (`security definer`, deleta
+    `auth.users where id=auth.uid()`; o `on delete cascade` de TODAS as tabelas remove o resto). `revoke` de
+    public/anon + `grant execute` só p/ `authenticated`. (Confirmado: todas as FKs já têm `on delete cascade`.)
+  - **`src/store/auth.ts`:** `deleteAccount()` → `supabase.rpc('delete_current_user')` → `signOut()` → o guard
+    do `_layout` leva ao /login. Erros traduzidos.
+  - **`(tabs)/perfil.tsx`:** botão **"Excluir conta"** (vermelho, fim do bloco de conta logada) com **DUPLA
+    confirmação** (Alert destrutivo: lista o que será apagado → "Tem certeza?") + spinner; sucesso = Alert.
+  - `tsc` limpo + `expo export --platform android` exit 0. **TESTADO E APROVADO pelo usuário (2026-06-22):**
+    "contas excluídas do supa" — a conta some do Supabase (cascade ok) e o app volta ao login. NOTA: os dados
+    LOCAIS (arquivo `leitura-library-<uid>.json`) não são apagados (ficam órfãos no device; inofensivo).
+- **PRÓXIMO Fase 4 (a combinar):** paywall + gating premium (UI, sem conta paga, testável) → RevenueCat/IAP
+  (precisa conta + produtos nas lojas) → builds de release (Apple $99/ano, Google $25; iOS exige Mac/EAS).
+  Pendências de loja restantes: **Política de Privacidade pública (URL)** + avaliar "continuar como convidado".
+- **POLÍTICA DE PRIVACIDADE REDIGIDA (2026-06-22):** `docs/POLITICA-DE-PRIVACIDADE.md` — texto completo PT-BR
+  ancorado na **LGPD** (art. 7º/18/33), fiel ao inventário do `PRIVACIDADE.md`. Cobre: resumo, dados locais vs
+  nuvem vs terceiros (BYOK), o que NÃO fazemos (sem ads/tracking/venda), compartilhamento, transferência
+  internacional, segurança, retenção/exclusão (linka o botão Excluir conta), direitos LGPD, crianças, moderação
+  UGC, alterações, contato. **Campos 〔em colchetes〕 a preencher:** responsável/razão social, e-mail de
+  contato/DPO. **FALTA o usuário:** preencher os colchetes + HOSPEDAR numa URL (ex.: mindreaderapp.com/privacidade)
+  + informar a URL nas fichas das lojas. **DEPOIS:** linkar no app (Perfil → "Privacidade" abrindo a URL via
+  expo-web-browser/Linking — ainda NÃO feito p/ não criar link morto antes de hospedar).
+
 **COMO RODAR:** `npx expo start` + tecla `a` (app já instalado no emulador Medium_Phone). Build nativo só se
-mexer em lib nativa: `npx expo run:android` (JDK 21 fixado em gradle.properties; ⚠️ patch foojay 1.0.0 em
-node_modules some a cada npm install — tornar durável com patch-package antes de instalar lib nativa nova).
+mexer em lib nativa: `npx expo run:android` (JDK 21 fixado em gradle.properties; patch foojay agora DURÁVEL via
+patch-package/postinstall — ver seção PATCH-PACKAGE 2026-06-22).
 
 **BACKLOG FUTURO:** `docs/IDEIAS-FUTURAS.md` — Metas (substitui Conquistas), IA sobre a obra (busca
 semântica/personagens), hiper-personalização, acessibilidade (dislexia/TDAH), e a camada social aberta §5
 (scraps = item D, em andamento). Kudos/comentários por RESENHA também ficou de backlog.
+
+===== CHECKPOINT — PRONTO PARA CLOSED TEST (2026-06-22, decisão do usuário) =====
+Usuário decidiu **pausar o desenvolvimento de features** e ir para um **teste fechado**, resolvendo as
+pendências de loja depois. **Código está pronto p/ closed test** (nada bloqueando do lado de programação):
+leitor completo, IA BYOK, social, metas+lembretes, **exclusão de conta FEITA/testada**, build Android funciona.
+**O QUE FALTA é console/conta (não código), p/ subir um closed test no Google Play (caminho realista — Android
+já buildou; iOS precisa Mac/EAS):**
+1. Conta **Google Play Console** ($25 única). [Apple = $99/ano + Mac/EAS p/ iOS — fica p/ depois.]
+2. **Build de release assinado** (AAB): `npx expo run:android --variant release` ou EAS; configurar keystore.
+3. **Ficha "App content" no Play Console:** Política de Privacidade URL (texto pronto em
+   `docs/POLITICA-DE-PRIVACIDADE.md` — só preencher 〔responsável〕+〔e-mail〕 e HOSPEDAR) · **Data Safety**
+   (mapa pronto em `docs/PRIVACIDADE.md` §4) · content rating · público-alvo · declarar "sem anúncios".
+4. Adicionar testadores (e-mails/Google Group). NB: conta pessoal Google exige closed test com ~12 testadores
+   por 14 dias antes de liberar produção.
+**NÃO precisa p/ closed test (DEFERIDO):** paywall + RevenueCat/IAP, IA/OCR gerida (premium), áudio em
+background, "continuar como convidado" (só vira risco na REVIEW da Apple, não no closed test Android), foto de
+avatar, testes automatizados, karaokê por palavra. Detalhe do premium decidido: IA/OCR gerida + gráficos
+avançados + feed social avançado (sync/backup ficou de fora).
+**Estado do build:** `tsc --noEmit` limpo + `expo export --platform android` exit 0 + web SPA limpa. Tudo verde.
+
+===== APK DE TESTE GERADO (2026-06-22) =====
+Primeiro **APK de release standalone** (roda sem Metro), p/ instalar em aparelho físico / closed test informal.
+- **Como foi feito:** `npx expo prebuild --platform android` (sincroniza expo-notifications — sem `--clean`,
+  preservou local.properties + linha JDK 21 do gradle.properties + foojay 1.0.0) → `./android/gradlew -p android
+  assembleRelease` (21m34s, exit 0, 1026 tasks).
+- **Assinatura:** o template Expo assina `release` com a **chave de DEBUG** (`android/app/build.gradle`:
+  `release { signingConfig signingConfigs.debug }`) → instala em qualquer device p/ teste, MAS **não serve p/
+  Play Store** (lá precisa keystore próprio + AAB).
+- **Saída:** `android/app/build/outputs/apk/release/app-release.apk` (~110 MB — APK UNIVERSAL, todas as ABIs +
+  sem minify; reduzir depois com ABI splits ou AAB). Instalar: copiar p/ o celular + permitir fontes
+  desconhecidas, ou `adb install -r <apk>`.
+- Contém tudo desta sessão (lembretes locais funcionando fora do Expo Go, IA de metas, exclusão de conta).
+
+**TESTE NO IPHONE — caminho definido (2026-06-22, usuário vai decidir depois):** no Windows, a ÚNICA via é
+**EAS Build (nuvem, compila em Mac da Expo) + conta Apple Developer US$99/ano** (obrigatória p/ instalar em
+iPhone físico; o "grátis" só com Mac+Xcode/7 dias). Expo Go no iPhone NÃO serve (App Store = SDK 54, projeto =
+SDK 56). Quando decidir: setar `ios.bundleIdentifier` no app.json (hoje ausente) + `eas.json` + `eas build
+--platform ios` → instalar via TestFlight ou ad-hoc (registrar UDID). Usuário escolheu "decidir depois" — não
+preparado ainda.
+
+===== GIT DO PROJETO ARRUMADO (2026-06-21) =====
+O repo estava inicializado em `C:/Users/CASA/.git` (home), SEM commits → `git status` listava o perfil inteiro
+e qualquer `git add` era perigoso. **Fix:** `git init -b main` DENTRO de `+leitura` (agora o git para de subir
+p/ o home); `.idea/` adicionado ao `.gitignore`; **commit inicial `d40f3ad`** (107 arquivos; `node_modules`/
+`android`/`ios`/`dist`/`.expo` ignorados; `package-lock.json` versionado; SEM segredos — só a publishable key
+pública do Supabase em app.json). O `.git` órfão do home ficou intocado (inofensivo agora; usuário decide se
+remove). Sem remoto ainda (é só local; oferecido push p/ GitHub via `gh` se quiser).
+
+===== WEB BUILD CORRIGIDA (2026-06-21) =====
+`app.json` `web.output: "static" → "single"` → `expo export --platform web` vira SPA client-side (1 `index.html`),
+some o `ReferenceError: window is not defined` (que vinha do SSR no Node lendo a sessão do Supabase). iOS/Android
+inalterados (web não é alvo). `tsc --noEmit` limpo. Esteira de build 100% silenciosa nas 3 saídas.
+
+===== LEMBRETES DE LEITURA — notificação local (2026-06-21, IDEIAS-FUTURAS §1b — INCREMENTO 1, falta testar) =====
+Parte SEM IA da ideia §1b (a IA personaliza texto/horário = incremento 2, ainda não feito). Lembrete diário via
+**notificação LOCAL** (sem servidor de push; offline).
+- **Instalado `expo-notifications`** (módulo NATIVO) + plugin no `app.json` (`color: "#5EF0A0"`). ⚠️ **EXIGE
+  REBUILD** (`npx expo run:android`) — o app no emulador hoje NÃO tem o módulo; só `expo start`+`a` quebra no boot.
+- **`src/services/reminders.ts`:** `setupNotificationHandler` (chamado 1x no `_layout.tsx`, mostra notif com app
+  aberto), `requestReminderPermission`, `scheduleDailyReminder(hour,minute,body?)` (trigger DAILY, id estável
+  `leitura-daily-reminder` → reagendar substitui), `cancelDailyReminder`, `fmtTime`, `remindersUnsupported`
+  (=Expo Go via `Constants.executionEnvironment==='storeClient'` → no-op + aviso). Texto fixo por enquanto:
+  "Hora de ler 📖 — mantenha seu ritmo!".
+- **Store `library.ts`:** novo `ReminderConfig{enabled,hour,minute}` + campo persistido `reminder` (default
+  20:00, desligado) + ação `setReminder`. Atualizados Persisted/empty/parse/initial/persist (POR USUÁRIO).
+- **`app/conquistas.tsx` (tela Metas):** card "🔔 Lembrete de leitura" entre metas ativas e concluídas — `Switch`
+  liga/desliga (pede permissão; nega → desliga + Alert) + chips de horário (Manhã 8h/Almoço 12h/Fim da tarde 18h/
+  Noite 20h/Antes de dormir 22h). NÃO gated por `hasKey` (lembrete simples não exige IA). `applyReminder` agenda/
+  cancela e persiste. **A schedule DAILY persiste no SO** (sobrevive a restart) → sem reagendar no boot.
+- `tsc` limpo + `expo export --platform android` exit 0. **TESTAR (no dev build, após `npx expo run:android`):**
+  Perfil→Metas→ligar lembrete→escolher horário→conceder permissão; conferir notificação no horário (ou pôr um
+  horário ~1-2 min à frente p/ testar rápido); desligar cancela.
+===== METAS COM IA (BYOK) — INCREMENTO 2 (2026-06-22, §1b — falta usuário testar) =====
+Parte de IA da §1b, OPCIONAL e gated em `useAI.hasKey` (sem chave, Metas seguem só com a matemática local).
+- **`src/services/ai/goal-coach.ts` (novo):** `suggestGoal(CoachInput)` → `GoalSuggestion{kind,target,days,
+  bookId?,title,rationale}` via `chatJSON` (providers.ts, reusa provider/model/chave do `useAI`+`getApiKey`).
+  Envia só RESUMO numérico (avgMinPerDay/streak/activeDays/totalMin/booksCount + livro atual %/págs — barato §5).
+  Clampa a resposta (days 3–30, minutos 5–100000, dias 1–60; kind inválido→'minutos'; 'livro' só se há livro
+  atual). `reminderText(summary)` → frase curta personalizada p/ o lembrete (null se sem chave/falha → texto fixo).
+  parseJSON tolerante a ```json``` (igual dictionary.ts).
+- **`app/conquistas.tsx`:** botão **"✨ Sugerir meta (IA)"** (só se `hasKey`, abaixo do título; spinner enquanto
+  pensa) → monta `CoachInput` do estado real (currentBookId+bookProgress+bookPages+derived) → `suggestGoal` →
+  **pré-preenche o modal "Nova meta"** (kind/target/days via `nearestWindow`/bookId) + mostra a **justificativa
+  da IA** num card roxo no topo do modal (`aiRationale`). Usuário REVISA e cria (não cria sozinho). Erros:
+  needsKey→manda p/ Integrações; outro→Alert. `aiRationale` limpa ao criar/abrir manualmente.
+- **Lembrete personalizado:** `applyReminder` (do incremento 1) agora, se `hasKey`, monta um summary (média/
+  streak/meta ativa: faltam X unit, perDay/dia, daysLeft) → `reminderText` → passa como `body` ao
+  `scheduleDailyReminder`. Sem chave, mantém o texto fixo. ⚠️ o texto é fixado NO MOMENTO de agendar (trigger
+  DAILY tem body estático); "dinâmico de verdade por dia" exigiria reagendar diariamente — fica p/ depois.
+- `tsc` limpo + `expo export --platform android` exit 0. **TESTAR (precisa de chave de IA configurada +, p/
+  lembretes, o dev build com `npx expo run:android`):** Perfil→Integrações→colar chave; Metas→"✨ Sugerir meta"
+  → revisar sugestão+justificativa → criar; ligar lembrete com chave → o texto vem personalizado.
+**STATUS §1b:** AMBOS os incrementos (1 lembrete local + 2 IA sugere/personaliza) FEITOS; falta o teste do usuário.
+
+**FIX "Sugerir meta (IA)" dava "formato inesperado" (2026-06-22):** no aparelho o botão ✨ falhava no parse.
+Causa = `maxTokens` baixo (suggest 300, reminder 80): modelos **Gemini 2.5** "pensam" antes do JSON e, com
+orçamento pequeno, estouram no raciocínio e devolvem TEXTO VAZIO → parseJSON(null) → erro. (O dicionário usa
+700 e por isso nunca falhou.) **Fix:** suggest 300→**1024**, reminder 80→**512** (maxTokens é TETO, não custo;
+seguro/grátis p/ OpenAI/Anthropic). `goal-coach.ts`. `tsc` limpo. NOTA p/ futuro: se reincidir, considerar
+`thinkingConfig.thinkingBudget:0` no branch Gemini do `providers.ts` (só em flash; pode quebrar pro).
+
+===== PATCH-PACKAGE — patch foojay DURÁVEL (2026-06-22) =====
+A nota antiga "patch foojay 1.0.0 some a cada npm install" está RESOLVIDA. Instalado `patch-package` (devDep) +
+script **`"postinstall": "patch-package"`** no package.json. Patch em `patches/@react-native+gradle-plugin+0.85.3.patch`
+(LIMPO — só a linha `settings.gradle.kts` foojay `0.5.0→1.0.0`; o 1º patch saiu poluído com `.gradle/`+`build/
+classes/*.class` de um build anterior em node_modules → refeito com `--include 'settings\.gradle\.kts$'`).
+**Testado:** revertendo o arquivo p/ 0.5.0 e rodando `npm run postinstall`, ele reaplica p/ 1.0.0 ✔. Agora
+qualquer `npm install`/`expo install` reaplica sozinho → build nativo não quebra mais por isso. ⚠️ se o patch
+poluir de novo, rodar `rm` no .patch + recriar com `--include`.

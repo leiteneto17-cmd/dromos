@@ -89,6 +89,15 @@ export type ReadingSession = {
 /** Tema da camada social (não confundir com os temas do leitor — §2.5/§2.7). */
 export type UITheme = 'system' | 'light' | 'dark';
 
+/** Lembrete de leitura (notificação local diária — IDEIAS-FUTURAS §1b). */
+export type ReminderConfig = {
+  enabled: boolean;
+  /** Hora local (0–23) do lembrete diário. */
+  hour: number;
+  /** Minuto local (0–59) do lembrete diário. */
+  minute: number;
+};
+
 /** Meta de leitura (Fase 6). O usuário cria um objetivo com prazo; a app calcula o ritmo
  * necessário por dia (recalcula sozinha = cronograma adaptativo). Concluir = conquista. */
 export type GoalKind = 'minutos' | 'dias' | 'livro';
@@ -125,7 +134,10 @@ type Persisted = {
   sessions: ReadingSession[];
   goals: Goal[];
   uiTheme: UITheme;
+  reminder: ReminderConfig;
 };
+
+const DEFAULT_REMINDER: ReminderConfig = { enabled: false, hour: 20, minute: 0 };
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -150,6 +162,7 @@ function emptyPersisted(): Persisted {
     sessions: [],
     goals: [],
     uiTheme: 'system',
+    reminder: { ...DEFAULT_REMINDER },
   };
 }
 
@@ -172,6 +185,11 @@ function parsePersisted(f: File): Persisted {
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
       goals: Array.isArray(parsed.goals) ? parsed.goals : [],
       uiTheme: parsed.uiTheme ?? 'system',
+      reminder: {
+        enabled: Boolean(parsed.reminder?.enabled),
+        hour: typeof parsed.reminder?.hour === 'number' ? parsed.reminder.hour : DEFAULT_REMINDER.hour,
+        minute: typeof parsed.reminder?.minute === 'number' ? parsed.reminder.minute : DEFAULT_REMINDER.minute,
+      },
     };
   } catch {
     return emptyPersisted();
@@ -221,6 +239,7 @@ type LibraryState = Persisted & {
   removeGoal: (id: string) => void;
   completeGoal: (id: string, doneAt: number) => void;
   setUiTheme: (theme: UITheme) => void;
+  setReminder: (reminder: ReminderConfig) => void;
 };
 
 // Usuário ativo (escopo do arquivo). No boot a sessão ainda não resolveu → undefined
@@ -240,6 +259,7 @@ export const useLibrary = create<LibraryState>((set) => ({
   sessions: initial.sessions,
   goals: initial.goals,
   uiTheme: initial.uiTheme,
+  reminder: initial.reminder,
   addBook: (book) =>
     set((s) => ({
       books: [book, ...s.books.filter((b) => b.uri !== book.uri)],
@@ -298,6 +318,7 @@ export const useLibrary = create<LibraryState>((set) => ({
       };
     }),
   setUiTheme: (uiTheme) => set({ uiTheme }),
+  setReminder: (reminder) => set({ reminder }),
 }));
 
 // Salva no arquivo DA CONTA ATIVA a cada mudança (escrita síncrona; arquivo pequeno).
@@ -305,12 +326,12 @@ let switchingUser = false;
 function persist() {
   if (switchingUser) return; // não regravar durante a troca de conta
   try {
-    const { books, currentBookId, positions, progress, bookPages, bookmarks, vocab, stats, sessions, goals, uiTheme } =
+    const { books, currentBookId, positions, progress, bookPages, bookmarks, vocab, stats, sessions, goals, uiTheme, reminder } =
       useLibrary.getState();
     const f = fileFor(currentUserId);
     if (!f.exists) f.create();
     f.write(
-      JSON.stringify({ books, currentBookId, positions, progress, bookPages, bookmarks, vocab, stats, sessions, goals, uiTheme }),
+      JSON.stringify({ books, currentBookId, positions, progress, bookPages, bookmarks, vocab, stats, sessions, goals, uiTheme, reminder }),
     );
   } catch {
     // ignora falha de escrita

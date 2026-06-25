@@ -9,10 +9,11 @@
  */
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
+import { suggestGoal, reminderText } from '@/services/ai/goal-coach';
 import {
   computeAchievements,
   dayKeyInDays,
@@ -21,9 +22,30 @@ import {
   fmtShortDate,
   localDayKey,
 } from '@/services/progress';
-import { useLibrary, type Goal, type GoalKind } from '@/store/library';
+import {
+  cancelDailyReminder,
+  fmtTime,
+  remindersUnsupported,
+  scheduleDailyReminder,
+} from '@/services/reminders';
+import { useAI } from '@/store/ai';
+import { useLibrary, type Goal, type GoalKind, type ReminderConfig } from '@/store/library';
 
 const WINDOWS = [7, 14, 30];
+
+/** Janela de prazo (7/14/30) mais próxima de `n` dias — p/ encaixar a sugestão da IA nos chips. */
+function nearestWindow(n: number): number {
+  return WINDOWS.reduce((best, w) => (Math.abs(w - n) < Math.abs(best - n) ? w : best), WINDOWS[0]);
+}
+
+/** Horários comuns de leitura (o usuário escolhe; §1b "deixar escolher horário"). */
+const REMINDER_TIMES: { h: number; m: number; label: string }[] = [
+  { h: 8, m: 0, label: 'Manhã' },
+  { h: 12, m: 0, label: 'Almoço' },
+  { h: 18, m: 0, label: 'Fim da tarde' },
+  { h: 20, m: 0, label: 'Noite' },
+  { h: 22, m: 0, label: 'Antes de dormir' },
+];
 
 export default function GoalsScreen() {
   const c = useUI();
@@ -36,12 +58,19 @@ export default function GoalsScreen() {
   const addGoal = useLibrary((s) => s.addGoal);
   const removeGoal = useLibrary((s) => s.removeGoal);
   const completeGoal = useLibrary((s) => s.completeGoal);
+  const reminder = useLibrary((s) => s.reminder);
+  const setReminder = useLibrary((s) => s.setReminder);
+  const currentBookId = useLibrary((s) => s.currentBookId);
+  const hasKey = useAI((s) => s.hasKey);
 
   const [showNew, setShowNew] = useState(false);
   const [kind, setKind] = useState<GoalKind>('minutos');
   const [target, setTarget] = useState('');
   const [days, setDays] = useState(7);
   const [bookId, setBookId] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  /** Justificativa da IA p/ a meta sugerida (mostrada no modal). */
+  const [aiRationale, setAiRationale] = useState('');
 
   const derived = deriveStats(stats);
   const achievements = computeAchievements({ booksCount: booksList.length, vocabCount: vocab, derived });
@@ -63,6 +92,88 @@ export default function GoalsScreen() {
   }, [goals, stats, bookProgress]);
 
   const goBack = () => (router.canGoBack() ? router.back() : router.navigate('/perfil'));
+
+  // --- Sugestão de meta por IA (BYOK, §1b incremento 2) ---
+  async function onSuggest() {
+    if (suggesting) return;
+    setSuggesting(true);
+    try {
+      const cb = currentBookId ? booksList.find((b) => b.id === currentBookId) : undefined;
+      const pct = cb ? bookProgress[cb.id] ?? 0 : 0;
+      const pages = cb ? bookPages[cb.id] ?? 0 : 0;
+      const res = await suggestGoal({
+        avgMinPerDay: derived.avgMinPerDay,
+        streak: derived.streak,
+        activeDays: derived.activeDays,
+        totalMinutes: Math.round(derived.totalSeconds / 60),
+        booksCount: booksList.length,
+        currentBook: cb
+          ? {
+              id: cb.id,
+              title: cb.title ?? cb.name,
+              pct,
+              pages,
+              pagesLeft: pages > 0 ? Math.ceil(pages * (1 - pct)) : 0,
+            }
+          : undefined,
+      });
+      if (!res.ok) {
+        if (res.needsKey) {
+          Alert.alert('IA não configurada', 'Configure sua chave em Perfil → Integrações para usar sugestões.');
+        } else {
+          Alert.alert('Não consegui sugerir', res.error);
+        }
+        return;
+      }
+      // Pré-preenche o modal "Nova meta" com a sugestão (o usuário revisa e cria).
+      const s = res.data;
+      setKind(s.kind);
+      setTarget(s.kind === 'livro' ? '' : String(s.target));
+      setDays(WINDOWS.includes(s.days) ? s.days : nearestWindow(s.days));
+      setBookId(s.bookId ?? null);
+      setAiRationale(s.rationale);
+      setShowNew(true);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  // --- Lembrete de leitura (notificação local diária — §1b) ---
+  async function applyReminder(next: ReminderConfig) {
+    if (next.enabled) {
+      // Com IA (BYOK), personaliza o texto pelo ritmo/meta; senão, texto fixo no serviço.
+      let body: string | undefined;
+      if (hasKey) {
+        const g = active[0] ? deriveGoal(active[0], stats, bookFor(active[0])) : null;
+        const summary = [
+          `Média: ${derived.avgMinPerDay} min/dia`,
+          `Sequência: ${derived.streak} dia(s)`,
+          g && !g.expired
+            ? `Meta ativa "${active[0].title}": faltam ${g.remaining} ${g.unit} (${g.perDay} ${g.unit}/dia, ${g.daysLeft} dia(s))`
+            : 'Sem meta ativa no momento',
+        ].join('. ');
+        body = (await reminderText(summary)) ?? undefined;
+      }
+      const ok = await scheduleDailyReminder(next.hour, next.minute, body);
+      if (!ok) {
+        Alert.alert(
+          'Permissão necessária',
+          remindersUnsupported
+            ? 'Lembretes precisam do app instalado (dev build), não funcionam no Expo Go.'
+            : 'Ative as notificações do +leitura nas configurações do aparelho para receber lembretes.',
+        );
+        setReminder({ ...next, enabled: false });
+        return;
+      }
+    } else {
+      await cancelDailyReminder();
+    }
+    setReminder(next);
+  }
+
+  const toggleReminder = (enabled: boolean) => applyReminder({ ...reminder, enabled });
+  const pickTime = (h: number, m: number) =>
+    applyReminder({ ...reminder, hour: h, minute: m, enabled: true });
 
   function create() {
     let goal: Goal;
@@ -105,6 +216,7 @@ export default function GoalsScreen() {
     setBookId(null);
     setKind('minutos');
     setDays(7);
+    setAiRationale('');
     setShowNew(false);
   }
 
@@ -116,10 +228,29 @@ export default function GoalsScreen() {
 
       <View style={styles.titleRow}>
         <Text style={[styles.title, { color: c.text }]}>Metas</Text>
-        <Pressable onPress={() => setShowNew(true)} style={[styles.newBtn, { backgroundColor: c.green }]}>
+        <Pressable
+          onPress={() => {
+            setAiRationale('');
+            setShowNew(true);
+          }}
+          style={[styles.newBtn, { backgroundColor: c.green }]}>
           <Text style={[styles.newBtnText, { color: c.onGreen }]}>+ Nova meta</Text>
         </Pressable>
       </View>
+
+      {/* Sugestão por IA (BYOK) — só aparece com chave configurada (§1b) */}
+      {hasKey ? (
+        <Pressable
+          onPress={onSuggest}
+          disabled={suggesting}
+          style={[styles.suggestBtn, { borderColor: c.purple, opacity: suggesting ? 0.7 : 1 }]}>
+          {suggesting ? (
+            <ActivityIndicator size="small" color={c.purple} />
+          ) : (
+            <Text style={[styles.suggestText, { color: c.purple }]}>✨ Sugerir meta (IA)</Text>
+          )}
+        </Pressable>
+      ) : null}
 
       {/* Metas ativas */}
       {active.length === 0 ? (
@@ -169,6 +300,49 @@ export default function GoalsScreen() {
           );
         })
       )}
+
+      {/* Lembrete de leitura (notificação local diária — §1b) */}
+      <Card style={styles.reminder}>
+        <View style={styles.remHead}>
+          <View style={styles.flex}>
+            <Text style={[styles.remTitle, { color: c.text }]}>🔔 Lembrete de leitura</Text>
+            <Text style={[styles.remSub, { color: c.textFaint }]}>
+              {reminder.enabled
+                ? `Todo dia às ${fmtTime(reminder.hour, reminder.minute)}`
+                : 'Receba um aviso diário para manter o ritmo'}
+            </Text>
+          </View>
+          <Switch
+            value={reminder.enabled}
+            onValueChange={toggleReminder}
+            trackColor={{ true: c.green, false: c.border }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        {reminder.enabled ? (
+          <View style={styles.timeRow}>
+            {REMINDER_TIMES.map((t) => {
+              const sel = reminder.hour === t.h && reminder.minute === t.m;
+              return (
+                <Pressable
+                  key={`${t.h}:${t.m}`}
+                  onPress={() => pickTime(t.h, t.m)}
+                  style={[styles.timeChip, { borderColor: sel ? c.green : c.border, backgroundColor: sel ? c.green : 'transparent' }]}>
+                  <Text style={[styles.timeLabel, { color: sel ? c.onGreen : c.text }]}>{t.label}</Text>
+                  <Text style={[styles.timeClock, { color: sel ? c.onGreen : c.textFaint }]}>{fmtTime(t.h, t.m)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {remindersUnsupported ? (
+          <Text style={[styles.remNote, { color: c.textFaint }]}>
+            No Expo Go os lembretes não disparam — teste no app instalado (dev build).
+          </Text>
+        ) : null}
+      </Card>
 
       {/* Concluídas (conquistas personalizadas) */}
       {completed.length > 0 ? (
@@ -226,6 +400,12 @@ export default function GoalsScreen() {
         <Pressable style={styles.backdrop} onPress={() => setShowNew(false)}>
           <Pressable style={[styles.sheet, { backgroundColor: c.card, borderColor: c.border }]} onPress={() => {}}>
             <Text style={[styles.sheetTitle, { color: c.text }]}>Nova meta</Text>
+
+            {aiRationale ? (
+              <View style={[styles.aiTip, { backgroundColor: c.cardElevated, borderColor: c.purple }]}>
+                <Text style={[styles.aiTipText, { color: c.text }]}>✨ {aiRationale}</Text>
+              </View>
+            ) : null}
 
             <Text style={[styles.label, { color: c.textDim }]}>Tipo</Text>
             <View style={[styles.segment, { borderColor: c.border }]}>
@@ -309,6 +489,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800' },
   newBtn: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
   newBtnText: { fontSize: 14, fontWeight: '800' },
+  suggestBtn: { marginTop: 12, borderWidth: 1, borderRadius: 999, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', minHeight: 42 },
+  suggestText: { fontSize: 14, fontWeight: '800' },
+  aiTip: { marginTop: 14, borderWidth: 1, borderRadius: 12, padding: 12 },
+  aiTipText: { fontSize: 13, lineHeight: 19, fontWeight: '600' },
   emptyTitle: { fontSize: 16, fontWeight: '700' },
   emptySub: { fontSize: 13, marginTop: 4, lineHeight: 19 },
   goal: { marginTop: 12 },
@@ -318,6 +502,15 @@ const styles = StyleSheet.create({
   track: { height: 9, borderRadius: 5, marginTop: 12, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 5 },
   goalStats: { fontSize: 14, fontWeight: '700', marginTop: 10 },
+  reminder: { marginTop: 14 },
+  remHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  remTitle: { fontSize: 16, fontWeight: '800' },
+  remSub: { fontSize: 12, marginTop: 3 },
+  timeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+  timeChip: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center' },
+  timeLabel: { fontSize: 13, fontWeight: '700' },
+  timeClock: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+  remNote: { fontSize: 11, marginTop: 12, lineHeight: 16 },
   medal: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   medalIcon: { fontSize: 30 },
   medalTitle: { fontSize: 15, fontWeight: '800' },

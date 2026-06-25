@@ -39,6 +39,11 @@ com a matemática local (já é assim). Com chave:
 - **Gate:** tudo isso atrás de `useAI.hasKey` (configurado em Perfil → Integrações). Notificação local NÃO
   exige IA, mas a personalização do texto/horário sim. `expo-notifications` é módulo nativo → ok no dev
   build (já temos); no Expo Go tem limitações — confirmar.
+- **STATUS (2026-06-22): §1b FEITO** (falta teste do usuário). Incremento 1 = lembrete local diário
+  (`expo-notifications`, `src/services/reminders.ts`, card na tela Metas, sem IA). Incremento 2 = IA opcional
+  (`src/services/ai/goal-coach.ts`): botão "✨ Sugerir meta (IA)" pré-preenche a meta + justificativa, e o
+  texto do lembrete vira personalizado pelo ritmo quando há chave. ⚠️ exige `npx expo run:android` (módulo
+  nativo novo). Detalhes em `docs/MEMORIA-PROJETO.md`.
 
 ---
 

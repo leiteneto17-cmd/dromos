@@ -4,7 +4,11 @@ import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useUI } from '@/hooks/use-ui';
+import { setupNotificationHandler } from '@/services/reminders';
 import { useAuth } from '@/store/auth';
+
+// Mostra os lembretes de leitura mesmo com o app aberto (no-op no Expo Go).
+setupNotificationHandler();
 
 /**
  * Pilha raiz com LOGIN OBRIGATÓRIO (decisão do usuário 2026-06-21 — reverte o

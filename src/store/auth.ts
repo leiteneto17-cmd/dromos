@@ -85,6 +85,20 @@ export async function signOut(): Promise<void> {
   await supabase?.auth.signOut();
 }
 
+/**
+ * Exclui PERMANENTEMENTE a conta do usuário (obrigatório nas lojas — Apple
+ * Guideline 5.1.1(v) + Google). Chama a função `delete_current_user` no Supabase
+ * (apaga de auth.users; o cascade remove perfil, atividades, estante, follows,
+ * resenhas, recados, etc.) e então desloga. Irreversível.
+ */
+export async function deleteAccount(): Promise<AuthResult> {
+  if (!supabase) return { ok: false, error: 'Supabase não configurado.' };
+  const { error } = await supabase.rpc('delete_current_user');
+  if (error) return { ok: false, error: traduzErro(error.message) };
+  await supabase.auth.signOut(); // limpa a sessão local; o guard leva ao /login
+  return { ok: true };
+}
+
 /** Mensagens de erro mais comuns do Supabase Auth em PT-BR. */
 function traduzErro(msg: string): string {
   const m = msg.toLowerCase();

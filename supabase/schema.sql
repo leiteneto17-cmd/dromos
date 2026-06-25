@@ -546,3 +546,24 @@ create policy "enviar recado" on public.scraps for insert to authenticated
 drop policy if exists "apagar recado" on public.scraps;
 create policy "apagar recado" on public.scraps for delete to authenticated
   using (auth.uid() = author_id or auth.uid() = recipient_id);
+
+-- =====================================================================
+-- EXCLUSÃO DE CONTA (obrigatório p/ loja — Apple Guideline 5.1.1(v) + Google).
+-- O usuário apaga a PRÓPRIA conta de dentro do app. Deleta de auth.users; o
+-- `on delete cascade` em TODAS as tabelas (profiles, reading_activities, estante,
+-- follows, blocks, reports, kudos, resenhas, scraps...) remove o resto. É
+-- `security definer` p/ poder mexer em auth.users (roda como o dono = postgres).
+-- =====================================================================
+create or replace function public.delete_current_user()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from auth.users where id = auth.uid();
+end; $$;
+
+-- Só um usuário autenticado pode apagar a própria conta (anon não).
+revoke all on function public.delete_current_user() from public, anon;
+grant execute on function public.delete_current_user() to authenticated;
