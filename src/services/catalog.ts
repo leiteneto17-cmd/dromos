@@ -44,10 +44,14 @@ export const SOURCES: { id: CatalogSource; label: string; note?: string }[] = [
 export const QUICK_SEARCHES: { label: string; query: string }[] = [
   { label: 'Machado de Assis', query: 'Machado de Assis' },
   { label: 'Eça de Queirós', query: 'Eça de Queirós' },
+  { label: 'José de Alencar', query: 'Alencar' },
+  { label: 'Lima Barreto', query: 'Lima Barreto' },
   { label: 'Aventura', query: 'adventure' },
   { label: 'Romance', query: 'romance' },
   { label: 'Ficção científica', query: 'science fiction' },
+  { label: 'Terror', query: 'horror' },
   { label: 'Poesia', query: 'poetry' },
+  { label: 'Contos', query: 'short stories' },
 ];
 
 // ----------------- Project Gutenberg (Gutendex) -----------------
@@ -70,6 +74,7 @@ function pickEpub(formats: Record<string, string>): string | null {
 async function searchGutenberg(query: string, lang: CatalogLang, page: number): Promise<CatalogPage> {
   const params = new URLSearchParams();
   if (query.trim()) params.set('search', query.trim());
+  else params.set('sort', 'popular'); // navegação (sem busca) = os mais lidos primeiro
   if (lang !== 'all') params.set('languages', lang);
   params.set('page', String(page));
 

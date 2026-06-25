@@ -120,7 +120,8 @@ export default function ExplorarScreen() {
 
       <Text style={[styles.title, { color: c.text }]}>Explorar</Text>
       <Text style={[styles.subtitle, { color: c.textFaint }]}>
-        Livros gratuitos para baixar e ler. Escolha a fonte do acervo.
+        Clássicos populares para baixar e ler de graça (domínio público). Busque um título ou
+        explore os mais lidos.
       </Text>
 
       {/* Fonte do acervo (só aparece quando há mais de uma) */}
@@ -215,6 +216,13 @@ export default function ExplorarScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            results.length > 0 ? (
+              <Text style={[styles.sectionLabel, { color: c.purple }]}>
+                {query.trim() ? '🔎 Resultados' : '🔥 Populares'}
+              </Text>
+            ) : null
+          }
           renderItem={({ item }) => {
             const busy = downloadingId === item.id;
             return (
@@ -276,6 +284,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   errorText: { fontSize: 15, lineHeight: 22, textAlign: 'center', paddingHorizontal: 20 },
   list: { gap: 12, paddingTop: 8, paddingBottom: 24 },
+  sectionLabel: { fontSize: 16, fontWeight: '800', letterSpacing: 0.3, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   cover: { width: 46, height: 64, borderRadius: 6 },
   coverPlaceholder: { borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
