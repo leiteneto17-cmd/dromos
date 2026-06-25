@@ -36,6 +36,27 @@ async function uid(): Promise<string | null> {
   return session?.user.id ?? null;
 }
 
+/**
+ * Busca leitores por nome para seguir (aba Comunidade). Só retorna perfis PÚBLICOS
+ * (§4.8: privado por padrão não aparece em buscas) e nunca você mesmo.
+ */
+export async function searchUsers(query: string): Promise<PublicProfile[]> {
+  if (!supabase) return [];
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const me = await uid();
+  // ilike = case-insensitive; escapamos % e _ para não virarem curingas.
+  const safe = q.replace(/[%_]/g, '\\$&');
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, name, avatar_url, is_public')
+    .eq('is_public', true)
+    .ilike('name', `%${safe}%`)
+    .limit(20);
+  if (error || !data) return [];
+  return (data as PublicProfile[]).filter((p) => p.id !== me && (p.name ?? '').trim().length > 0);
+}
+
 /** Dados públicos de um perfil (qualquer autenticado pode ler profiles). */
 export async function getUserProfile(userId: string): Promise<PublicProfile | null> {
   if (!supabase) return null;

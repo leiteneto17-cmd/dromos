@@ -24,7 +24,10 @@ import {
   type PopularBook,
   type ShelfItem,
 } from '@/services/community';
+import { searchUsers, type PublicProfile } from '@/services/social';
 import { useAuth } from '@/store/auth';
+
+type SearchMode = 'books' | 'people';
 
 type CoverSize = 'sm' | 'grid';
 
@@ -44,8 +47,10 @@ export default function CommunityScreen() {
   const configured = useAuth((s) => s.configured);
   const user = useAuth((s) => s.user);
 
+  const [mode, setMode] = useState<SearchMode>('books');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CatalogBook[]>([]);
+  const [people, setPeople] = useState<PublicProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [lang, setLang] = useState<LangFilter>('pt');
@@ -75,10 +80,12 @@ export default function CommunityScreen() {
   const shelfByKey = new Map(shelf.map((s) => [s.book_key, s] as const));
 
   // Busca AO VIVO (debounce 450ms, mín. 2 letras) com cancelamento da anterior.
+  // Atende os dois modos: livros (catálogo) e pessoas (perfis públicos).
   useEffect(() => {
     const q = query.trim();
     if (q.length < 2) {
       setResults([]);
+      setPeople([]);
       setSearched(false);
       setSearching(false);
       return;
@@ -87,10 +94,18 @@ export default function CommunityScreen() {
     setSearching(true);
     const t = setTimeout(async () => {
       try {
-        const r = await searchBooks(q, lang, ctrl.signal);
-        if (!ctrl.signal.aborted) {
-          setResults(r);
-          setSearched(true);
+        if (mode === 'people') {
+          const r = await searchUsers(q);
+          if (!ctrl.signal.aborted) {
+            setPeople(r);
+            setSearched(true);
+          }
+        } else {
+          const r = await searchBooks(q, lang, ctrl.signal);
+          if (!ctrl.signal.aborted) {
+            setResults(r);
+            setSearched(true);
+          }
         }
       } finally {
         if (!ctrl.signal.aborted) setSearching(false);
@@ -100,12 +115,26 @@ export default function CommunityScreen() {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [query, lang]);
+  }, [query, lang, mode]);
 
   const clearSearch = useCallback(() => {
     setResults([]);
+    setPeople([]);
     setQuery('');
     setSearched(false);
+  }, []);
+
+  // Trocar de modo limpa a busca atual (livros e pessoas têm resultados diferentes).
+  const switchMode = useCallback(
+    (m: SearchMode) => {
+      setMode(m);
+      clearSearch();
+    },
+    [clearSearch],
+  );
+
+  const openUser = useCallback((p: PublicProfile) => {
+    router.push({ pathname: '/usuario', params: { id: p.id, name: p.name ?? '' } });
   }, []);
 
   // Abre a página do livro. Da busca/Em alta passa o livro inteiro (JSON) p/ não re-buscar.
@@ -145,14 +174,35 @@ export default function CommunityScreen() {
         </Card>
       ) : (
         <>
-          {/* Busca no catálogo (descoberta liberada p/ todos) */}
+          {/* Seletor: buscar livros (catálogo) ou pessoas (leitores p/ seguir) */}
+          <View style={styles.modeRow}>
+            {([
+              ['books', '📚 Livros'],
+              ['people', '👥 Pessoas'],
+            ] as const).map(([m, label]) => {
+              const active = mode === m;
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => switchMode(m)}
+                  style={[
+                    styles.modeChip,
+                    { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' },
+                  ]}>
+                  <Text style={[styles.modeText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Campo de busca (livros no catálogo / pessoas por nome) */}
           <View style={styles.searchRow}>
             <View style={[styles.inputWrap, { backgroundColor: c.card, borderColor: c.border }]}>
               <TextInput
                 value={query}
                 onChangeText={setQuery}
                 onSubmitEditing={() => Keyboard.dismiss()}
-                placeholder="Buscar livro ou autor…"
+                placeholder={mode === 'people' ? 'Buscar leitor pelo nome…' : 'Buscar livro ou autor…'}
                 placeholderTextColor={c.textFaint}
                 returnKeyType="search"
                 style={[styles.input, { color: c.text }]}
@@ -172,68 +222,128 @@ export default function CommunityScreen() {
             </Pressable>
           </View>
 
-          {/* Idioma (regionalização) */}
-          <View style={styles.langRow}>
-            {([
-              ['pt', '🇧🇷 Português'],
-              ['en', '🇺🇸 Inglês'],
-              ['all', '🌐 Todos'],
-            ] as const).map(([l, label]) => {
-              const active = lang === l;
-              return (
-                <Pressable
-                  key={l}
-                  onPress={() => setLang(l)}
-                  style={[styles.langChip, { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' }]}>
-                  <Text style={[styles.langText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {/* Idioma (regionalização) — só faz sentido na busca de livros */}
+          {mode === 'books' ? (
+            <View style={styles.langRow}>
+              {([
+                ['pt', '🇧🇷 Português'],
+                ['en', '🇺🇸 Inglês'],
+                ['all', '🌐 Todos'],
+              ] as const).map(([l, label]) => {
+                const active = lang === l;
+                return (
+                  <Pressable
+                    key={l}
+                    onPress={() => setLang(l)}
+                    style={[styles.langChip, { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' }]}>
+                    <Text style={[styles.langText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
 
           {query.trim().length >= 2 ? (
-            /* ---- Modo de busca (resultados ao vivo) ---- */
+            /* ---- Modo de busca (resultados ao vivo: livros ou pessoas) ---- */
             <>
               <View style={styles.resultsHead}>
-                <Text style={[styles.resultsTitle, { color: c.purple }]}>🔎 Resultados</Text>
+                <Text style={[styles.resultsTitle, { color: c.purple }]}>
+                  {mode === 'people' ? '🔎 Pessoas' : '🔎 Resultados'}
+                </Text>
                 <Pressable onPress={clearSearch} hitSlop={8}>
                   <Text style={[styles.clearLink, { color: c.green }]}>‹ Voltar</Text>
                 </Pressable>
               </View>
-              {searching && results.length === 0 ? (
-                <ActivityIndicator color={c.green} style={{ marginTop: 24 }} />
-              ) : results.length === 0 && searched ? (
-                <Text style={[styles.hint, { color: c.textFaint, marginTop: 8 }]}>
-                  Nenhum resultado para “{query.trim()}”. Tente outro termo ou troque o idioma para 🌐 Todos.
-                </Text>
-              ) : null}
-              {results.map((b) => {
-                const mine = shelfByKey.get(bookKeyOf(b.title));
-                return (
-                  <Pressable key={`${b.source}-${b.id}`} onPress={() => openCatalog(b)}>
-                    <Card style={styles.row}>
-                      <Cover uri={b.coverUrl} />
-                      <View style={styles.rowBody}>
-                        <Text style={[styles.bookTitle, { color: c.text }]} numberOfLines={2}>
-                          {b.title}
-                        </Text>
-                        {b.author ? (
-                          <Text style={[styles.author, { color: c.textFaint }]} numberOfLines={1}>
-                            {b.author}
-                            {b.year ? ` · ${b.year}` : ''}
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Text style={[styles.addChip, { color: mine ? c.green : c.purple }]}>
-                        {mine ? SHELF_LABEL[mine.status] + ' ✓' : '+ Estante'}
+
+              {mode === 'people' && !user ? (
+                <Pressable onPress={() => router.navigate('/login')}>
+                  <Card style={styles.acctRow}>
+                    <View style={styles.flex}>
+                      <Text style={[styles.noteTitle, { color: c.text }]}>Entrar para buscar leitores</Text>
+                      <Text style={[styles.noteSub, { color: c.textFaint }]}>
+                        Crie sua conta ou entre para encontrar e seguir leitores.
                       </Text>
-                    </Card>
-                  </Pressable>
-                );
-              })}
+                    </View>
+                    <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
+                  </Card>
+                </Pressable>
+              ) : (
+                <>
+                  {searching && (mode === 'people' ? people.length === 0 : results.length === 0) ? (
+                    <ActivityIndicator color={c.green} style={{ marginTop: 24 }} />
+                  ) : (mode === 'people' ? people.length === 0 : results.length === 0) && searched ? (
+                    <Text style={[styles.hint, { color: c.textFaint, marginTop: 8 }]}>
+                      {mode === 'people'
+                        ? `Nenhum leitor público encontrado para “${query.trim()}”. Só quem ativa o perfil público aparece aqui.`
+                        : `Nenhum resultado para “${query.trim()}”. Tente outro termo ou troque o idioma para 🌐 Todos.`}
+                    </Text>
+                  ) : null}
+
+                  {mode === 'people'
+                    ? people.map((p) => (
+                        <Pressable key={p.id} onPress={() => openUser(p)}>
+                          <Card style={styles.row}>
+                            <Text style={styles.personAvatar}>
+                              {p.avatar_url && !p.avatar_url.startsWith('http') ? p.avatar_url : '🦉'}
+                            </Text>
+                            <View style={styles.rowBody}>
+                              <Text style={[styles.bookTitle, { color: c.text }]} numberOfLines={1}>
+                                {p.name?.trim() || 'Leitor'}
+                              </Text>
+                              <Text style={[styles.author, { color: c.textFaint }]}>Perfil público</Text>
+                            </View>
+                            <Text style={[styles.addChip, { color: c.purple }]}>Ver ›</Text>
+                          </Card>
+                        </Pressable>
+                      ))
+                    : results.map((b) => {
+                        const mine = shelfByKey.get(bookKeyOf(b.title));
+                        return (
+                          <Pressable key={`${b.source}-${b.id}`} onPress={() => openCatalog(b)}>
+                            <Card style={styles.row}>
+                              <Cover uri={b.coverUrl} />
+                              <View style={styles.rowBody}>
+                                <Text style={[styles.bookTitle, { color: c.text }]} numberOfLines={2}>
+                                  {b.title}
+                                </Text>
+                                {b.author ? (
+                                  <Text style={[styles.author, { color: c.textFaint }]} numberOfLines={1}>
+                                    {b.author}
+                                    {b.year ? ` · ${b.year}` : ''}
+                                  </Text>
+                                ) : null}
+                              </View>
+                              <Text style={[styles.addChip, { color: mine ? c.green : c.purple }]}>
+                                {mine ? SHELF_LABEL[mine.status] + ' ✓' : '+ Estante'}
+                              </Text>
+                            </Card>
+                          </Pressable>
+                        );
+                      })}
+                </>
+              )}
             </>
+          ) : mode === 'people' ? (
+            /* ---- Pessoas, sem busca: instrução / login ---- */
+            !user ? (
+              <Pressable onPress={() => router.navigate('/login')}>
+                <Card style={[styles.acctRow, { marginTop: 22 }]}>
+                  <View style={styles.flex}>
+                    <Text style={[styles.noteTitle, { color: c.text }]}>Entrar para buscar leitores</Text>
+                    <Text style={[styles.noteSub, { color: c.textFaint }]}>
+                      Crie sua conta ou entre para encontrar e seguir leitores.
+                    </Text>
+                  </View>
+                  <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
+                </Card>
+              </Pressable>
+            ) : (
+              <Text style={[styles.hint, { color: c.textFaint, marginTop: 22 }]}>
+                Digite o nome de um leitor para encontrá-lo e seguir. Só aparecem perfis públicos.
+              </Text>
+            )
           ) : (
-            /* ---- Tela inicial: Em alta + Populares ---- */
+            /* ---- Tela inicial (livros): Em alta + Populares ---- */
             <>
               {featured.length > 0 ? (
                 <>
@@ -311,7 +421,11 @@ const styles = StyleSheet.create({
   noteSub: { fontSize: 13, marginTop: 3 },
   acctRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chev: { fontSize: 22 },
-  searchRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  modeRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  modeChip: { flex: 1, borderWidth: 1, borderRadius: 999, paddingVertical: 9, alignItems: 'center' },
+  modeText: { fontSize: 14, fontWeight: '800' },
+  personAvatar: { fontSize: 30, width: 44, textAlign: 'center' },
+  searchRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14 },
   input: { flex: 1, paddingVertical: 10, fontSize: 15 },
   clearX: { paddingLeft: 8 },

@@ -33,6 +33,7 @@ import {
   saveTtsConfig,
   useAI,
 } from '@/store/ai';
+import { useAuth } from '@/store/auth';
 
 const PROVIDER_IDS: AIProvider[] = ['gemini', 'openai', 'anthropic'];
 
@@ -41,6 +42,10 @@ export default function IntegracoesScreen() {
   const savedProvider = useAI((s) => s.provider);
   const savedModel = useAI((s) => s.model);
   const hasKey = useAI((s) => s.hasKey);
+  const session = useAuth((s) => s.session);
+  // IA grátis/gerida (nossa chave no servidor) fica ativa por padrão para quem está
+  // logado e ainda não trouxe a própria chave (BYOK).
+  const managedOn = !hasKey && !!session;
 
   const [provider, setProvider] = useState<AIProvider>(savedProvider);
   const [model, setModel] = useState(savedModel);
@@ -249,21 +254,24 @@ export default function IntegracoesScreen() {
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text style={[styles.title, { color: c.text }]}>Integrações de IA</Text>
           <Text style={[styles.subtitle, { color: c.textFaint }]}>
-            Use sua própria chave de IA. Ela fica só no seu aparelho (criptografada) e as
-            consultas vão direto para o provedor — quem paga o uso é a sua conta.
+            O dicionário contextual já vem com <Text style={{ fontWeight: '700' }}>IA grátis ativada</Text> para
+            quem está logado. Conecte sua própria chave abaixo só se quiser tirar o limite da versão grátis — a
+            chave fica criptografada no seu aparelho e as consultas vão direto ao provedor.
           </Text>
 
           {/* Estado atual */}
           <View
             style={[
               styles.statusRow,
-              { backgroundColor: c.card, borderColor: hasKey ? c.green : c.border },
+              { backgroundColor: c.card, borderColor: hasKey || managedOn ? c.green : c.border },
             ]}>
-            <Text style={[styles.statusDot, { color: hasKey ? c.green : c.textFaint }]}>●</Text>
+            <Text style={[styles.statusDot, { color: hasKey || managedOn ? c.green : c.textFaint }]}>●</Text>
             <Text style={[styles.statusText, { color: c.text }]}>
               {hasKey
-                ? `Conectado a ${PROVIDERS[savedProvider].label} · ${savedModel}`
-                : 'Nenhuma IA conectada'}
+                ? `Sua chave · ${PROVIDERS[savedProvider].label} · ${savedModel}`
+                : managedOn
+                  ? 'IA grátis ativada (nossa conta) · sem custo para você'
+                  : 'Entre na sua conta para usar a IA grátis'}
             </Text>
           </View>
 
@@ -409,9 +417,11 @@ export default function IntegracoesScreen() {
           <Text style={[styles.sectionSub, { color: c.text, marginTop: 22 }]}>
             🎙️ Voz premium · ElevenLabs
           </Text>
-          <Text style={[styles.note, { color: c.textFaint, textAlign: 'left', marginTop: 0, marginBottom: 4 }]}>
+          <Text style={[styles.note, { color: c.textFaint, textAlign: 'left', marginTop: 0, marginBottom: 10 }]}>
             Quando conectada, tem prioridade na leitura. Free tier ~10 mil caracteres/mês.
           </Text>
+
+          <VozPremiumTutorial />
 
           <View
             style={[
@@ -537,6 +547,58 @@ export default function IntegracoesScreen() {
   );
 }
 
+/** Passo-a-passo recolhível de como ativar a voz premium (ElevenLabs). */
+function VozPremiumTutorial() {
+  const c = useUI();
+  const [open, setOpen] = useState(false);
+  const steps = [
+    'Crie uma conta grátis no ElevenLabs (botão abaixo).',
+    'Confirme seu e-mail e faça login.',
+    'Abra Perfil → API Keys e toque em “Create API Key”.',
+    'Copie a chave gerada (começa com “sk_…”).',
+    'Cole no campo “Chave do ElevenLabs” aqui embaixo.',
+    'Toque em “Validar e buscar vozes”, escolha uma voz e toque em “▶ Testar voz”.',
+  ];
+
+  return (
+    <View style={[styles.tutorialCard, { backgroundColor: c.card, borderColor: c.border }]}>
+      <Pressable onPress={() => setOpen((o) => !o)} style={styles.tutorialHead} hitSlop={6}>
+        <Text style={[styles.tutorialTitle, { color: c.text }]}>📘 Como ativar a voz premium</Text>
+        <Text style={[styles.tutorialChevron, { color: c.purple }]}>{open ? '▾' : '▸'}</Text>
+      </Pressable>
+
+      {open ? (
+        <View style={styles.tutorialBody}>
+          {steps.map((s, i) => (
+            <View key={i} style={styles.tutorialStep}>
+              <Text style={[styles.tutorialNum, { color: c.onGreen, backgroundColor: c.green }]}>{i + 1}</Text>
+              <Text style={[styles.tutorialStepText, { color: c.textDim }]}>{s}</Text>
+            </View>
+          ))}
+
+          <View style={styles.tutorialBtns}>
+            <Pressable
+              onPress={() => openBrowserAsync('https://elevenlabs.io/app/sign-up')}
+              style={[styles.tutorialBtn, { borderColor: c.green }]}>
+              <Text style={{ color: c.green, fontWeight: '700', fontSize: 13 }}>Criar conta grátis ↗</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => openBrowserAsync('https://elevenlabs.io/app/settings/api-keys')}
+              style={[styles.tutorialBtn, { borderColor: c.purple }]}>
+              <Text style={{ color: c.purple, fontWeight: '700', fontSize: 13 }}>Abrir minhas chaves ↗</Text>
+            </Pressable>
+          </View>
+
+          <Text style={[styles.note, { color: c.textFaint, marginTop: 12, textAlign: 'left' }]}>
+            💡 A voz premium tem prioridade na leitura e dá o destaque palavra-a-palavra mais preciso. Quando a
+            cota grátis do mês acabar, o app volta sozinho para a voz grátis do aparelho.
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingHorizontal: 16, paddingVertical: 8 },
@@ -574,4 +636,23 @@ const styles = StyleSheet.create({
   usageFill: { height: '100%', borderRadius: 4 },
   usageReset: { fontSize: 12, marginTop: 8 },
   note: { fontSize: 12, lineHeight: 18, marginTop: 24, textAlign: 'center' },
+  tutorialCard: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 6 },
+  tutorialHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tutorialTitle: { fontSize: 15, fontWeight: '800' },
+  tutorialChevron: { fontSize: 16, fontWeight: '800' },
+  tutorialBody: { marginTop: 12, gap: 10 },
+  tutorialStep: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  tutorialNum: {
+    fontSize: 12,
+    fontWeight: '800',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    textAlign: 'center',
+    lineHeight: 22,
+    overflow: 'hidden',
+  },
+  tutorialStepText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  tutorialBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  tutorialBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
 });

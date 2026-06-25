@@ -226,6 +226,21 @@ APIs de TTS e LLM **cobram por caractere/token**. Isso define o modelo de negóc
     regerar e não gastar a chave do usuário à toa).
   - **Segurança:** nunca logar a chave; nunca sincronizá-la pro Supabase; usar `expo-secure-store`
     (Keychain iOS / Keystore Android). Validar a chave com uma chamada barata antes de salvar.
+- **DECISÃO (do usuário, 2026-06-25) — IA GRÁTIS PADRÃO via proxy (nossa chave Gemini no servidor):**
+  além do BYOK, o dicionário contextual agora vem **ligado por padrão** para quem está logado, usando
+  **a nossa chave do Gemini guardada numa Supabase Edge Function** (`supabase/functions/ai-proxy`), nunca
+  embutida no app (§8). O app chama via `supabase.functions.invoke('ai-proxy')` (só logado — `verify_jwt`).
+  - **Ordem de uso:** se o usuário trouxe a chave dele (BYOK) → fala direto com o provedor; senão, e se
+    logado → IA grátis/gerida pelo proxy; senão → pede login ou chave. Ver `src/services/ai/dictionary.ts`
+    e `src/services/ai/managed.ts`.
+  - **Limite:** a cota grátis do Gemini é **uma só para todos** → boa para começar/beta; estourou (429) o
+    app sugere BYOK ou premium. Dá para impor limite por usuário dentro da própria Edge Function (TODO).
+  - **Não invalida o BYOK nem o offline:** quem traz a própria chave continua sem backend. O proxy é só o
+    "padrão grátis" para reduzir atrito. Atualiza o "Supabase deixa de ser necessário para a IA" acima:
+    continua verdade para BYOK, mas a IA grátis padrão **passa a usar** uma Edge Function.
+- **Dicionário básico (botão "Significado") agora é em PORTUGUÊS** (Wiktionary PT, cai p/ EN) —
+  `src/services/dictionary-basic.ts`. Antes era só inglês (`api.dictionaryapi.dev/.../en`), por isso
+  "palavra brasileira não era encontrada". O significado rico/contextual continua sendo o "✨ Explicar (IA)".
 
 ---
 

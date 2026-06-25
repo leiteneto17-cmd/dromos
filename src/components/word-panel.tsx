@@ -1,9 +1,9 @@
 /**
  * Painel que aparece ao tocar numa palavra durante a leitura (CLAUDE.md §2.2/§2.3).
  * - "Marcar"/"Marcada" → alterna a palavra no banco de vocabulário (persistido).
- * - "Significado" → busca básica (dicionário em inglês, sem chave).
- * - "✨ Explicar (IA)" → dicionário CONTEXTUAL em PT-BR (Fase 2), usando a chave
- *   do próprio usuário (BYOK) — significado no contexto + sinônimos/antônimos + 3 frases.
+ * - "Significado" → busca básica grátis no dicionário em PORTUGUÊS (cai p/ inglês).
+ * - "✨ Explicar (IA)" → dicionário CONTEXTUAL em PT-BR (Fase 2): com a chave do
+ *   usuário (BYOK) ou a IA grátis/gerida — significado no contexto + sinônimos/exemplos.
  *
  * O painel lê o vocabulário direto da store, então o estado "Marcada" atualiza
  * sozinho ao marcar/desmarcar.
@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { contextualLookup, type ContextualMeaning } from '@/services/ai/dictionary';
+import { basicDefinitions } from '@/services/dictionary-basic';
 import { useLibrary } from '@/store/library';
 import type { ReadingPalette } from '@/theme/reading';
 
@@ -56,29 +57,16 @@ export function WordPanel({ word, context, bookId, bookName, t, onClose, onListe
     setError(null);
     setDefs(null);
     try {
-      const res = await fetch(
-        'https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word.toLowerCase()),
-      );
-      if (!res.ok) throw new Error('not found');
-      const data = await res.json();
-      const out: string[] = [];
-      for (const entry of data ?? []) {
-        for (const m of entry.meanings ?? []) {
-          for (const d of m.definitions ?? []) {
-            if (d.definition) {
-              out.push((m.partOfSpeech ? `(${m.partOfSpeech}) ` : '') + d.definition);
-            }
-            if (out.length >= 3) break;
-          }
-          if (out.length >= 3) break;
-        }
-        if (out.length >= 3) break;
+      const res = await basicDefinitions(word);
+      if (res.ok) {
+        setDefs(res.defs);
+      } else {
+        setError(
+          'Definição não encontrada no dicionário (pode ser uma forma flexionada). Use “✨ Explicar no contexto (IA)” para o significado em PT-BR.',
+        );
       }
-      setDefs(out);
     } catch {
-      setError(
-        'Definição não encontrada. O dicionário automático é em inglês; use “✨ Explicar (IA)” para o significado contextual em PT-BR.',
-      );
+      setError('Não foi possível buscar agora. Verifique a conexão e tente de novo.');
     } finally {
       setLoading(false);
     }
