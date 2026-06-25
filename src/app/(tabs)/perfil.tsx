@@ -14,6 +14,7 @@ import { ProfileHeader } from '@/components/profile-header';
 import { SettingsSheet } from '@/components/settings-sheet';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { StatsCard } from '@/components/stats-card';
+import { Fonts } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import { computeAchievements, deriveStats } from '@/services/progress';
 import { approveRequest, getFollowRequests, rejectRequest, type FollowRequest } from '@/services/social';
@@ -62,6 +63,7 @@ export default function ProfileScreen() {
         <View style={styles.topBar}>
           <Pressable onPress={() => setShowSettings(true)} hitSlop={10} style={styles.gearBtn}>
             <Text style={styles.gear}>⚙️</Text>
+            <Text style={[styles.gearLabel, { color: c.textDim }]}>Configurações</Text>
           </Pressable>
         </View>
       ) : null}
@@ -241,8 +243,10 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   topBar: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 2 },
-  gearBtn: { padding: 4 },
-  gear: { fontSize: 22 },
+  gearBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 4 },
+  gear: { fontSize: 20 },
+  // Rótulo em fonte monoespaçada ("máquina de escrever") para deixar claro o que o ⚙️ abre.
+  gearLabel: { fontFamily: Fonts?.mono, fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardTitle: { fontSize: 16, fontWeight: '700' },
   cardSub: { fontSize: 13, marginTop: 3 },

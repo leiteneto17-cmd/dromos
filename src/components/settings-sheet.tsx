@@ -12,6 +12,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Swi
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Card, SectionTitle } from '@/components/social-ui';
+import { Fonts } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import { PROVIDERS } from '@/services/ai/providers';
 import { useAI } from '@/store/ai';
@@ -209,7 +210,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 },
-  title: { fontSize: 24, fontWeight: '800' },
+  title: { fontSize: 24, fontWeight: '800', fontFamily: Fonts?.mono, letterSpacing: 0.5 },
   close: { fontSize: 15, fontWeight: '700' },
   body: { paddingHorizontal: 16, paddingBottom: 48 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
