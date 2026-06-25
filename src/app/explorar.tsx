@@ -92,8 +92,19 @@ export default function ExplorarScreen() {
     try {
       const url = await resolveEpubUrl(book);
       if (!url) throw new Error('EPUB indisponível para este título.');
-      const dest = new File(Paths.document, `book-${Date.now()}.epub`);
-      const f = await File.downloadFileAsync(url, dest);
+      // O servidor do Project Gutenberg às vezes responde devagar (timeout de leitura).
+      // Tentamos até 2 vezes antes de desistir.
+      let f: File | null = null;
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < 2 && !f; attempt++) {
+        try {
+          const dest = new File(Paths.document, `book-${Date.now()}-${attempt}.epub`);
+          f = await File.downloadFileAsync(url, dest);
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!f) throw lastErr ?? new Error('Falha no download.');
       const imported: ImportedBook = {
         id: `${Date.now()}`,
         name: book.title,
@@ -108,7 +119,11 @@ export default function ExplorarScreen() {
       router.navigate('/reader');
     } catch (e) {
       setDownloadingId(null);
-      Alert.alert('Falha no download', e instanceof Error ? e.message : 'Tente novamente.');
+      const msg = e instanceof Error ? e.message : '';
+      const friendly = /tim(e|ed)\s*out|timeout/i.test(msg)
+        ? 'A conexão com o acervo ficou lenta e o download expirou. Tente de novo — o servidor do Project Gutenberg às vezes oscila.'
+        : msg || 'Tente novamente.';
+      Alert.alert('Falha no download', friendly);
     }
   }
 

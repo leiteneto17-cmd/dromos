@@ -4,8 +4,9 @@
  * Base neutra (60-30-10) com roxo+verde só como acento (CLAUDE.md §2.7).
  * Abrir um livro empurra o leitor (/reader) por cima das abas.
  */
+import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { MyShelf } from '@/components/my-shelf';
 import { ProfileHeader } from '@/components/profile-header';
@@ -48,6 +49,26 @@ export default function HubScreen() {
   function continueReading() {
     if (current) openBook(current.id);
     router.navigate('/reader');
+  }
+
+  // Exporta (compartilha) o arquivo do livro atual via share sheet do sistema.
+  async function exportCurrent() {
+    if (!current) {
+      Alert.alert('Nada para exportar', 'Importe ou abra um livro primeiro.');
+      return;
+    }
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Indisponível', 'Compartilhamento não está disponível neste aparelho.');
+        return;
+      }
+      await Sharing.shareAsync(current.uri, {
+        dialogTitle: `Exportar "${current.title ?? current.name}"`,
+        mimeType: current.format === 'pdf' ? 'application/pdf' : 'application/epub+zip',
+      });
+    } catch (e) {
+      Alert.alert('Falha ao exportar', e instanceof Error ? e.message : 'Tente novamente.');
+    }
   }
 
   return (
@@ -119,14 +140,20 @@ export default function HubScreen() {
               </Text>
             </Pressable>
           ))}
-          <Pressable
-            onPress={() => importBookFlow(addBook, () => router.navigate('/reader'))}
-            style={styles.tileWrap}>
-            <View style={[styles.tile, styles.tileAdd, { backgroundColor: c.cardElevated, borderColor: c.border }]}>
-              <Text style={[styles.tileAddPlus, { color: c.green }]}>+</Text>
-            </View>
-            <Text style={[styles.tileCaption, { color: c.textFaint }]}>Importar</Text>
-          </Pressable>
+          <View style={styles.tileStack}>
+            <Pressable
+              onPress={() => importBookFlow(addBook, () => router.navigate('/reader'))}
+              style={[styles.tileHalf, { backgroundColor: c.cardElevated, borderColor: c.border }]}>
+              <Text style={[styles.tileHalfIcon, { color: c.green }]}>＋</Text>
+              <Text style={[styles.tileHalfLabel, { color: c.green }]}>Importar</Text>
+            </Pressable>
+            <Pressable
+              onPress={exportCurrent}
+              style={[styles.tileHalf, { backgroundColor: c.cardElevated, borderColor: c.border }]}>
+              <Text style={[styles.tileHalfIcon, { color: c.purple }]}>↑</Text>
+              <Text style={[styles.tileHalfLabel, { color: c.purple }]}>Exportar</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       )}
 
@@ -186,6 +213,19 @@ const styles = StyleSheet.create({
   tileCaption: { fontSize: 12, marginTop: 6 },
   tileAdd: { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed' },
   tileAddPlus: { fontSize: 40, fontWeight: '300' },
+  // Coluna com dois meios-tiles (Importar em cima, Exportar embaixo) no lugar de 1 tile.
+  tileStack: { width: 110, height: 156, justifyContent: 'space-between' },
+  tileHalf: {
+    width: 110,
+    height: 73,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileHalfIcon: { fontSize: 22, fontWeight: '300' },
+  tileHalfLabel: { fontSize: 12, fontWeight: '700', marginTop: 2 },
   weekTotal: { fontSize: 30, fontWeight: '800' },
   weekUnit: { fontSize: 16, fontWeight: '400' },
   weekLabel: { fontSize: 13, fontWeight: '400' },
