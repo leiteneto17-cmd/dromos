@@ -24,6 +24,7 @@ export default function HubScreen() {
   const books = useLibrary((s) => s.books);
   const vocab = useLibrary((s) => s.vocab);
   const stats = useLibrary((s) => s.stats);
+  const progress = useLibrary((s) => s.progress);
   const currentBookId = useLibrary((s) => s.currentBookId);
   const openBook = useLibrary((s) => s.openBook);
   const addBook = useLibrary((s) => s.addBook);
@@ -38,6 +39,7 @@ export default function HubScreen() {
   });
 
   const current = books.find((b) => b.id === currentBookId) ?? books[0] ?? null;
+  const pct = current ? Math.round((progress[current.id] ?? 0) * 100) : 0;
   const weekMinutes = derived.last7.reduce((a, day) => a + day.minutes, 0);
 
   function open(book: ImportedBook) {
@@ -59,31 +61,32 @@ export default function HubScreen() {
         achievements={achievements}
       />
 
-      {/* Continuar lendo */}
+      {/* Lendo agora — card "hero" roxo no estilo da referência (LIBRA / Strava) */}
       <SectionTitle icon="📖">Continuar lendo</SectionTitle>
-      <Card glow>
-        {current ? (
-          <>
-            <Text style={[styles.kicker, { color: c.purple }]}>{current.format.toUpperCase()}</Text>
-            <Text style={[styles.bookTitle, { color: c.text }]} numberOfLines={2}>
-              {current.title ?? current.name}
+      <Pressable onPress={continueReading}>
+        <View style={styles.hero}>
+          <View style={styles.heroCover}>
+            <Text style={styles.heroCoverText}>{current ? current.format.toUpperCase() : 'LER'}</Text>
+            <Text style={styles.heroCoverIcon}>📖</Text>
+          </View>
+          <View style={styles.heroBody}>
+            <Text style={styles.heroKicker}>Lendo agora</Text>
+            <Text style={styles.heroTitle} numberOfLines={2}>
+              {current ? current.title ?? current.name : 'Dom Casmurro'}
             </Text>
-            <Text style={[styles.bookSub, { color: c.textFaint }]}>
-              {current.format === 'pdf' ? 'PDF · convertido para leitura' : 'EPUB'}
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text style={[styles.bookTitle, { color: c.text }]}>Dom Casmurro</Text>
-            <Text style={[styles.bookSub, { color: c.textFaint }]}>Amostra · Machado de Assis</Text>
-          </>
-        )}
-        <Pressable onPress={continueReading} style={[styles.cta, { backgroundColor: c.green }]}>
-          <Text style={[styles.ctaText, { color: c.onGreen }]}>
-            {current ? 'Continuar Lendo' : 'Ler amostra'}
-          </Text>
-        </Pressable>
-      </Card>
+            <View style={styles.heroRow}>
+              <Text style={styles.heroSub}>
+                {current ? `${pct}% lido` : 'Amostra · Machado de Assis'}
+              </Text>
+              {current ? <Text style={styles.heroPct}>{pct}%</Text> : null}
+            </View>
+            <View style={styles.heroTrack}>
+              <View style={[styles.heroFill, { width: `${current ? pct : 0}%`, backgroundColor: c.green }]} />
+            </View>
+            <Text style={styles.heroCtaText}>{current ? 'Continuar lendo ›' : 'Ler amostra ›'}</Text>
+          </View>
+        </View>
+      </Pressable>
 
       {/* Biblioteca atual */}
       <View style={styles.sectionHeadRow}>
@@ -176,11 +179,22 @@ function WeekBars({ data }: { data: { label: string; minutes: number }[] }) {
 }
 
 const styles = StyleSheet.create({
-  kicker: { fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-  bookTitle: { fontSize: 22, fontWeight: '800', marginTop: 4 },
-  bookSub: { fontSize: 14, marginTop: 4 },
   cta: { marginTop: 16, borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
   ctaText: { fontSize: 15, fontWeight: '800' },
+  // Card "hero" roxo (Lendo agora) — texto sempre claro pois o fundo é roxo fixo.
+  hero: { flexDirection: 'row', gap: 14, borderRadius: 18, padding: 14, alignItems: 'center', backgroundColor: '#4A3F8F' },
+  heroCover: { width: 56, height: 78, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.22)', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  heroCoverText: { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '800' },
+  heroCoverIcon: { fontSize: 22 },
+  heroBody: { flex: 1, minWidth: 0 },
+  heroKicker: { color: '#E5DEFA', fontSize: 12, fontWeight: '600' },
+  heroTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', marginTop: 2 },
+  heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10 },
+  heroSub: { color: '#E5DEFA', fontSize: 13 },
+  heroPct: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  heroTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.22)', marginTop: 6, overflow: 'hidden' },
+  heroFill: { height: '100%', borderRadius: 4 },
+  heroCtaText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginTop: 10 },
   sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   link: { fontSize: 14, fontWeight: '700' },
   emptyText: { fontSize: 14, lineHeight: 21 },
