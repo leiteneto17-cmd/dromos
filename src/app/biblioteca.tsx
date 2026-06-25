@@ -51,9 +51,10 @@ export async function importBookFlow(
   try {
     // Seletor do próprio expo-file-system: o arquivo volta com permissão de leitura
     // (diferente do expo-document-picker, cujo cache o Expo Go recusa ler).
-    const result = await File.pickFileAsync({
-      mimeTypes: ['application/epub+zip', 'application/pdf'],
-    });
+    // Abrimos para TODOS os tipos ('*/*') de propósito: o Android costuma ESCONDER os
+    // EPUBs quando filtramos por 'application/epub+zip' (MIME mal indexado pelo sistema),
+    // deixando a tela "Sem itens". Validamos o formato real depois (extensão/MIME/bytes).
+    const result = await File.pickFileAsync({ mimeTypes: ['*/*'] });
     if (result.canceled) return;
 
     const picked = result.result;
