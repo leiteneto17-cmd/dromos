@@ -5,8 +5,19 @@
  * usuário ainda não trouxe a própria chave (BYOK). Quem traz a chave fala direto
  * com o provedor (services/ai/providers.ts), sem passar por aqui.
  */
+import Constants from 'expo-constants';
+
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/store/auth';
+
+/**
+ * Nome (slug) da Edge Function. Por padrão `ai-proxy`, mas o painel do Supabase às
+ * vezes gera um slug aleatório ao criar a função (ex.: "hyper-task"). Nesses casos,
+ * defina `extra.aiProxyFunction` no app.json com o slug real (o que aparece na URL
+ * `/functions/v1/<slug>`).
+ */
+const FUNCTION_NAME =
+  (Constants.expoConfig?.extra?.aiProxyFunction as string | undefined) || 'ai-proxy';
 
 /** true quando a IA grátis pode ser usada agora (Supabase configurado + logado). */
 export function managedAIAvailable(): boolean {
@@ -22,7 +33,7 @@ export async function managedChatJSON(args: {
 }): Promise<string> {
   if (!supabase) throw new Error('Backend não configurado.');
 
-  const { data, error } = await supabase.functions.invoke('ai-proxy', {
+  const { data, error } = await supabase.functions.invoke(FUNCTION_NAME, {
     body: {
       system: args.system,
       user: args.user,
@@ -55,7 +66,7 @@ async function extractError(error: unknown): Promise<string> {
   // 2) Sem corpo útil: traduz pelo status / tipo do erro.
   const status = ctx?.status;
   if (status === 404) {
-    return 'A IA grátis ainda não foi publicada no servidor (função “ai-proxy”). Publique-a no Supabase, ou conecte sua própria chave em Integrações.';
+    return `A IA grátis não foi encontrada no servidor (função “${FUNCTION_NAME}”). Confira se ela está publicada no Supabase e se o nome em app.json (extra.aiProxyFunction) bate com o slug da função (o que aparece na URL /functions/v1/…). Ou conecte sua própria chave em Integrações.`;
   }
   if (status === 401 || status === 403) {
     return 'Sem permissão para a IA grátis. Entre na sua conta de novo, ou use sua própria chave em Integrações.';
