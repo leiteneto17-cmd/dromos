@@ -126,14 +126,15 @@ export default function IntegracoesScreen() {
   async function salvar() {
     setError(null);
     setOkMsg(null);
-    // Sem chave nova: só atualiza provider/modelo (se já houver chave salva).
+    // Sem chave nova: salva a PREFERÊNCIA de provedor/modelo (a chave própria é opcional —
+    // a IA grátis funciona sem ela). Antes isso exigia chave e a escolha não persistia.
     if (!key.trim()) {
-      if (!hasKey) {
-        setError('Cole sua chave de IA para conectar.');
-        return;
-      }
       await saveAIConfig({ provider, model: model.trim() || info.defaultModel });
-      setOkMsg('Provedor e modelo atualizados.');
+      setOkMsg(
+        hasKey
+          ? 'Provedor e modelo atualizados.'
+          : 'Preferência salva. A IA grátis está ativa — cole uma chave só se quiser tirar o limite.',
+      );
       return;
     }
     setBusy(true);

@@ -1,31 +1,25 @@
 /**
- * Aba Perfil — cabeçalho do leitor, card de estatísticas (roxo+verde, base do
- * card compartilhável da Fase 5a), seletor de aparência (claro/escuro/sistema)
- * e o banco de Vocabulário (§2.3). Base neutra; card de stats mantém a marca.
+ * Aba Perfil — estilo Instagram: cabeçalho do leitor + um ⚙️ que abre a folha de
+ * CONFIGURAÇÕES (editar perfil, aparência, privacidade, IA, sair, excluir conta —
+ * components/settings-sheet.tsx). O corpo do perfil fica enxuto: estatísticas
+ * (retráteis), Metas, Vocabulário e a parte social (recados + solicitações).
  */
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProfileEditor } from '@/components/profile-editor';
 import { ProfileHeader } from '@/components/profile-header';
+import { SettingsSheet } from '@/components/settings-sheet';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { StatsCard } from '@/components/stats-card';
 import { useUI } from '@/hooks/use-ui';
 import { computeAchievements, deriveStats } from '@/services/progress';
 import { approveRequest, getFollowRequests, rejectRequest, type FollowRequest } from '@/services/social';
-import { useAI } from '@/store/ai';
-import { deleteAccount, displayName, signOut, useAuth } from '@/store/auth';
-import { useLibrary, type UITheme } from '@/store/library';
-import { updateProfile, useProfile } from '@/store/profile';
-import { PROVIDERS } from '@/services/ai/providers';
-
-const THEME_OPTIONS: { id: UITheme; label: string }[] = [
-  { id: 'system', label: 'Sistema' },
-  { id: 'light', label: 'Claro' },
-  { id: 'dark', label: 'Escuro' },
-];
+import { displayName, useAuth } from '@/store/auth';
+import { useLibrary } from '@/store/library';
+import { useProfile } from '@/store/profile';
 
 export default function ProfileScreen() {
   const c = useUI();
@@ -33,18 +27,16 @@ export default function ProfileScreen() {
   const vocab = useLibrary((s) => s.vocab);
   const removeVocab = useLibrary((s) => s.removeVocab);
   const stats = useLibrary((s) => s.stats);
-  const uiTheme = useLibrary((s) => s.uiTheme);
-  const setUiTheme = useLibrary((s) => s.setUiTheme);
   const user = useAuth((s) => s.user);
   const configured = useAuth((s) => s.configured);
   const profile = useProfile((s) => s.profile);
-  const aiProvider = useAI((s) => s.provider);
-  const aiHasKey = useAI((s) => s.hasKey);
+
   const [showVocab, setShowVocab] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const [savingPublic, setSavingPublic] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  // Estatísticas retráteis — começam recolhidas para o perfil ocupar menos espaço.
+  const [showStats, setShowStats] = useState(false);
   const [requests, setRequests] = useState<FollowRequest[]>([]);
-  const [deleting, setDeleting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -53,47 +45,9 @@ export default function ProfileScreen() {
     }, [user]),
   );
 
-  async function togglePublic(next: boolean) {
-    setSavingPublic(true);
-    await updateProfile({ is_public: next });
-    setSavingPublic(false);
-  }
-
   async function respondRequest(followerId: string, accept: boolean) {
     setRequests((prev) => prev.filter((r) => r.follower_id !== followerId)); // otimista
     await (accept ? approveRequest(followerId) : rejectRequest(followerId));
-  }
-
-  // Exclusão de conta (Apple 5.1.1(v) + Google): dupla confirmação por ser irreversível.
-  function confirmDeleteAccount() {
-    Alert.alert(
-      'Excluir conta',
-      'Isso apaga PERMANENTEMENTE sua conta e todos os seus dados na nuvem: perfil, ' +
-        'atividades de leitura, estante, resenhas, recados, seguidores e curtidas. Esta ação não pode ser desfeita.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Continuar', style: 'destructive', onPress: askFinalConfirm },
-      ],
-    );
-  }
-
-  function askFinalConfirm() {
-    Alert.alert('Tem certeza?', 'Confirma a exclusão definitiva da sua conta?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir minha conta', style: 'destructive', onPress: runDeleteAccount },
-    ]);
-  }
-
-  async function runDeleteAccount() {
-    setDeleting(true);
-    const res = await deleteAccount();
-    setDeleting(false);
-    if (!res.ok) {
-      Alert.alert('Não foi possível excluir', res.error);
-      return;
-    }
-    // Sucesso: a sessão caiu → o guard em _layout leva para /login automaticamente.
-    Alert.alert('Conta excluída', 'Sua conta e seus dados foram removidos.');
   }
 
   const derived = deriveStats(stats);
@@ -103,6 +57,15 @@ export default function ProfileScreen() {
 
   return (
     <ScreenBG>
+      {/* Barra superior com o ⚙️ (entrada para Configurações), estilo Instagram */}
+      {user ? (
+        <View style={styles.topBar}>
+          <Pressable onPress={() => setShowSettings(true)} hitSlop={10} style={styles.gearBtn}>
+            <Text style={styles.gear}>⚙️</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <ProfileHeader
         name={headerName}
         avatar={profile?.avatar_url}
@@ -110,69 +73,36 @@ export default function ProfileScreen() {
         achievements={achievements}
       />
 
-      <SectionTitle icon="👤">Conta</SectionTitle>
       {!configured ? (
         <Card>
-          <Text style={[styles.acctTitle, { color: c.text }]}>Backend não configurado</Text>
-          <Text style={[styles.acctSub, { color: c.textFaint }]}>
+          <Text style={[styles.cardTitle, { color: c.text }]}>Backend não configurado</Text>
+          <Text style={[styles.cardSub, { color: c.textFaint }]}>
             Preencha as credenciais do Supabase em app.json para habilitar conta e sincronização.
           </Text>
         </Card>
-      ) : user ? (
-        <Card style={styles.acctRow}>
-          <Pressable style={styles.flex} onPress={() => setShowEditProfile(true)}>
-            <Text style={[styles.acctTitle, { color: c.text }]}>{headerName}</Text>
-            <Text style={[styles.acctSub, { color: c.textFaint }]}>{user.email}</Text>
-            <Text style={[styles.acctEdit, { color: c.green }]}>Editar perfil ›</Text>
-          </Pressable>
-          <Pressable onPress={() => signOut()} hitSlop={8}>
-            <Text style={[styles.acctAction, { color: c.textDim }]}>Sair</Text>
-          </Pressable>
-        </Card>
-      ) : (
+      ) : !user ? (
         <Pressable onPress={() => router.navigate('/login')}>
-          <Card style={styles.acctRow}>
+          <Card style={styles.row}>
             <View style={styles.flex}>
-              <Text style={[styles.acctTitle, { color: c.text }]}>Entrar / Criar conta</Text>
-              <Text style={[styles.acctSub, { color: c.textFaint }]}>
+              <Text style={[styles.cardTitle, { color: c.text }]}>Entrar / Criar conta</Text>
+              <Text style={[styles.cardSub, { color: c.textFaint }]}>
                 Para feed, kudos e sincronizar entre aparelhos.
               </Text>
             </View>
             <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
           </Card>
         </Pressable>
-      )}
-
-      {user ? (
+      ) : (
         <>
           <Pressable onPress={() => router.navigate({ pathname: '/usuario', params: { id: user.id, name: headerName } })}>
-            <Card style={[styles.acctRow, { marginTop: 12 }]}>
+            <Card style={styles.row}>
               <View style={styles.flex}>
-                <Text style={[styles.acctTitle, { color: c.text }]}>Meu perfil e recados</Text>
-                <Text style={[styles.acctSub, { color: c.textFaint }]}>Veja como os outros te veem · mural de recados</Text>
+                <Text style={[styles.cardTitle, { color: c.text }]}>Meu perfil e recados</Text>
+                <Text style={[styles.cardSub, { color: c.textFaint }]}>Veja como os outros te veem · mural de recados</Text>
               </View>
               <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
             </Card>
           </Pressable>
-
-          <SectionTitle icon="🌐">Privacidade</SectionTitle>
-          <Card style={styles.acctRow}>
-            <View style={styles.flex}>
-              <Text style={[styles.acctTitle, { color: c.text }]}>Perfil público</Text>
-              <Text style={[styles.acctSub, { color: c.textFaint }]}>
-                {profile?.is_public
-                  ? 'Outros leitores veem seu perfil, sua estante e suas leituras.'
-                  : 'Seu perfil é privado. Ative para participar do feed e ser seguido.'}
-              </Text>
-            </View>
-            <Switch
-              value={!!profile?.is_public}
-              onValueChange={togglePublic}
-              disabled={savingPublic}
-              trackColor={{ true: c.green, false: c.border }}
-              thumbColor="#fff"
-            />
-          </Card>
 
           {requests.length > 0 ? (
             <>
@@ -199,33 +129,32 @@ export default function ProfileScreen() {
               ))}
             </>
           ) : null}
+        </>
+      )}
 
-          <Pressable
-            onPress={confirmDeleteAccount}
-            disabled={deleting}
-            style={styles.deleteRow}
-            hitSlop={8}>
-            {deleting ? (
-              <ActivityIndicator size="small" color="#E5484D" />
-            ) : (
-              <Text style={styles.deleteText}>Excluir conta</Text>
-            )}
+      {/* Estatísticas — retrátil (toque no título para abrir/fechar) */}
+      <Pressable onPress={() => setShowStats((v) => !v)} style={styles.statsHeader}>
+        <View style={styles.statsHeaderLeft}>
+          <Text style={styles.statsIcon}>📈</Text>
+          <Text style={[styles.statsTitle, { color: c.purple }]}>Estatísticas</Text>
+        </View>
+        <Text style={[styles.statsChevron, { color: c.purple }]}>{showStats ? '▾' : '▸'}</Text>
+      </Pressable>
+      {showStats ? (
+        <>
+          <StatsCard />
+          <Pressable onPress={() => router.navigate('/compartilhar')} style={[styles.shareCta, { backgroundColor: c.green }]}>
+            <Text style={[styles.shareCtaText, { color: c.onGreen }]}>📤 Compartilhar</Text>
           </Pressable>
         </>
       ) : null}
 
-      <SectionTitle icon="📈">Estatísticas</SectionTitle>
-      <StatsCard />
-      <Pressable onPress={() => router.navigate('/compartilhar')} style={[styles.shareCta, { backgroundColor: c.green }]}>
-        <Text style={[styles.shareCtaText, { color: c.onGreen }]}>📤 Compartilhar</Text>
-      </Pressable>
-
       <SectionTitle icon="🎯">Metas</SectionTitle>
       <Pressable onPress={() => router.navigate('/conquistas')}>
-        <Card style={styles.acctRow}>
+        <Card style={styles.row}>
           <View style={styles.flex}>
-            <Text style={[styles.acctTitle, { color: c.text }]}>Metas e conquistas</Text>
-            <Text style={[styles.acctSub, { color: c.textFaint }]}>
+            <Text style={[styles.cardTitle, { color: c.text }]}>Metas e conquistas</Text>
+            <Text style={[styles.cardSub, { color: c.textFaint }]}>
               Crie objetivos com prazo · {unlocked} de {achievements.length} emblemas
             </Text>
           </View>
@@ -233,44 +162,12 @@ export default function ProfileScreen() {
         </Card>
       </Pressable>
 
-      <SectionTitle icon="🎨">Aparência</SectionTitle>
-      <View style={[styles.segment, { backgroundColor: c.card, borderColor: c.border }]}>
-        {THEME_OPTIONS.map((opt) => {
-          const active = uiTheme === opt.id;
-          return (
-            <Pressable
-              key={opt.id}
-              onPress={() => setUiTheme(opt.id)}
-              style={[styles.segItem, active && { backgroundColor: c.green }]}>
-              <Text style={[styles.segText, { color: active ? c.onGreen : c.textDim }]}>{opt.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <SectionTitle icon="✨">Inteligência Artificial</SectionTitle>
-      <Pressable onPress={() => router.navigate('/integracoes')}>
-        <Card style={styles.acctRow}>
-          <View style={styles.flex}>
-            <Text style={[styles.acctTitle, { color: c.text }]}>Integrações de IA</Text>
-            <Text style={[styles.acctSub, { color: c.textFaint }]}>
-              {aiHasKey
-                ? `Conectado · ${PROVIDERS[aiProvider].label}`
-                : 'Use sua própria chave para o dicionário contextual'}
-            </Text>
-          </View>
-          <Text style={[styles.chev, { color: aiHasKey ? c.green : c.textFaint }]}>
-            {aiHasKey ? '●' : '›'}
-          </Text>
-        </Card>
-      </Pressable>
-
       <SectionTitle icon="💬">Vocabulário</SectionTitle>
       <Pressable onPress={() => setShowVocab(true)}>
-        <Card style={styles.vocabRow}>
-          <View>
-            <Text style={[styles.vocabTitle, { color: c.text }]}>Banco de palavras</Text>
-            <Text style={[styles.vocabSub, { color: c.textFaint }]}>
+        <Card style={styles.row}>
+          <View style={styles.flex}>
+            <Text style={[styles.cardTitle, { color: c.text }]}>Banco de palavras</Text>
+            <Text style={[styles.cardSub, { color: c.textFaint }]}>
               {vocab.length} palavra{vocab.length === 1 ? '' : 's'} marcada
               {vocab.length === 1 ? '' : 's'}
             </Text>
@@ -323,6 +220,15 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      <SettingsSheet
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        onEditProfile={() => {
+          setShowSettings(false);
+          setShowEditProfile(true);
+        }}
+      />
+
       <ProfileEditor
         visible={showEditProfile}
         profile={profile}
@@ -334,11 +240,13 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  acctRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  acctTitle: { fontSize: 16, fontWeight: '700' },
-  acctSub: { fontSize: 13, marginTop: 3 },
-  acctEdit: { fontSize: 13, marginTop: 6, fontWeight: '700' },
-  acctAction: { fontSize: 15, fontWeight: '700' },
+  topBar: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 2 },
+  gearBtn: { padding: 4 },
+  gear: { fontSize: 22 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardTitle: { fontSize: 16, fontWeight: '700' },
+  cardSub: { fontSize: 13, marginTop: 3 },
+  chev: { fontSize: 22 },
   reqRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
   reqWho: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   reqAvatar: { fontSize: 26 },
@@ -347,17 +255,13 @@ const styles = StyleSheet.create({
   reqAccept: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
   reqAcceptText: { fontSize: 13, fontWeight: '800' },
   reqReject: { fontSize: 13, fontWeight: '700' },
+  statsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 10 },
+  statsHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statsIcon: { fontSize: 18 },
+  statsTitle: { fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
+  statsChevron: { fontSize: 16, fontWeight: '800' },
   shareCta: { marginTop: 14, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   shareCtaText: { fontSize: 15, fontWeight: '800' },
-  deleteRow: { marginTop: 16, alignItems: 'center', paddingVertical: 8, minHeight: 36, justifyContent: 'center' },
-  deleteText: { fontSize: 14, fontWeight: '700', color: '#E5484D' },
-  segment: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, padding: 4, gap: 4 },
-  segItem: { flex: 1, borderRadius: 999, paddingVertical: 9, alignItems: 'center' },
-  segText: { fontSize: 14, fontWeight: '700' },
-  vocabRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  vocabTitle: { fontSize: 16, fontWeight: '700' },
-  vocabSub: { fontSize: 13, marginTop: 3 },
-  chev: { fontSize: 22 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   modalTitle: { fontSize: 22, fontWeight: '800' },
   close: { fontSize: 15, fontWeight: '700' },

@@ -38,8 +38,9 @@ type AIState = {
 };
 
 export const useAI = create<AIState>(() => ({
-  provider: 'openai',
-  model: PROVIDERS.openai.defaultModel,
+  // Padrão = Gemini (free tier). Sem chave própria, o app usa a IA grátis/gerida.
+  provider: 'gemini',
+  model: PROVIDERS.gemini.defaultModel,
   hasKey: false,
   ttsVoice: TTS_DEFAULT_VOICE,
   ttsVoiceName: 'Rachel',
@@ -61,7 +62,7 @@ export const useAI = create<AIState>(() => ({
       SecureStore.getItemAsync(DEVICE_VOICE_STORE),
     ]);
     const cfg = cfgRaw ? (JSON.parse(cfgRaw) as { provider?: AIProvider; model?: string }) : null;
-    const provider = cfg?.provider ?? 'openai';
+    const provider = cfg?.provider ?? 'gemini';
     const ttsCfg = ttsCfgRaw
       ? (JSON.parse(ttsCfgRaw) as { voice?: string; voiceName?: string; model?: string })
       : null;

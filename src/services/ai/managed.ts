@@ -38,16 +38,33 @@ export async function managedChatJSON(args: {
   return payload?.text ?? '';
 }
 
-/** Extrai a mensagem PT-BR que a função devolveu no corpo do erro HTTP. */
+/** Traduz o erro do invoke numa mensagem PT-BR clara (a crua é "non-2xx status code"). */
 async function extractError(error: unknown): Promise<string> {
-  try {
-    const ctx = (error as { context?: Response }).context;
-    if (ctx && typeof ctx.json === 'function') {
-      const body = await ctx.json();
+  const ctx = (error as { context?: Response }).context;
+
+  // 1) Mensagem PT que a NOSSA função devolve no corpo (503/429/etc.).
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const body = await ctx.clone().json();
       if (body?.error) return String(body.error);
+    } catch {
+      // corpo não-JSON (ex.: 404 da plataforma quando a função não existe)
     }
-  } catch {
-    // sem corpo JSON utilizável
+  }
+
+  // 2) Sem corpo útil: traduz pelo status / tipo do erro.
+  const status = ctx?.status;
+  if (status === 404) {
+    return 'A IA grátis ainda não foi publicada no servidor (função “ai-proxy”). Publique-a no Supabase, ou conecte sua própria chave em Integrações.';
+  }
+  if (status === 401 || status === 403) {
+    return 'Sem permissão para a IA grátis. Entre na sua conta de novo, ou use sua própria chave em Integrações.';
+  }
+  if (status && status >= 500) {
+    return 'A IA grátis falhou no servidor agora. Tente de novo em instantes, ou use sua própria chave.';
+  }
+  if ((error as { name?: string }).name === 'FunctionsFetchError') {
+    return 'Sem conexão com o servidor da IA grátis. Verifique a internet e tente de novo.';
   }
   return error instanceof Error ? error.message : 'Falha ao consultar a IA grátis.';
 }
