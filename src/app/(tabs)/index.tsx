@@ -230,7 +230,7 @@ export default function HubScreen() {
             </ScrollView>
           )}
 
-          <MyShelf />
+          <MyShelf onDark />
         </ScrollView>
       </SafeAreaView>
     </View>

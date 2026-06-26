@@ -12,7 +12,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Card, SectionTitle } from '@/components/social-ui';
+import { Card } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import {
   createCollection,
@@ -39,9 +39,15 @@ function Cover({ uri }: { uri?: string | null }) {
   );
 }
 
-export function MyShelf() {
+export function MyShelf({ onDark = false }: { onDark?: boolean }) {
   const c = useUI();
   const user = useAuth((s) => s.user);
+
+  // Quando renderizado sobre o fundo VERDE do hub (onDark), o texto "solto" (fora dos
+  // cards) precisa ser claro para não sumir. Dentro dos cards segue o tema normal.
+  const titleColor = onDark ? '#FFFFFF' : c.purple;
+  const onBgText = onDark ? '#E8F6EE' : c.textDim;
+  const onBgBorder = onDark ? 'rgba(255,255,255,0.4)' : c.border;
 
   const [shelf, setShelf] = useState<ShelfItem[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -143,7 +149,10 @@ export function MyShelf() {
 
   return (
     <>
-      <SectionTitle icon="📚">Minha estante</SectionTitle>
+      <View style={styles.titleRow}>
+        <Text style={styles.titleIcon}>📚</Text>
+        <Text style={[styles.titleText, { color: titleColor }]}>Minha estante</Text>
+      </View>
 
       {shelf.length === 0 ? (
         <Pressable onPress={() => router.navigate('/comunidade')}>
@@ -165,8 +174,8 @@ export function MyShelf() {
                 <Pressable
                   key={f}
                   onPress={() => setFilter(f)}
-                  style={[styles.chip, { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' }]}>
-                  <Text style={[styles.chipText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
+                  style={[styles.chip, { borderColor: active ? c.green : onBgBorder, backgroundColor: active ? c.green : 'transparent' }]}>
+                  <Text style={[styles.chipText, { color: active ? c.onGreen : onBgText }]}>{label}</Text>
                 </Pressable>
               );
             })}
@@ -176,8 +185,8 @@ export function MyShelf() {
           <View style={styles.filterRow}>
             <Pressable
               onPress={() => setColFilter('todas')}
-              style={[styles.chip, { borderColor: colFilter === 'todas' ? c.purple : c.border, backgroundColor: colFilter === 'todas' ? c.purple : 'transparent' }]}>
-              <Text style={[styles.chipText, { color: colFilter === 'todas' ? c.onGreen : c.textDim }]}>📚 Todas</Text>
+              style={[styles.chip, { borderColor: colFilter === 'todas' ? c.purple : onBgBorder, backgroundColor: colFilter === 'todas' ? c.purple : 'transparent' }]}>
+              <Text style={[styles.chipText, { color: colFilter === 'todas' ? c.onGreen : onBgText }]}>📚 Todas</Text>
             </Pressable>
             {collections.map((col) => {
               const active = colFilter === col.id;
@@ -185,13 +194,13 @@ export function MyShelf() {
                 <Pressable
                   key={col.id}
                   onPress={() => setColFilter(col.id)}
-                  style={[styles.chip, { borderColor: active ? c.purple : c.border, backgroundColor: active ? c.purple : 'transparent' }]}>
-                  <Text style={[styles.chipText, { color: active ? c.onGreen : c.textDim }]}>📁 {col.name}</Text>
+                  style={[styles.chip, { borderColor: active ? c.purple : onBgBorder, backgroundColor: active ? c.purple : 'transparent' }]}>
+                  <Text style={[styles.chipText, { color: active ? c.onGreen : onBgText }]}>📁 {col.name}</Text>
                 </Pressable>
               );
             })}
-            <Pressable onPress={() => setManageOpen(true)} style={[styles.chip, { borderColor: c.border }]}>
-              <Text style={[styles.chipText, { color: c.purple }]}>+ Coleções</Text>
+            <Pressable onPress={() => setManageOpen(true)} style={[styles.chip, { borderColor: onBgBorder }]}>
+              <Text style={[styles.chipText, { color: onBgText }]}>+ Coleções</Text>
             </Pressable>
           </View>
 
@@ -301,6 +310,9 @@ export function MyShelf() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24, marginBottom: 12 },
+  titleIcon: { fontSize: 18 },
+  titleText: { fontSize: 18, fontWeight: '800', letterSpacing: 0.3 },
   emptyTitle: { fontSize: 16, fontWeight: '700' },
   emptySub: { fontSize: 13, marginTop: 4, lineHeight: 19 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
