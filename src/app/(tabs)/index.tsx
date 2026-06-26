@@ -1,11 +1,10 @@
 /**
- * HUB (aba Leitura) — "Feed" estilo referência 2026 (image_75a1a1.jpg): fundo dark-first
- * com gradiente verde-musgo → quase preto → roxo (OLED), header com avatar + busca/sino,
- * card "Lendo agora" roxo (progresso real), card de atividade recente (dados reais de
- * sessão) e gráfico semanal com barras roxo→verde. Abaixo: biblioteca + estante.
+ * HUB (aba Leitura) — "Feed" estilo referência 2026 (image_75a1a1.jpg): fundo VERDE
+ * vibrante (clean), header avatar + busca/sino, card "Lendo agora" roxo (progresso real),
+ * cards BRANCOS de atividade (dados reais de sessão) e gráfico semanal, biblioteca + estante.
  *
- * Esta tela é DARK fixa (cores próprias, não segue claro/escuro) por ser a "pele neon"
- * da camada social — o leitor continua sépia/claro/escuro (CLAUDE.md §2.7).
+ * Esta tela tem cores próprias (verde + branco) para bater com a imagem aprovada — não
+ * segue o claro/escuro do app (é a "pele" do feed). O leitor continua sépia/claro/escuro.
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -21,25 +20,28 @@ import { displayName, useAuth } from '@/store/auth';
 import { useLibrary, type ImportedBook } from '@/store/library';
 import { useProfile } from '@/store/profile';
 
-// Paleta DARK fixa do hub (independe do tema claro/escuro — visual OLED da referência).
+// Paleta do hub (verde clean + cards brancos) — fiel à imagem aprovada.
 const HUB = {
-  grad: ['#13392C', '#0C0C13', '#181229'] as const,
-  hero: '#4A3F8F',
-  card: '#17141F',
-  border: 'rgba(255,255,255,0.07)',
-  text: '#F3F1F8',
-  dim: '#B9A6E8',
-  faint: '#8B85A0',
-  green: '#5EF0A0',
+  grad: ['#2C7E5E', '#1F6147', '#1B4F3D'] as const, // verde vibrante → mais fechado
+  hero: '#5B4FA6', // roxo do card de leitura
+  cardBg: '#FFFFFF',
+  cardText: '#1A1A1A',
+  cardMuted: '#6B7280',
+  purple: '#6E4FB0',
+  greenInk: '#0FA968', // verde para texto/acento sobre branco
+  onBg: '#FFFFFF', // texto sobre o fundo verde
+  onBgDim: '#CFEFDD',
+  green: '#5EF0A0', // verde-neon (barra do hero)
   onGreen: '#0E2A1E',
-  barBase: '#5A3FA0',
+  barTop: '#27C892',
+  barBottom: '#0C5E46',
 };
 
 const TILE_COLORS = ['#4C3A7A', '#3A5A78', '#6A3A5A', '#3A6A55', '#5A4A2A'];
 
 function SearchIcon() {
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={HUB.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={HUB.onBg} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Circle cx="11" cy="11" r="7" />
       <Path d="M21 21l-4.3-4.3" />
     </Svg>
@@ -48,7 +50,7 @@ function SearchIcon() {
 
 function BellIcon() {
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={HUB.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={HUB.onBg} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5 2 5.5H4c.5-.5 2-1.5 2-5.5" />
       <Path d="M10 19.5a2 2 0 0 0 4 0" />
     </Svg>
@@ -61,8 +63,7 @@ function fmtMin(seconds: number): number {
 
 function fmtDay(ts: number): string {
   const d = new Date(ts);
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
+  const sameDay = d.toDateString() === new Date().toDateString();
   return sameDay ? `hoje ${d.toTimeString().slice(0, 5)}` : d.toLocaleDateString('pt-BR');
 }
 
@@ -148,7 +149,7 @@ export default function HubScreen() {
             </View>
           </Pressable>
 
-          {/* Atividade recente (dados reais da última sessão) */}
+          {/* Atividade recente (dados reais da última sessão) — card branco */}
           {lastSession ? (
             <Pressable onPress={() => router.navigate('/atividades')}>
               <View style={styles.feedCard}>
@@ -173,7 +174,7 @@ export default function HubScreen() {
             </Pressable>
           ) : null}
 
-          {/* Gráfico semanal estilo Strava (barras roxo → verde) */}
+          {/* Gráfico semanal estilo Strava — card branco, barras verdes */}
           <View style={styles.feedCard}>
             <View style={styles.weekHead}>
               <Text style={styles.feedKicker}>Leitura na semana</Text>
@@ -218,12 +219,12 @@ export default function HubScreen() {
                 <Pressable
                   onPress={() => importBookFlow(addBook, () => router.navigate('/reader'))}
                   style={styles.tileHalf}>
-                  <Text style={[styles.tileHalfIcon, { color: HUB.green }]}>＋</Text>
-                  <Text style={[styles.tileHalfLabel, { color: HUB.green }]}>Importar</Text>
+                  <Text style={[styles.tileHalfIcon, { color: HUB.greenInk }]}>＋</Text>
+                  <Text style={[styles.tileHalfLabel, { color: HUB.greenInk }]}>Importar</Text>
                 </Pressable>
                 <Pressable onPress={() => router.navigate('/explorar')} style={styles.tileHalf}>
                   <Text style={styles.tileHalfIcon}>🔎</Text>
-                  <Text style={[styles.tileHalfLabel, { color: HUB.dim }]}>Explorar</Text>
+                  <Text style={[styles.tileHalfLabel, { color: HUB.purple }]}>Explorar</Text>
                 </Pressable>
               </View>
             </ScrollView>
@@ -246,7 +247,7 @@ function WeekBars({ data }: { data: { label: string; minutes: number }[] }) {
           <View key={i} style={styles.barCol}>
             <View style={styles.barTrack}>
               <LinearGradient
-                colors={[HUB.barBase, HUB.green]}
+                colors={[HUB.barBottom, HUB.barTop]}
                 start={{ x: 0, y: 1 }}
                 end={{ x: 0, y: 0 }}
                 style={[styles.bar, { height: `${h}%`, opacity: d.minutes ? 1 : 0.3 }]}
@@ -260,71 +261,79 @@ function WeekBars({ data }: { data: { label: string; minutes: number }[] }) {
   );
 }
 
+const cardShadow = {
+  shadowColor: '#000',
+  shadowOpacity: 0.12,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 4,
+};
+
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0C0C13' },
+  root: { flex: 1, backgroundColor: '#1F6147' },
   flex: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: BottomTabInset + 60 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 18, color: HUB.text, fontWeight: '700' },
-  appName: { color: HUB.text, fontSize: 17, fontWeight: '700' },
+  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 18, color: HUB.onBg, fontWeight: '700' },
+  appName: { color: HUB.onBg, fontSize: 17, fontWeight: '700' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 18 },
-  bigTitle: { color: HUB.text, fontSize: 30, fontWeight: '800', marginTop: 14, marginBottom: 14 },
+  bigTitle: { color: HUB.onBg, fontSize: 30, fontWeight: '800', marginTop: 14, marginBottom: 14 },
 
-  // Hero "Lendo agora"
-  hero: { flexDirection: 'row', gap: 14, borderRadius: 24, padding: 16, alignItems: 'center', backgroundColor: HUB.hero },
-  heroCover: { width: 60, height: 84, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  heroCoverText: { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '800' },
+  // Hero "Lendo agora" (roxo)
+  hero: { flexDirection: 'row', gap: 14, borderRadius: 24, padding: 16, alignItems: 'center', backgroundColor: HUB.hero, ...cardShadow },
+  heroCover: { width: 60, height: 84, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.22)', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  heroCoverText: { color: 'rgba(255,255,255,0.9)', fontSize: 10, fontWeight: '800' },
   heroCoverIcon: { fontSize: 24 },
   heroBody: { flex: 1, minWidth: 0 },
-  heroKicker: { color: '#E5DEFA', fontSize: 13, fontWeight: '600' },
+  heroKicker: { color: '#E7E1FB', fontSize: 13, fontWeight: '600' },
   heroTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', marginTop: 2 },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 12 },
-  heroSub: { color: '#E5DEFA', fontSize: 13 },
+  heroSub: { color: '#E7E1FB', fontSize: 13 },
   heroPct: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  heroTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.22)', marginTop: 6, overflow: 'hidden' },
+  heroTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', marginTop: 6, overflow: 'hidden' },
   heroFill: { height: '100%', borderRadius: 4, backgroundColor: HUB.green },
   heroChapter: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginTop: 12 },
 
-  // Cards de feed (escuros)
-  feedCard: { backgroundColor: HUB.card, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: HUB.border, padding: 16, marginTop: 14 },
-  feedKicker: { color: HUB.dim, fontSize: 12, fontWeight: '700' },
-  feedText: { color: HUB.text, fontSize: 17, fontWeight: '600', marginTop: 6, lineHeight: 23 },
+  // Cards de feed BRANCOS
+  feedCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, marginTop: 14, ...cardShadow },
+  feedKicker: { color: HUB.purple, fontSize: 12, fontWeight: '700' },
+  feedText: { color: HUB.cardText, fontSize: 17, fontWeight: '600', marginTop: 6, lineHeight: 23 },
   feedStrong: { fontWeight: '800' },
   feedFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
   feedWho: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  feedAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(94,240,160,0.16)', alignItems: 'center', justifyContent: 'center' },
-  feedAvatarText: { fontSize: 15, color: HUB.green, fontWeight: '700' },
-  feedMeta: { color: HUB.faint, fontSize: 12 },
-  feedShare: { color: HUB.green, fontSize: 13, fontWeight: '700' },
+  feedAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(15,169,104,0.14)', alignItems: 'center', justifyContent: 'center' },
+  feedAvatarText: { fontSize: 15, color: HUB.greenInk, fontWeight: '700' },
+  feedMeta: { color: HUB.cardMuted, fontSize: 12 },
+  feedShare: { color: HUB.greenInk, fontSize: 13, fontWeight: '700' },
 
   // Semana
   weekHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 },
-  weekTotal: { color: HUB.green, fontSize: 16, fontWeight: '800' },
+  weekTotal: { color: HUB.greenInk, fontSize: 16, fontWeight: '800' },
   bars: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 96, gap: 7 },
   barCol: { flex: 1, alignItems: 'center' },
-  barTrack: { width: '100%', height: 76, justifyContent: 'flex-end', borderRadius: 7, overflow: 'hidden' },
+  barTrack: { width: '100%', height: 76, justifyContent: 'flex-end', borderRadius: 7, overflow: 'hidden', backgroundColor: '#EFF1F0' },
   bar: { width: '100%', borderRadius: 7 },
-  barLabel: { color: HUB.faint, fontSize: 11, marginTop: 6 },
+  barLabel: { color: HUB.cardMuted, fontSize: 11, marginTop: 6 },
 
-  // Biblioteca
+  // Biblioteca (sobre o fundo verde)
   sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 12 },
-  sectionTitle: { color: HUB.text, fontSize: 18, fontWeight: '800' },
-  link: { color: HUB.green, fontSize: 14, fontWeight: '700' },
-  emptyCard: { backgroundColor: HUB.card, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: HUB.border, padding: 16 },
-  emptyText: { color: HUB.faint, fontSize: 14, lineHeight: 21 },
-  cta: { marginTop: 16, borderRadius: 999, paddingVertical: 12, alignItems: 'center', backgroundColor: HUB.green },
-  ctaText: { fontSize: 15, fontWeight: '800', color: HUB.onGreen },
+  sectionTitle: { color: HUB.onBg, fontSize: 18, fontWeight: '800' },
+  link: { color: HUB.onBg, fontSize: 14, fontWeight: '700' },
+  emptyCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, ...cardShadow },
+  emptyText: { color: HUB.cardMuted, fontSize: 14, lineHeight: 21 },
+  cta: { marginTop: 16, borderRadius: 999, paddingVertical: 12, alignItems: 'center', backgroundColor: HUB.greenInk },
+  ctaText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
   shelf: { gap: 14, paddingVertical: 4, paddingRight: 8 },
   tileWrap: { width: 110 },
-  tile: { width: 110, height: 156, borderRadius: 14, padding: 10, justifyContent: 'space-between' },
+  tile: { width: 110, height: 156, borderRadius: 14, padding: 10, justifyContent: 'space-between', ...cardShadow },
   tileBadge: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '800' },
   tileTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  tileCaption: { color: HUB.faint, fontSize: 12, marginTop: 6 },
+  tileCaption: { color: HUB.onBgDim, fontSize: 12, marginTop: 6 },
   tileStack: { width: 110, height: 156, justifyContent: 'space-between' },
-  tileHalf: { width: 110, height: 73, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: HUB.border, backgroundColor: HUB.card, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  tileHalf: { width: 110, height: 73, borderRadius: 14, backgroundColor: HUB.cardBg, alignItems: 'center', justifyContent: 'center', ...cardShadow },
   tileHalfIcon: { fontSize: 22, fontWeight: '300' },
   tileHalfLabel: { fontSize: 12, fontWeight: '700', marginTop: 2 },
 });

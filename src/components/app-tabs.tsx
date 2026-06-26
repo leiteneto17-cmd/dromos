@@ -1,8 +1,8 @@
 /**
- * Navegação inferior FLUTUANTE (estilo referência 2026) — pílula arredondada que flutua
- * na base, com a aba ativa em verde e um BOTÃO CENTRAL maior (círculo verde) que abre a
- * leitura atual. Substitui as abas nativas por uma tab bar customizada (expo-router Tabs
- * + tabBar próprio), com ícones vetoriais (react-native-svg).
+ * Navegação inferior FLUTUANTE (estilo referência 2026) — pílula CLARA que flutua na
+ * base, ícones verdes (ativo) / cinza (inativo) e um BOTÃO CENTRAL maior (círculo verde)
+ * que abre a leitura atual. Substitui as abas nativas por tab bar customizada (expo-router
+ * Tabs + tabBar próprio), com ícones vetoriais (react-native-svg).
  */
 import { router, Tabs } from 'expo-router';
 import type { ComponentType, ReactNode } from 'react';
@@ -10,12 +10,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { useUI } from '@/hooks/use-ui';
 import { useLibrary } from '@/store/library';
+
+// Paleta da nav (clara, fiel à imagem) — independe do tema claro/escuro do app.
+const NAV = {
+  pill: '#FFFFFF',
+  border: 'rgba(0,0,0,0.06)',
+  inactive: '#8A968F',
+  active: '#0FA968',
+  centerBg: '#16A06B',
+  centerIcon: '#FFFFFF',
+};
 
 type IconProps = { color: string; size?: number };
 
-// Tipo mínimo da tab bar (evita depender dos tipos de @react-navigation/bottom-tabs).
 type TabRoute = { key: string; name: string };
 type TabBarProps = {
   state: { index: number; routes: TabRoute[] };
@@ -25,7 +33,7 @@ type TabBarProps = {
   };
 };
 
-function HomeIcon({ color, size = 22 }: IconProps) {
+function HomeIcon({ color, size = 23 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Path d="M4 11.5 12 4l8 7.5" />
@@ -34,7 +42,7 @@ function HomeIcon({ color, size = 22 }: IconProps) {
   );
 }
 
-function UsersIcon({ color, size = 22 }: IconProps) {
+function UsersIcon({ color, size = 23 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Circle cx="9" cy="8" r="3.2" />
@@ -45,7 +53,7 @@ function UsersIcon({ color, size = 22 }: IconProps) {
   );
 }
 
-function ChartIcon({ color, size = 22 }: IconProps) {
+function ChartIcon({ color, size = 23 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Path d="M5 20V11" />
@@ -55,7 +63,7 @@ function ChartIcon({ color, size = 22 }: IconProps) {
   );
 }
 
-function UserIcon({ color, size = 22 }: IconProps) {
+function UserIcon({ color, size = 23 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Circle cx="12" cy="8" r="3.5" />
@@ -93,7 +101,6 @@ function openCurrentReading() {
 }
 
 function FloatingTabBar({ state, navigation }: TabBarProps) {
-  const c = useUI();
   const insets = useSafeAreaInsets();
 
   function tabButton(route: TabRoute, focused: boolean) {
@@ -112,19 +119,13 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
         accessibilityState={focused ? { selected: true } : {}}
         accessibilityLabel={meta.label}
         style={styles.item}>
-        <View style={[styles.iconWrap, focused && { backgroundColor: c.green }]}>
-          <Icon color={focused ? c.onGreen : c.textDim} />
-        </View>
-        {focused ? (
-          <Text style={[styles.label, { color: c.green }]} numberOfLines={1}>
-            {meta.label}
-          </Text>
-        ) : null}
+        <Icon color={focused ? NAV.active : NAV.inactive} />
+        <View style={[styles.dot, focused && { backgroundColor: NAV.active }]} />
       </Pressable>
     );
   }
 
-  // Monta os slots: [Leitura, Comunidade, (Ler central), Atividades, Perfil]
+  // Slots: [Leitura, Comunidade, (Ler central), Atividades, Perfil]
   const slots: ReactNode[] = [];
   state.routes.forEach((route, i) => {
     slots.push(tabButton(route, state.index === i));
@@ -135,8 +136,8 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
           onPress={openCurrentReading}
           accessibilityRole="button"
           accessibilityLabel="Continuar lendo"
-          style={[styles.center, { backgroundColor: c.green, borderColor: c.card }]}>
-          <BookOpenIcon color={c.onGreen} />
+          style={[styles.center, { backgroundColor: NAV.centerBg }]}>
+          <BookOpenIcon color={NAV.centerIcon} />
         </Pressable>,
       );
     }
@@ -144,7 +145,7 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
 
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]} pointerEvents="box-none">
-      <View style={[styles.bar, { backgroundColor: c.card, borderColor: c.border }]}>{slots}</View>
+      <View style={[styles.bar, { backgroundColor: NAV.pill, borderColor: NAV.border }]}>{slots}</View>
     </View>
   );
 }
@@ -163,32 +164,32 @@ export default function AppTabs() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: 'transparent', paddingHorizontal: 16, paddingTop: 6 },
+  wrap: { backgroundColor: 'transparent', paddingHorizontal: 18, paddingTop: 6 },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    borderRadius: 32,
+    borderRadius: 34,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.18,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
     elevation: 12,
   },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 2 },
-  iconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 12, fontWeight: '700' },
+  item: { alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  dot: { width: 16, height: 3, borderRadius: 2, backgroundColor: 'transparent' },
   center: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -24,
+    marginTop: -26,
     borderWidth: 4,
+    borderColor: NAV.pill,
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 10,
