@@ -69,6 +69,25 @@ void loadProfile(useAuth.getState().user?.id);
 
 export type UpdateResult = { ok: true } | { ok: false; error: string };
 
+// Última lista de emblemas publicada (evita reescrever o perfil a cada foco/sessão).
+let lastBadgesKey = '';
+
+/**
+ * Publica os emblemas DESBLOQUEADOS (ids) no próprio perfil, para aparecerem no perfil
+ * PÚBLICO (outras pessoas veem o esforço). No-op se deslogado/sem backend ou se nada mudou
+ * desde a última sincronização. As conquistas continuam sendo calculadas localmente
+ * (computeAchievements) — aqui só espelhamos o resultado no banco.
+ */
+export async function syncBadges(unlockedIds: string[]): Promise<void> {
+  const user = useAuth.getState().user;
+  if (!supabase || !user) return;
+  const ids = [...unlockedIds].sort();
+  const key = ids.join(',');
+  if (key === lastBadgesKey) return;
+  const { error } = await supabase.from('profiles').update({ badges: ids }).eq('id', user.id);
+  if (!error) lastBadgesKey = key; // só marca como sincronizado se deu certo (senão tenta de novo)
+}
+
 /** Atualiza nome, avatar e/ou visibilidade pública do próprio perfil no banco. */
 export async function updateProfile(fields: {
   name?: string;

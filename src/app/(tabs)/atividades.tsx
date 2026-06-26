@@ -3,17 +3,18 @@
  * Usa dados REAIS (store.stats.perDay): resumo do dia, últimos 7 dias e recordes.
  * Base neutra; verde = números/ação, roxo = detalhe (CLAUDE.md §2.6/§2.7).
  */
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
-import { useUI } from '@/hooks/use-ui';
 import { syncActivities } from '@/services/activity-sync';
 import { deriveStats, fmtHMS } from '@/services/progress';
 import { getFeed, toggleKudo, type FeedItem } from '@/services/social';
 import { useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
+import { HUB, hubUI } from '@/theme/hub';
 
 /** Data amigável da sessão: "hoje 14:30", "ontem 09:10" ou "12/06/2026". Usa data
  * LOCAL (não UTC) para casar com a hora local exibida — senão erra "hoje/ontem" perto
@@ -31,7 +32,7 @@ function fmtSessionDate(ts: number): string {
 }
 
 export default function ActivitiesScreen() {
-  const c = useUI();
+  const c = hubUI;
   const stats = useLibrary((s) => s.stats);
   const sessions = useLibrary((s) => s.sessions);
   const session = useAuth((s) => s.session);
@@ -39,6 +40,7 @@ export default function ActivitiesScreen() {
   const d = deriveStats(stats);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [feedOpen, setFeedOpen] = useState(false); // recolhido por padrão (economiza espaço)
+  const [allSessions, setAllSessions] = useState(false); // sessões recentes: mostra poucas e expande
 
   // Ao abrir a aba: sobe sessões pendentes (no-op se deslogado) e carrega o feed.
   useFocusEffect(
@@ -69,13 +71,13 @@ export default function ActivitiesScreen() {
   const pendingCount = sessions.filter((s) => !s.synced).length;
 
   return (
-    <ScreenBG>
+    <ScreenBG hub>
       <View style={styles.titleRow}>
-        <Text style={[styles.title, { color: c.text }]}>Atividades</Text>
+        <Text style={[styles.title, { color: HUB.onBg }]}>Atividades</Text>
         <Pressable
           onPress={() => router.navigate('/compartilhar')}
-          style={[styles.shareChip, { borderColor: c.green }]}>
-          <Text style={[styles.shareChipText, { color: c.green }]}>📤 Compartilhar</Text>
+          style={[styles.shareChip, { borderColor: 'rgba(255,255,255,0.55)' }]}>
+          <Text style={[styles.shareChipText, { color: HUB.onBg }]}>📤 Compartilhar</Text>
         </Pressable>
       </View>
 
@@ -85,20 +87,20 @@ export default function ActivitiesScreen() {
           <Pressable style={styles.feedHeader} onPress={() => setFeedOpen((o) => !o)}>
             <View style={styles.feedHeaderLeft}>
               <Text style={styles.feedHeaderIcon}>📡</Text>
-              <Text style={[styles.feedHeaderTitle, { color: c.purple }]}>
+              <Text style={[styles.feedHeaderTitle, { color: HUB.onBg }]}>
                 Seguindo{feed.length > 0 ? ` (${feed.length})` : ''}
               </Text>
             </View>
-            <Text style={[styles.feedChevron, { color: c.purple }]}>{feedOpen ? '▾' : '▸'}</Text>
+            <Text style={[styles.feedChevron, { color: HUB.onBgDim }]}>{feedOpen ? '▾' : '▸'}</Text>
           </Pressable>
           {!feedOpen ? null : feed.length === 0 ? (
-            <Text style={[styles.hint, { color: c.textFaint, marginTop: 0, textAlign: 'left' }]}>
+            <Text style={[styles.hint, { color: HUB.onBgDim, marginTop: 0, textAlign: 'left' }]}>
               Siga leitores (toque no nome de quem escreve resenhas) e ative seu perfil público no Perfil para
               que as leituras apareçam aqui.
             </Text>
           ) : (
             feed.map((f) => (
-              <Card key={f.id} style={styles.feedRow}>
+              <Card hub key={f.id} style={styles.feedRow}>
                 <Pressable
                   onPress={() => router.push({ pathname: '/usuario', params: { id: f.user_id, name: f.author_name } })}>
                   <Text style={styles.feedAvatar}>{f.author_avatar || '🦉'}</Text>
@@ -128,8 +130,8 @@ export default function ActivitiesScreen() {
       ) : null}
 
       {/* Resumo do dia */}
-      <SectionTitle icon="🏃">Resumo do dia</SectionTitle>
-      <Card glow>
+      <SectionTitle hub icon="🏃">Resumo do dia</SectionTitle>
+      <Card hub glow>
         <View style={styles.dayRow}>
           <View>
             <Text style={[styles.bigGreen, { color: c.green }]}>
@@ -151,7 +153,7 @@ export default function ActivitiesScreen() {
       </Card>
 
       {/* Totais */}
-      <SectionTitle icon="📊">Totais</SectionTitle>
+      <SectionTitle hub icon="📊">Totais</SectionTitle>
       <View style={styles.statGrid}>
         <StatBox label="Tempo total" value={fmtHMS(d.totalSeconds)} />
         <StatBox label="Dias lidos" value={`${d.activeDays}`} />
@@ -160,12 +162,12 @@ export default function ActivitiesScreen() {
       </View>
 
       {/* Recordes */}
-      <SectionTitle icon="🥇">Recordes pessoais</SectionTitle>
-      <Card style={styles.recordRow}>
+      <SectionTitle hub icon="🥇">Recordes pessoais</SectionTitle>
+      <Card hub style={styles.recordRow}>
         <Text style={[styles.recordLabel, { color: c.text }]}>Melhor dia de leitura</Text>
         <Text style={[styles.recordValue, { color: c.green }]}>{d.bestDayMinutes} min</Text>
       </Card>
-      <Card style={styles.recordRow}>
+      <Card hub style={styles.recordRow}>
         <Text style={[styles.recordLabel, { color: c.text }]}>Maior sequência atual</Text>
         <Text style={[styles.recordValue, { color: c.green }]}>
           {d.streak} {d.streak === 1 ? 'dia' : 'dias'}
@@ -175,25 +177,25 @@ export default function ActivitiesScreen() {
       {/* Sessões recentes (cada período de leitura = uma "atividade", §2.6) */}
       {sessions.length > 0 ? (
         <>
-          <SectionTitle icon="📖">Sessões recentes</SectionTitle>
+          <SectionTitle hub icon="📖">Sessões recentes</SectionTitle>
           {configured && !session ? (
             <Pressable onPress={() => router.navigate('/login')} style={styles.syncHint}>
-              <Text style={[styles.syncHintText, { color: c.green }]}>
+              <Text style={[styles.syncHintText, { color: HUB.onBg, fontWeight: '700' }]}>
                 Entre para sincronizar suas atividades na nuvem ›
               </Text>
             </Pressable>
           ) : configured && session && pendingCount > 0 ? (
-            <Text style={[styles.syncHint, styles.syncHintText, { color: c.textFaint }]}>
+            <Text style={[styles.syncHint, styles.syncHintText, { color: HUB.onBgDim }]}>
               ↻ {pendingCount} {pendingCount === 1 ? 'sessão pendente' : 'sessões pendentes'}…
             </Text>
           ) : null}
-          {sessions.slice(0, 8).map((s) => (
+          {sessions.slice(0, allSessions ? 30 : 3).map((s) => (
             <Pressable
               key={s.id}
               onPress={() =>
                 router.navigate({ pathname: '/compartilhar', params: { sessionId: s.id } })
               }>
-              <Card style={styles.sessionRow}>
+              <Card hub style={styles.sessionRow}>
                 <View style={styles.sessionInfo}>
                   <Text style={[styles.sessionTitle, { color: c.text }]} numberOfLines={1}>
                     {s.bookTitle}
@@ -217,11 +219,18 @@ export default function ActivitiesScreen() {
               </Card>
             </Pressable>
           ))}
+          {sessions.length > 3 ? (
+            <Pressable onPress={() => setAllSessions((v) => !v)} style={styles.moreBtn}>
+              <Text style={[styles.moreText, { color: HUB.onBg }]}>
+                {allSessions ? 'Ver menos ▴' : `Ver todas (${sessions.length}) ▾`}
+              </Text>
+            </Pressable>
+          ) : null}
         </>
       ) : null}
 
       {d.totalSeconds === 0 ? (
-        <Text style={[styles.hint, { color: c.textFaint }]}>
+        <Text style={[styles.hint, { color: HUB.onBgDim }]}>
           Comece a ler na aba Leitura — o tempo é registrado automaticamente e aparece aqui.
         </Text>
       ) : null}
@@ -230,9 +239,9 @@ export default function ActivitiesScreen() {
 }
 
 function StatBox({ label, value }: { label: string; value: string }) {
-  const c = useUI();
+  const c = hubUI;
   return (
-    <Card style={styles.statBox}>
+    <Card hub style={styles.statBox}>
       <Text style={[styles.statValue, { color: c.green }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: c.textFaint }]}>{label}</Text>
     </Card>
@@ -240,17 +249,20 @@ function StatBox({ label, value }: { label: string; value: string }) {
 }
 
 function WeekBars({ data }: { data: { label: string; minutes: number }[] }) {
-  const c = useUI();
+  const c = hubUI;
   const max = Math.max(10, ...data.map((x) => x.minutes));
   return (
     <View style={styles.bars}>
       {data.map((x, i) => (
         <View key={i} style={styles.barCol}>
           <View style={[styles.barTrack, { backgroundColor: c.cardElevated }]}>
-            <View
+            <LinearGradient
+              colors={[HUB.barBottom, HUB.barTop]}
+              start={{ x: 0, y: 1 }}
+              end={{ x: 0, y: 0 }}
               style={[
                 styles.bar,
-                { backgroundColor: c.green, height: `${Math.round((x.minutes / max) * 100)}%`, opacity: x.minutes ? 1 : 0.25 },
+                { height: `${Math.round((x.minutes / max) * 100)}%`, opacity: x.minutes ? 1 : 0.25 },
               ]}
             />
           </View>
@@ -295,6 +307,8 @@ const styles = StyleSheet.create({
   sessionValue: { fontSize: 16, fontWeight: '800' },
   sessionPages: { fontSize: 12, marginTop: 2 },
   sessionShare: { fontSize: 16, marginLeft: 2 },
+  moreBtn: { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
+  moreText: { fontSize: 14, fontWeight: '700' },
   feedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 10 },
   feedHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   feedHeaderIcon: { fontSize: 18 },

@@ -1187,3 +1187,165 @@ classes/*.class` de um build anterior em node_modules → refeito com `--include
 **Testado:** revertendo o arquivo p/ 0.5.0 e rodando `npm run postinstall`, ele reaplica p/ 1.0.0 ✔. Agora
 qualquer `npm install`/`expo install` reaplica sozinho → build nativo não quebra mais por isso. ⚠️ se o patch
 poluir de novo, rodar `rm` no .patch + recriar com `--include`.
+
+==========================================================================================
+===== ESTADO CONSOLIDADO (2026-06-26) — IA GRÁTIS + REDESIGN "LAYOUT MODERNO 2026" + FALTANTES =====
+==========================================================================================
+> Tudo ACIMA (até o checkpoint 2026-06-22) continua válido. Esta seção cobre o que foi feito DEPOIS
+> e que ainda NÃO estava neste doc, + a lista de pontos faltantes p/ não se perder.
+
+--- FEITO desde 2026-06-22 (testado/aprovado salvo onde indicado) ---
+
+**1. IA GRÁTIS PADRÃO via proxy (2026-06-23/25) — CLAUDE.md §5:** além do BYOK, o dicionário contextual
+   agora vem LIGADO por padrão p/ quem está logado, usando NOSSA chave Gemini numa **Supabase Edge
+   Function `supabase/functions/ai-proxy`** (nunca embarcada). App chama via `supabase.functions.invoke
+   ('ai-proxy')` (só logado, verify_jwt). Ordem: BYOK > IA grátis (logado) > pede login/chave. Ver
+   `src/services/ai/dictionary.ts` + `managed.ts`. ⚠️ cota grátis do Gemini é ÚNICA p/ todos (boa p/ beta;
+   429 → sugere BYOK/premium). **TODO:** limite por usuário dentro da Edge Function.
+**2. DICIONÁRIO BÁSICO em PT (2026-06-25):** botão "Significado" agora usa **Wiktionary PT** (cai p/ EN) —
+   `src/services/dictionary-basic.ts` (antes era só inglês). Busca de PESSOAS na Comunidade + perfil
+   estilo Instagram + tutorial de voz (commits 39083b1/5cf38ea).
+
+**3. REDESIGN "LAYOUT MODERNO 2026"** (detalhe vivo na minha memória `layout-moderno-2026.md`). Backup:
+   branch `01` + tag `backup-01`. Imagem-guia: hub "LIBRA/Feed" — fundo VERDE clean + cards BRANCOS (NÃO
+   dark-OLED; 1ª versão ficou escura demais e foi reprovada). Acento roxo+verde; o LEITOR continua sépia/
+   claro/escuro. Feito:
+   - **Hub** (`(tabs)/index.tsx`): fundo verde, card "Lendo agora" ROXO (progresso real), cards brancos de
+     atividade/gráfico, biblioteca+estante. Paleta `src/theme/hub.ts` (`HUB` + `hubUI`).
+   - **Nav flutuante** (`components/app-tabs.tsx`): `Tabs` + tabBar custom; **agora OLED dark glass** (pílula
+     escura translúcida, ativo verde-neon `#00FF66`, botão central `#052E16` com halo neon, BlurView tint
+     dark). ⚠️ contraste proposital: nav dark sobre hub verde.
+   - **Liquid Glass (expo-blur ~56.0.3 instalado):** nav + `bookmarks-sheet`. iOS = blur nativo real;
+     **Android = frost translúcido** (blur real exigiria `blurMethod=dimezisBlurView` + `blurTarget`, que
+     captura snapshot que não atualiza ao rolar e pesa → NÃO usamos). Fallbacks translúcidos.
+   - **Aba Atividades** convertida ao skin verde. **Comunidade e Perfil ficam no tema neutro** (pedido do
+     usuário — NÃO converter).
+   - **Capas reais dos livros:** `ImportedBook.coverUrl`; EPUB importado extrai capa embutida (`saveEpubCover`),
+     catálogo baixa a capa do Gutenberg (offline), backfill dos antigos (`services/cover-backfill.ts`),
+     render via `components/book-cover.tsx`. **FALTA: capa de PDF (1ª página).**
+   - **Destaques de marca:** gráfico semanal com gradiente **roxo→verde-neon**; barra do hero neon + glow.
+   - **Menu CONTEXTUAL do leitor:** tocar palavra abre popover flutuante (`components/word-popover.tsx`)
+     perto do toque [Marcar/Significado/✨IA/▶], some no scroll; Significado/IA expandem o `WordPanel`
+     (prop `autoAction`). Coords via `bionic-text` `Word.onPress` (pageX/pageY).
+
+**4. GAMIFICAÇÃO / SESSÃO (laço Strava: ler→registrar→comemorar→compartilhar):**
+   - **Timer ao vivo** na barra de progresso do leitor (`SessionTimer`, isolado).
+   - **Celebração** ao terminar (store efêmero `src/store/session.ts` + `components/celebration-overlay.tsx`
+     na raiz): "Sessão concluída / Conquista desbloqueada" (tempo+páginas+conquistas novas+Compartilhar) e
+     **"Meta concluída"**. Detecção **central** de metas (`src/services/goals.ts` `evaluateGoals()`, chamada
+     no reader a cada tick e ao sair, e em /conquistas) → comemora no momento exato.
+   - **Catálogo de conquistas 8 → 20** (`computeAchievements` agora usa sessions+progress): streaks 3/7/14/30,
+     horas 1/10/50, maratona, fôlego, 100/1000 págs, livro concluído, noite em claro, vocab 10/50/100.
+     Arte = emoji (os anexos do usuário são colagens, não PNGs avulsos).
+
+**5. BUGS DO LEITOR corrigidos:**
+   - **"Voltava ao início" + travava 9s:** resume agora por `initialScrollIndex` + **`getItemLayout`** com
+     altura estimada por parágrafo (salto O(1), sem renderizar o caminho). Lista remonta via `key`. (Trocou
+     o antigo scrollToOffset que clampava, e o scrollToIndex+retry que renderizava tudo.)
+   - **App quebrava no Expo Go:** `reminders.ts` importava `expo-notifications` estaticamente (lança no Expo
+     Go SDK 53+ → derrubava `_layout`/`conquistas`). Agora **require preguiçoso só fora do Expo Go**. Ver
+     memória [[expo-go-native-modules]].
+
+--- PONTOS FALTANTES / PRÓXIMOS PASSOS (a combinar) ---
+
+**A. Fechar a "casca premium" (guia do design system, itens menores):**
+   - Vidro: ✅ extraído `components/glass-sheet.tsx` (`GlassSheet` reutilizável, palette-agnóstico) e aplicado
+     na folha "Aa" (`reading-a11y-sheet`); `bookmarks-sheet` refatorado p/ usá-lo. **Falta:** folhas SOCIAIS
+     CENTRALIZADAS (fade): "Nova meta" (`conquistas`) e coleções (`my-shelf`) → precisam variante centrada do
+     glass (decidir com usuário). `settings-sheet` é PÁGINA (não folha) → fora. `word-popover` (opcional).
+   - ✅ **Grade de conquistas estilo Steam (2026-06-26):** `conquistas.tsx` — células QUADRADAS (`aspectRatio:1`,
+     3/linha, `width:'31%'` sem flexGrow), ícone grande centralizado com **glow neon (`textShadow` verde) só
+     quando destravada**, locked = `opacity:0.55` + 🔒; toque → Alert com desc + progresso. (Antes era card
+     retangular 2/linha com desc inline.)
+   - Card social com **avatares empilhados** de amigos no feed (dados já vêm do Supabase).
+   - ✅ **Ícones SVG do chrome (2026-06-26):** `components/icon.tsx` (`Icon name= size= color=`, 18 glifos
+     traço Lucide). `SectionTitle` aceita `name` (SVG) c/ fallback `icon` (emoji); **21 títulos migrados**
+     (book-reviews, usuario, perfil, profile-scraps, livro, conquistas, comunidade, settings-sheet). Emojis
+     de CONQUISTA continuam badges coloridos (decisão do usuário).
+   - ✅ **`BrandIcon` (2026-06-26) — ícone de DESTAQUE com gradiente da marca (roxo→verde-neon):** mesmo
+     `icon.tsx`. Gradiente via **`useId()`** (id único por instância — ids duplicados COLIDEM no
+     react-native-svg). Glow por **traço empilhado** (2 camadas neon translúcidas), NÃO `<filter>`
+     (`feGaussianBlur` é instável no Android — ver `book-trail.tsx`). Prop `active` alterna gradiente×cor
+     do tema. Aplicado no **hero 🏆 da celebração de META** (`celebration-overlay.tsx`, size 68). Usar só
+     em pontos GRANDES (≥28px) — em 17px o gradiente não lê. ⚠️ Sintaxe RN: `<Stop stopColor>`/`<LinearGradient>`
+     camelCase (não `<stop stop-color>` do web). Próximos pontos possíveis: nav central (precisa glyph
+     'book'), linhas de conquista desbloqueada.
+   - Micro-interações (scroll elástico, feedback de sucesso, animações).
+
+**B. Card compartilhável (§2.6) — FEITO (2026-06-26):** os 3 modelos base (escuro/transparente/compacto)
+   + **3 modelos novos** em `src/components/shareable-card.tsx` (carrossel em `src/app/compartilhar.tsx`):
+   - **'capa'** → as stats SOBRE a capa do livro (`refBook.coverUrl`) com véu escuro (`SCRIM`
+     LinearGradient) p/ legibilidade; sem capa cai no gradiente + aviso "Este livro ainda não tem capa".
+   - **'foto'** → as stats SOBRE uma foto do usuário; botão **"📸 Escolher foto"** aparece só nessa
+     variante (`expo-image-picker` ~56.0.18, `mediaTypes:['images']`, aspect 4:5) → `photoUri` passa ao card.
+   - **'citacao'** → trecho MARCADO (bookmark mais recente do livro: `bookmarks[refBookId]?.[0].snippet`) +
+     título do livro, com aspas grandes verdes; sem bookmark mostra "Marque um trecho no leitor…".
+   - A **trilha do livro** já existia no modelo 'escuro' (showTrail). Livro de referência = o da sessão,
+     senão `currentBookId`. Fundo de imagem usa `expo-image` (`Image` + `StyleSheet.absoluteFill`).
+   ⚠️ **Gotchas:** (1) salvar-na-galeria/sticker do Story exigem dev build (Expo Go limita — já doc.);
+   (2) `expo-image-picker` é módulo nativo → no dev build ANTIGO falta no binário (`Cannot find native
+   module 'ExponentImagePicker'`). O **import estático derrubava a rota inteira** ("missing default
+   export") → trocado por **import preguiçoso dentro de `onPickPhoto`** com try/catch (avisa p/ rebuildar
+   `npx expo run:android` ou Expo Go tecla `s`, sem quebrar a tela). Padrão [[expo-go-native-modules]];
+   (3) `view-shot` + `expo-image` (race da 1ª captura) — **RESOLVIDO:** antes de `captureRef`, quando o
+   modelo tem imagem de fundo (`activeBg` = capa/foto), o `capture()` faz `Image.prefetch(uri)` + espera
+   **2 frames** (`requestAnimationFrame` aninhado) p/ a imagem decodificar/pintar; senão o PNG saía só com
+   o gradiente. `tsc` limpo.
+   **Robustez da CITAÇÃO (2026-06-26):** o `snippet` antes era `paragraphs[idx].slice(0,90)` (cortava no
+   MEIO da palavra e era só o parágrafo do topo da tela). Agora há `cleanSnippet(raw, max, assumeCut)` em
+   `src/services/text-utils.ts` (normaliza espaços, corta na FRONTEIRA de palavra, põe "…"). Origem
+   (`reader.tsx`) grava com `cleanSnippet(p, 180)`; o card aplica `cleanSnippet(q, 180, true)` (`assumeCut`
+   remenda os marcadores ANTIGOS de 90 chars). `snippet` é só exibição (navegação usa `offset`/`index`) →
+   mudar o tamanho não quebra reconhecimento.
+   **CITAÇÃO DE VERDADE — FEITO (2026-06-26):** seleção de trecho EXATO no leitor → grifo persistido →
+   o card de citação puxa o grifo. Peças:
+   - **Store** (`library.ts`): novo tipo `Highlight {id,index,start,end,text,createdAt}` + `highlights:
+     Record<bookId, Highlight[]>` (persistido) + `addHighlight`/`removeHighlight`. `text` já vem limpo.
+   - **Seleção dentro de UM parágrafo** (cross-paragraph ficou de fora p/ não arriscar perf): tocar palavra
+     → popover ganhou **"✎ Grifar"** (entra no modo seleção, âncora=palavra); tocar OUTRA palavra do mesmo
+     parágrafo amplia (handleWord checa `selectionRef`); barra flutuante `components/selection-bar.tsx`
+     [Cancelar/✎ Grifar/" Citar] com prévia. "Citar" salva e abre `/compartilhar?model=citacao`.
+   - **Render do grifo** (`bionic-text.tsx`): props novas `selRange/selColor` (seleção ativa) e
+     `savedRanges/savedColor` (grifos salvos), overlap por offset de char. **Memoização preservada**: cores
+     `t.accent+'55'/'2E'` são string-estáveis por valor; `savedRangesByPara` (Map memoizado) → só o parágrafo
+     afetado re-renderiza. `extraData` da FlatList agora inclui seleção + nº de grifos.
+   - **Remover grifo**: tocar palavra dentro de um grifo → popover mostra "✕ Grifo".
+   - **Card** (`shareable-card.tsx`): citação prefere `highlights[book][0].text`; cai no snippet do bookmark
+     se não houver grifo. `/compartilhar` abre no modelo certo via `?model=` (`initialScrollIndex`).
+   - ⚠️ offsets do grifo = char no texto do parágrafo (`paragraphs[index]`), alinhados com `tk.start` do
+     bionic-text. Limite: seleção é por palavra (inclui pontuação do token) e só no mesmo parágrafo.
+   **Falta (menor):** autor no card de citação (store `ImportedBook` não guarda `author`, só `title`);
+   seleção cross-parágrafo; tela de gerenciar grifos.
+
+**C. Acessibilidade (usuário achou PROMISSOR) — INCREMENTO 1 FEITO (2026-06-26):**
+   - **Preferências do leitor agora PERSISTEM** (antes resetavam a cada abertura): store ganhou
+     `readerPrefs` (`src/store/library.ts`: theme, fontSize, bionic, **bionicRatio, lineSpacing,
+     letterSpacing**) + `setReaderPrefs`; o reader lê/escreve do store (tema/fonte/Bionic enfim guardam).
+   - **Folha "Leitura e acessibilidade"** (`components/reading-a11y-sheet.tsx`, botão **"Aa"** na barra do
+     leitor): intensidade do Bionic (leve/médio/forte = ratio 0.35/0.45/0.55), **entrelinha** (1.0/1.2/1.45),
+     **espaço entre letras** (0/0.6/1.2), preset **"🧠 Modo Dislexia"** e "Padrão". `BionicParagraph` ganhou
+     `letterSpacing`; lineHeight usa o multiplicador.
+   - **FALTA (incremento 2): sílaba tônica** (destacar a tônica — exige silabação + regras de acento PT-BR,
+     oxítona/paroxítona/proparoxítona) e, opcional, **fonte OpenDyslexic** (empacotar via expo-font).
+     Áudio dinâmico (entonação/emoção) = evolução do TTS premium, futuro.
+
+**D. Leitor / áudio (limites conhecidos, deferidos):** karaokê **por palavra** REMOVIDO (travava no
+   emulador/dev — só reavaliar em build de release/aparelho físico, por frases ou destaque nativo); **áudio
+   em background** do TTS (§4.1: `shouldPlayInBackground` + Foreground Service/track-player); PDF: extração
+   paginada/offline (hoje cap 150 págs, base64 inteiro na WebView) e modo "página fiel".
+
+**E. Lançamento (Fase 4) — código pronto p/ closed test; falta console/conta:**
+   - **Política de Privacidade:** texto pronto (`docs/POLITICA-DE-PRIVACIDADE.md`) — falta preencher
+     〔responsável〕+〔e-mail〕, HOSPEDAR numa URL, informar nas lojas e **linkar no app** (Perfil→Privacidade).
+   - **"Continuar como convidado"** (risco Apple 5.1.1(v); login hoje é obrigatório).
+   - **Paywall + RevenueCat/IAP** (premium = IA/OCR gerida + gráficos avançados + feed avançado).
+   - Google Play: build AAB assinado (keystore próprio), Data Safety (mapa em `PRIVACIDADE.md`), ~12
+     testadores 14 dias. iOS: EAS + Apple $99 + `ios.bundleIdentifier`.
+
+**F. Backend / pendências menores:** limite da IA grátis por usuário (cota na Edge Function); foto de avatar
+   (Supabase Storage + image-picker); kudos/comentários por RESENHA (backlog). **Sync de atividades = FEITO**
+   (`services/activity-sync.ts`, chamado no reader/atividades).
+
+**COMO RODAR:** `npx expo start` + `a` (dev build no emulador Medium_Phone) OU tecla `s` p/ Expo Go (blur
+real do expo-blur funciona no Expo Go; no dev build antigo o módulo nativo falta → rebuild `npx expo
+run:android`). Build verificado com `tsc --noEmit` limpo ao longo de toda esta sessão.

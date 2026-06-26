@@ -264,7 +264,7 @@ export default function BookScreen() {
           </View>
 
           {/* Estante: escolher/trocar status */}
-          <SectionTitle icon="📚">Minha estante</SectionTitle>
+          <SectionTitle name="books">Minha estante</SectionTitle>
           <Text style={[styles.hint, { color: c.textFaint }]}>
             {!user
               ? 'Entre na sua conta para montar a estante.'
@@ -295,7 +295,7 @@ export default function BookScreen() {
           {/* Temperatura na comunidade */}
           {totalReaders > 0 ? (
             <>
-              <SectionTitle icon="🔥">Na comunidade</SectionTitle>
+              <SectionTitle name="flame">Na comunidade</SectionTitle>
               <Card>
                 {SHELF_STATUSES.filter((st) => counts[st] > 0).map((st) => (
                   <View key={st} style={styles.countRow}>
@@ -312,7 +312,7 @@ export default function BookScreen() {
           {/* Quem está lendo (só perfis públicos — §4.8) */}
           {readers.length > 0 ? (
             <>
-              <SectionTitle icon="👥">Quem está lendo</SectionTitle>
+              <SectionTitle name="users">Quem está lendo</SectionTitle>
               {readers.map((r) => (
                 <Pressable
                   key={r.user_id}
@@ -341,7 +341,7 @@ export default function BookScreen() {
             <>
               {synopsis ? (
                 <>
-                  <SectionTitle icon="📝">Sinopse</SectionTitle>
+                  <SectionTitle name="fileText">Sinopse</SectionTitle>
                   <Text
                     style={[styles.synopsis, { color: c.textDim }]}
                     numberOfLines={expandSynopsis ? undefined : 6}>
@@ -359,7 +359,7 @@ export default function BookScreen() {
 
               {details && (details.pages || details.language || genres.length) ? (
                 <>
-                  <SectionTitle icon="ℹ️">Ficha</SectionTitle>
+                  <SectionTitle name="info">Ficha</SectionTitle>
                   <Card>
                     {details.pages ? (
                       <FichaRow label="Páginas" value={String(details.pages)} c={c} />
@@ -386,7 +386,7 @@ export default function BookScreen() {
           {/* Livros do mesmo autor */}
           {similar.length > 0 ? (
             <>
-              <SectionTitle icon="✍️">Do mesmo autor</SectionTitle>
+              <SectionTitle name="edit">Do mesmo autor</SectionTitle>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.similarRow}>
                 {similar.map((b) => (
                   <Pressable

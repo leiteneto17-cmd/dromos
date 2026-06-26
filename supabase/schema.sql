@@ -368,6 +368,12 @@ alter table public.book_shelves
 -- Perfil público? (default false = privado, respeitando §4.8)
 alter table public.profiles add column if not exists is_public boolean not null default false;
 
+-- Emblemas (conquistas) DESBLOQUEADOS — array de ids (ex.: ["first-book","streak-7"]) p/
+-- aparecerem no perfil PÚBLICO. O catálogo/arte mora no app (services/progress.ts +
+-- theme/medals.ts); aqui guardamos só quais foram conquistados. Lê junto com o profile
+-- (mesma policy de leitura), então segue a visibilidade do perfil.
+alter table public.profiles add column if not exists badges jsonb not null default '[]'::jsonb;
+
 -- ---------- SEGUIR leitores (com PEDIDO/APROVAÇÃO p/ perfis privados) ----------
 -- Perfil PÚBLICO: seguir é aceito na hora. PRIVADO: vira PEDIDO (status 'pending') que
 -- o dono aprova. O trigger abaixo define o status (cliente não escolhe — segurança).

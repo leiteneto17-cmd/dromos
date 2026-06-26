@@ -10,6 +10,7 @@
  * tenta o deep link e, se não der, cai no share sheet.
  */
 import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
 import * as Sharing from 'expo-sharing';
 import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -59,25 +60,50 @@ function Checkerboard() {
 
 export default function ShareScreen() {
   const c = useUI();
-  const [index, setIndex] = useState(0);
+  // Se veio `?model=`, abre o carrossel já naquele modelo (ex.: 'citacao' vindo do leitor).
+  const params = useLocalSearchParams<{ sessionId?: string; model?: string }>();
+  const initialIndex = Math.max(0, CARD_VARIANTS.findIndex((v) => v.id === params.model));
+  const [index, setIndex] = useState(initialIndex);
   const [busy, setBusy] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
   const shotRefs = useRef<(ElementRef<typeof ViewShot> | null)[]>([]);
 
   // Se veio um sessionId (compartilhar UMA atividade), o card mostra aquela sessão.
-  const params = useLocalSearchParams<{ sessionId?: string }>();
   const session = useLibrary((s) => s.sessions.find((x) => x.id === params.sessionId));
+  const books = useLibrary((s) => s.books);
+  const currentBookId = useLibrary((s) => s.currentBookId);
 
   const variant: CardVariant = CARD_VARIANTS[index].id;
+
+  // Imagem de fundo do modelo ativo (mesma regra do card): capa do livro ou a foto.
+  const refBookId = session?.bookId ?? currentBookId ?? null;
+  const coverUri = refBookId ? books.find((b) => b.id === refBookId)?.coverUrl : undefined;
+  const activeBg = variant === 'capa' ? coverUri : variant === 'foto' ? photoUri : undefined;
 
   function onScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN);
     if (i !== index) setIndex(i);
   }
 
+  /** Aguarda dois frames para o React Native PINTAR antes de capturar. */
+  function waitTwoFrames() {
+    return new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res())));
+  }
+
   async function capture(result: 'tmpfile' | 'base64'): Promise<string | null> {
     const ref = shotRefs.current[index];
     if (!ref) return null;
     try {
+      // Modelos com imagem de fundo (capa/foto): garante que a imagem já decodificou
+      // ANTES de capturar — senão o PNG sai só com o gradiente (race do expo-image).
+      if (activeBg) {
+        try {
+          await Image.prefetch(activeBg);
+        } catch {
+          /* prefetch é best-effort; segue mesmo se falhar */
+        }
+        await waitTwoFrames();
+      }
       return await captureRef(ref, { format: 'png', quality: 1, result });
     } catch (e) {
       Alert.alert('Ops', 'Não consegui gerar a imagem do card.');
@@ -159,6 +185,38 @@ export default function ShareScreen() {
       Alert.alert('Link copiado', 'Link placeholder — vira o link do seu perfil quando tivermos backend.');
     });
 
+  const onPickPhoto = () =>
+    withBusy(async () => {
+      // Módulo nativo: ausente no Expo Go e em dev build gerado ANTES de instalar o
+      // pacote (erro "Cannot find native module 'ExponentImagePicker'"). Carregamos
+      // preguiçosamente e, se faltar, avisamos em vez de derrubar a tela.
+      let ImagePicker: typeof import('expo-image-picker');
+      try {
+        ImagePicker = await import('expo-image-picker');
+        if (typeof ImagePicker.launchImageLibraryAsync !== 'function') throw new Error('no native module');
+      } catch {
+        Alert.alert(
+          'Recurso indisponível',
+          'Escolher foto precisa do app de desenvolvimento atualizado. Rode "npx expo run:android" para reconstruir, ou use o Expo Go (tecla s).',
+        );
+        return;
+      }
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permissão necessária', 'Autorize o acesso às fotos para usar uma imagem sua de fundo.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 5],
+        quality: 0.9,
+      });
+      if (!res.canceled && res.assets[0]?.uri) {
+        setPhotoUri(res.assets[0].uri);
+      }
+    });
+
   const onInstagram = () =>
     withBusy(async () => {
       const uri = await capture('tmpfile');
@@ -202,6 +260,8 @@ export default function ShareScreen() {
           data={CARD_VARIANTS}
           keyExtractor={(v) => v.id}
           onMomentumScrollEnd={onScrollEnd}
+          initialScrollIndex={initialIndex}
+          getItemLayout={(_, i) => ({ length: SCREEN, offset: SCREEN * i, index: i })}
           style={styles.flex}
           renderItem={({ item, index: i }) => (
             <View style={styles.page}>
@@ -212,7 +272,7 @@ export default function ShareScreen() {
                     shotRefs.current[i] = r;
                   }}
                   style={styles.shot}>
-                  <ShareableCard variant={item.id} session={session} />
+                  <ShareableCard variant={item.id} session={session} photoUri={photoUri} />
                 </ViewShot>
               </View>
             </View>
@@ -229,6 +289,15 @@ export default function ShareScreen() {
             />
           ))}
         </View>
+
+        {/* Ação contextual: escolher foto de fundo (só na variante 'foto') */}
+        {variant === 'foto' ? (
+          <Pressable onPress={onPickPhoto} style={[styles.pickPhoto, { borderColor: c.green }]}>
+            <Text style={[styles.pickPhotoText, { color: c.green }]}>
+              📸 {photoUri ? 'Trocar foto' : 'Escolher foto'}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {/* Barra de compartilhamento (estilo Strava) */}
         <View style={styles.shareBar}>
@@ -270,6 +339,15 @@ const styles = StyleSheet.create({
   cardSlot: { borderRadius: 28, overflow: 'hidden' },
   shot: { borderRadius: 28, overflow: 'hidden' },
   variantName: { textAlign: 'center', fontSize: 15, fontWeight: '800', marginTop: 4 },
+  pickPhoto: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  pickPhotoText: { fontSize: 14, fontWeight: '700' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 8 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   dotActive: { width: 22 },

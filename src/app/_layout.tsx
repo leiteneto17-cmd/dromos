@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { CelebrationOverlay } from '@/components/celebration-overlay';
 import { useUI } from '@/hooks/use-ui';
 import { setupNotificationHandler } from '@/services/reminders';
 import { useAuth } from '@/store/auth';
@@ -69,6 +70,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" />
         </Stack.Protected>
       </Stack>
+      <CelebrationOverlay />
       {initializing ? <BootGate /> : null}
     </ThemeProvider>
   );

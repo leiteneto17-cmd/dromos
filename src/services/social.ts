@@ -13,6 +13,8 @@ export type PublicProfile = {
   name: string | null;
   avatar_url: string | null;
   is_public: boolean;
+  /** Emblemas (conquistas) desbloqueados — ids; default [] p/ perfis antigos sem a coluna. */
+  badges: string[];
 };
 
 export type FeedItem = {
@@ -49,12 +51,14 @@ export async function searchUsers(query: string): Promise<PublicProfile[]> {
   const safe = q.replace(/[%_]/g, '\\$&');
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, avatar_url, is_public')
+    .select('id, name, avatar_url, is_public, badges')
     .eq('is_public', true)
     .ilike('name', `%${safe}%`)
     .limit(20);
   if (error || !data) return [];
-  return (data as PublicProfile[]).filter((p) => p.id !== me && (p.name ?? '').trim().length > 0);
+  return (data as PublicProfile[])
+    .filter((p) => p.id !== me && (p.name ?? '').trim().length > 0)
+    .map((p) => ({ ...p, badges: Array.isArray(p.badges) ? p.badges : [] }));
 }
 
 /** Dados públicos de um perfil (qualquer autenticado pode ler profiles). */
@@ -62,11 +66,12 @@ export async function getUserProfile(userId: string): Promise<PublicProfile | nu
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, avatar_url, is_public')
+    .select('id, name, avatar_url, is_public, badges')
     .eq('id', userId)
     .maybeSingle();
   if (error || !data) return null;
-  return data as PublicProfile;
+  const p = data as PublicProfile;
+  return { ...p, badges: Array.isArray(p.badges) ? p.badges : [] };
 }
 
 /** Estante de outra pessoa (a RLS só devolve se o perfil for público — ou se for a minha). */

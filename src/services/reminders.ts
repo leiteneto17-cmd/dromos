@@ -13,9 +13,18 @@
  * (CLAUDE.md §3), onde funciona. Detectamos Expo Go para não quebrar e avisar o usuário.
  */
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
 
 const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
+
+// ⚠️ `expo-notifications` LANÇA erro só de ser importado no Expo Go (push removido no
+// SDK 53+) — e isso derrubava o app inteiro (o _layout importa este módulo). Por isso
+// carregamos o pacote de forma PREGUIÇOSA e SÓ fora do Expo Go. No Expo Go fica null e
+// todas as funções caem cedo no guard IS_EXPO_GO (lembretes só valem no dev build).
+type NotificationsModule = typeof import('expo-notifications');
+let Notifications: NotificationsModule | null = null;
+if (!IS_EXPO_GO) {
+  Notifications = require('expo-notifications') as NotificationsModule;
+}
 
 /** Identificador estável do lembrete diário (um só; reagendar substitui). */
 const DAILY_ID = 'leitura-daily-reminder';
@@ -28,7 +37,7 @@ let handlerSet = false;
 export function setupNotificationHandler(): void {
   if (handlerSet || IS_EXPO_GO) return;
   handlerSet = true;
-  Notifications.setNotificationHandler({
+  Notifications!.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
@@ -41,10 +50,10 @@ export function setupNotificationHandler(): void {
 /** Pede permissão de notificação. Retorna true se concedida. */
 export async function requestReminderPermission(): Promise<boolean> {
   if (IS_EXPO_GO) return false;
-  const current = await Notifications.getPermissionsAsync();
+  const current = await Notifications!.getPermissionsAsync();
   if (current.granted) return true;
   if (!current.canAskAgain) return false;
-  const asked = await Notifications.requestPermissionsAsync();
+  const asked = await Notifications!.requestPermissionsAsync();
   return asked.granted;
 }
 
@@ -62,11 +71,11 @@ export async function scheduleDailyReminder(
   const ok = await requestReminderPermission();
   if (!ok) return false;
   await cancelDailyReminder();
-  await Notifications.scheduleNotificationAsync({
+  await Notifications!.scheduleNotificationAsync({
     identifier: DAILY_ID,
     content: { title: '+leitura', body },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      type: Notifications!.SchedulableTriggerInputTypes.DAILY,
       hour,
       minute,
     },
@@ -78,7 +87,7 @@ export async function scheduleDailyReminder(
 export async function cancelDailyReminder(): Promise<void> {
   if (IS_EXPO_GO) return;
   try {
-    await Notifications.cancelScheduledNotificationAsync(DAILY_ID);
+    await Notifications!.cancelScheduledNotificationAsync(DAILY_ID);
   } catch {
     // não havia nada agendado — ok
   }

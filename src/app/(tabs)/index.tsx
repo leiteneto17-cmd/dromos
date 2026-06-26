@@ -6,36 +6,22 @@
  * Esta tela tem cores próprias (verde + branco) para bater com a imagem aprovada — não
  * segue o claro/escuro do app (é a "pele" do feed). O leitor continua sépia/claro/escuro.
  */
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { MyShelf } from '@/components/my-shelf';
 import { importBookFlow } from '@/app/biblioteca';
 import { BottomTabInset } from '@/constants/theme';
+import { backfillCovers } from '@/services/cover-backfill';
 import { deriveStats } from '@/services/progress';
 import { displayName, useAuth } from '@/store/auth';
 import { useLibrary, type ImportedBook } from '@/store/library';
 import { useProfile } from '@/store/profile';
-
-// Paleta do hub (verde clean + cards brancos) — fiel à imagem aprovada.
-const HUB = {
-  grad: ['#2C7E5E', '#1F6147', '#1B4F3D'] as const, // verde vibrante → mais fechado
-  hero: '#5B4FA6', // roxo do card de leitura
-  cardBg: '#FFFFFF',
-  cardText: '#1A1A1A',
-  cardMuted: '#6B7280',
-  purple: '#6E4FB0',
-  greenInk: '#0FA968', // verde para texto/acento sobre branco
-  onBg: '#FFFFFF', // texto sobre o fundo verde
-  onBgDim: '#CFEFDD',
-  green: '#5EF0A0', // verde-neon (barra do hero)
-  onGreen: '#0E2A1E',
-  barTop: '#27C892',
-  barBottom: '#0C5E46',
-};
+import { HUB } from '@/theme/hub';
 
 const TILE_COLORS = ['#4C3A7A', '#3A5A78', '#6A3A5A', '#3A6A55', '#5A4A2A'];
 
@@ -88,6 +74,12 @@ export default function HubScreen() {
   const firstName = name.split(' ')[0];
   const avatar = profile?.avatar_url;
 
+  // Capas: extrai (uma vez) a capa embutida dos EPUBs importados antes de termos
+  // `coverUrl`. Roda em segundo plano — o livro aparece com 📖 e troca pela capa.
+  useEffect(() => {
+    void backfillCovers();
+  }, []);
+
   function open(book: ImportedBook) {
     openBook(book.id);
     router.navigate('/reader');
@@ -128,10 +120,14 @@ export default function HubScreen() {
           {/* Lendo agora — card hero roxo (progresso real) */}
           <Pressable onPress={continueReading}>
             <View style={styles.hero}>
-              <View style={styles.heroCover}>
-                <Text style={styles.heroCoverText}>{current ? current.format.toUpperCase() : 'LER'}</Text>
-                <Text style={styles.heroCoverIcon}>📖</Text>
-              </View>
+              {current?.coverUrl ? (
+                <Image source={{ uri: current.coverUrl }} style={styles.heroCover} contentFit="cover" transition={150} />
+              ) : (
+                <View style={styles.heroCover}>
+                  <Text style={styles.heroCoverText}>{current ? current.format.toUpperCase() : 'LER'}</Text>
+                  <Text style={styles.heroCoverIcon}>📖</Text>
+                </View>
+              )}
               <View style={styles.heroBody}>
                 <Text style={styles.heroKicker}>Lendo agora</Text>
                 <Text style={styles.heroTitle} numberOfLines={2}>
@@ -204,11 +200,21 @@ export default function HubScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelf}>
               {books.map((b, i) => (
                 <Pressable key={b.id} onPress={() => open(b)} style={styles.tileWrap}>
-                  <View style={[styles.tile, { backgroundColor: TILE_COLORS[i % TILE_COLORS.length] }]}>
-                    <Text style={styles.tileBadge}>{b.format.toUpperCase()}</Text>
-                    <Text style={styles.tileTitle} numberOfLines={4}>
-                      {b.title ?? b.name}
-                    </Text>
+                  <View style={[styles.tile, !b.coverUrl && { backgroundColor: TILE_COLORS[i % TILE_COLORS.length] }]}>
+                    {b.coverUrl ? (
+                      <Image
+                        source={{ uri: b.coverUrl }}
+                        style={[StyleSheet.absoluteFill, styles.tileImage]}
+                        contentFit="cover"
+                        transition={150}
+                      />
+                    ) : null}
+                    <Text style={[styles.tileBadge, b.coverUrl && styles.tileBadgeOnCover]}>{b.format.toUpperCase()}</Text>
+                    {b.coverUrl ? null : (
+                      <Text style={styles.tileTitle} numberOfLines={4}>
+                        {b.title ?? b.name}
+                      </Text>
+                    )}
                   </View>
                   <Text style={styles.tileCaption} numberOfLines={1}>
                     {b.title ?? b.name}
@@ -229,8 +235,6 @@ export default function HubScreen() {
               </View>
             </ScrollView>
           )}
-
-          <MyShelf onDark />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -293,8 +297,17 @@ const styles = StyleSheet.create({
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 12 },
   heroSub: { color: '#E7E1FB', fontSize: 13 },
   heroPct: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  heroTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', marginTop: 6, overflow: 'hidden' },
-  heroFill: { height: '100%', borderRadius: 4, backgroundColor: HUB.green },
+  heroTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', marginTop: 6 },
+  heroFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: HUB.neon,
+    shadowColor: HUB.neon,
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
   heroChapter: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginTop: 12 },
 
   // Cards de feed BRANCOS
@@ -328,8 +341,19 @@ const styles = StyleSheet.create({
   ctaText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
   shelf: { gap: 14, paddingVertical: 4, paddingRight: 8 },
   tileWrap: { width: 110 },
-  tile: { width: 110, height: 156, borderRadius: 14, padding: 10, justifyContent: 'space-between', ...cardShadow },
+  tile: { width: 110, height: 156, borderRadius: 14, padding: 10, justifyContent: 'space-between', overflow: 'hidden', ...cardShadow },
+  tileImage: { borderRadius: 14 },
   tileBadge: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '800' },
+  // Sobre a capa real, o selo do formato ganha um fundo escuro p/ ler em qualquer imagem.
+  tileBadgeOnCover: {
+    alignSelf: 'flex-start',
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
   tileTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
   tileCaption: { color: HUB.onBgDim, fontSize: 12, marginTop: 6 },
   tileStack: { width: 110, height: 156, justifyContent: 'space-between' },

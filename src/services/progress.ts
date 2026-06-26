@@ -3,7 +3,7 @@
  * (livros, tempo de leitura por dia, vocabulário). Tudo derivado — sem inventar
  * dados. Usado pelo HUB (nível/badges), Atividades, Conquistas e Perfil.
  */
-import type { Goal, ReadingStats } from '@/store/library';
+import type { Goal, ReadingSession, ReadingStats } from '@/store/library';
 
 export type DerivedStats = {
   totalSeconds: number;
@@ -79,9 +79,27 @@ export function computeAchievements(input: {
   booksCount: number;
   vocabCount: number;
   derived: DerivedStats;
+  /** Opcional: habilita as conquistas baseadas em sessões (páginas, sessão longa, noite). */
+  sessions?: ReadingSession[];
+  /** Opcional: progresso por livro (0..1) — habilita "Livro concluído". */
+  progress?: Record<string, number>;
 }): Achievement[] {
-  const { booksCount, vocabCount, derived } = input;
+  const { booksCount, vocabCount, derived, sessions = [], progress = {} } = input;
   const hours = derived.totalSeconds / 3600;
+
+  // Métricas derivadas das sessões (estilo Strava) — 0 quando não há sessões.
+  const totalPages = sessions.reduce((a, s) => a + (s.pages || 0), 0);
+  const maxSessionPages = sessions.reduce((a, s) => Math.max(a, s.pages || 0), 0);
+  const maxSessionMin = sessions.reduce((a, s) => Math.max(a, (s.seconds || 0) / 60), 0);
+  // "Noite em claro": alguma sessão iniciada entre meia-noite e 5h (hora local).
+  const nightOwl = sessions.some((s) => {
+    const h = new Date(s.startedAt).getHours();
+    return h >= 0 && h < 5;
+  })
+    ? 1
+    : 0;
+  // "Livro concluído": algum livro lido até ~o fim (≥97%).
+  const booksCompleted = Object.values(progress).filter((p) => p >= 0.97).length;
 
   const make = (
     id: string,
@@ -100,15 +118,57 @@ export function computeAchievements(input: {
   });
 
   return [
+    // Iniciação & exploração
     make('first-book', '📚', 'Primeira leitura', 'Adicione 1 livro', booksCount, 1),
+    make('first-mark', '🔖', 'Primeira marcação', 'Marque 1 palavra', vocabCount, 1),
     make('shelf', '🗂️', 'Estante', 'Tenha 5 livros', booksCount, 5),
+    make('collector', '📚', 'Colecionador', 'Tenha 25 livros', booksCount, 25),
+    // Consistência
     make('streak-3', '🔥', 'Pegando o ritmo', '3 dias seguidos', derived.streak, 3),
-    make('streak-7', '🔥', 'Maratona', '7 dias seguidos', derived.streak, 7),
+    make('streak-7', '🔥', 'Semana de leitura', '7 dias seguidos', derived.streak, 7),
+    make('streak-14', '🔥', 'Hábito firme', '14 dias seguidos', derived.streak, 14),
+    make('streak-30', '🏅', 'Sequência de ouro', '30 dias seguidos', derived.streak, 30),
+    // Tempo
     make('hour-1', '⏱️', 'Imersão', '1 hora de leitura', hours, 1),
     make('hour-10', '⏱️', 'Dedicado', '10 horas de leitura', hours, 10),
+    make('hour-50', '⏱️', 'Veterano', '50 horas de leitura', hours, 50),
+    make('marathon', '⚡', 'Maratona do leitor', 'Uma sessão de 60 min', maxSessionMin, 60),
+    // Páginas (sessões)
+    make('pages-burst', '📄', 'Fôlego', '10 páginas numa sessão', maxSessionPages, 10),
+    make('pages-100', '📖', 'Passador de páginas', 'Leia 100 páginas', totalPages, 100),
+    make('pages-1000', '📚', 'Mil páginas', 'Leia 1000 páginas', totalPages, 1000),
+    make('book-done', '✅', 'Livro concluído', 'Termine um livro', booksCompleted, 1),
+    make('night-owl', '🌙', 'Noite em claro', 'Leia após a meia-noite', nightOwl, 1),
+    // Vocabulário
     make('words-10', '💬', 'Curioso', 'Marque 10 palavras', vocabCount, 10),
     make('words-50', '🧠', 'Vocabulário+', 'Marque 50 palavras', vocabCount, 50),
+    make('words-100', '🧠', 'Poliglota', 'Marque 100 palavras', vocabCount, 100),
   ];
+}
+
+/** Catálogo dos emblemas (id/ícone/título/desc) sem nenhum desbloqueado — derivado de
+ * `computeAchievements` com entradas zeradas. Serve p/ reconstruir a lista a partir só
+ * dos ids (ex.: emblemas de OUTRO usuário lidos do Supabase, no perfil público). */
+const EMPTY_DERIVED: DerivedStats = {
+  totalSeconds: 0,
+  activeDays: 0,
+  avgMinPerDay: 0,
+  streak: 0,
+  level: 1,
+  levelProgress: 0,
+  last7: [],
+  bestDayMinutes: 0,
+};
+
+/** Reconstrói `Achievement[]` marcando como desbloqueados só os ids passados (o resto fica
+ * bloqueado). Usado no perfil público, onde só temos a lista de ids vinda do backend. */
+export function achievementsFromIds(unlockedIds: string[]): Achievement[] {
+  const set = new Set(unlockedIds);
+  return computeAchievements({ booksCount: 0, vocabCount: 0, derived: EMPTY_DERIVED }).map((a) => ({
+    ...a,
+    unlocked: set.has(a.id),
+    progress: set.has(a.id) ? 1 : 0,
+  }));
 }
 
 // ---------- METAS (Fase 6) ----------

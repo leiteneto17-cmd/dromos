@@ -5,10 +5,12 @@
  * (retráteis), Metas, Vocabulário e a parte social (recados + solicitações).
  */
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MyShelf } from '@/components/my-shelf';
+import { PressableScale } from '@/components/pressable-scale';
 import { ProfileEditor } from '@/components/profile-editor';
 import { ProfileHeader } from '@/components/profile-header';
 import { SettingsSheet } from '@/components/settings-sheet';
@@ -20,7 +22,7 @@ import { computeAchievements, deriveStats } from '@/services/progress';
 import { approveRequest, getFollowRequests, rejectRequest, type FollowRequest } from '@/services/social';
 import { displayName, useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
-import { useProfile } from '@/store/profile';
+import { syncBadges, useProfile } from '@/store/profile';
 
 export default function ProfileScreen() {
   const c = useUI();
@@ -28,6 +30,8 @@ export default function ProfileScreen() {
   const vocab = useLibrary((s) => s.vocab);
   const removeVocab = useLibrary((s) => s.removeVocab);
   const stats = useLibrary((s) => s.stats);
+  const sessions = useLibrary((s) => s.sessions);
+  const bookProgress = useLibrary((s) => s.progress);
   const user = useAuth((s) => s.user);
   const configured = useAuth((s) => s.configured);
   const profile = useProfile((s) => s.profile);
@@ -52,9 +56,24 @@ export default function ProfileScreen() {
   }
 
   const derived = deriveStats(stats);
-  const achievements = computeAchievements({ booksCount: books, vocabCount: vocab.length, derived });
-  const unlocked = achievements.filter((a) => a.unlocked).length;
+  const achievements = computeAchievements({
+    booksCount: books,
+    vocabCount: vocab.length,
+    derived,
+    sessions,
+    progress: bookProgress,
+  });
+  const unlockedIds = achievements.filter((a) => a.unlocked).map((a) => a.id);
+  const unlocked = unlockedIds.length;
   const headerName = profile?.name?.trim() || displayName(user);
+
+  // Espelha os emblemas desbloqueados no perfil do banco, p/ aparecerem no perfil
+  // PÚBLICO (outras pessoas veem). No-op se nada mudou / deslogado (ver syncBadges).
+  const badgesKey = unlockedIds.join(',');
+  useEffect(() => {
+    void syncBadges(unlockedIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [badgesKey]);
 
   return (
     <ScreenBG>
@@ -96,7 +115,7 @@ export default function ProfileScreen() {
         </Pressable>
       ) : (
         <>
-          <Pressable onPress={() => router.navigate({ pathname: '/usuario', params: { id: user.id, name: headerName } })}>
+          <PressableScale onPress={() => router.navigate({ pathname: '/usuario', params: { id: user.id, name: headerName } })}>
             <Card style={styles.row}>
               <View style={styles.flex}>
                 <Text style={[styles.cardTitle, { color: c.text }]}>Meu perfil e recados</Text>
@@ -104,11 +123,11 @@ export default function ProfileScreen() {
               </View>
               <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
             </Card>
-          </Pressable>
+          </PressableScale>
 
           {requests.length > 0 ? (
             <>
-              <SectionTitle icon="🙋">Solicitações de seguir</SectionTitle>
+              <SectionTitle name="userPlus">Solicitações de seguir</SectionTitle>
               {requests.map((r) => (
                 <Card key={r.follower_id} style={styles.reqRow}>
                   <Pressable
@@ -145,14 +164,14 @@ export default function ProfileScreen() {
       {showStats ? (
         <>
           <StatsCard />
-          <Pressable onPress={() => router.navigate('/compartilhar')} style={[styles.shareCta, { backgroundColor: c.green }]}>
+          <PressableScale onPress={() => router.navigate('/compartilhar')} style={[styles.shareCta, { backgroundColor: c.green }]}>
             <Text style={[styles.shareCtaText, { color: c.onGreen }]}>📤 Compartilhar</Text>
-          </Pressable>
+          </PressableScale>
         </>
       ) : null}
 
-      <SectionTitle icon="🎯">Metas</SectionTitle>
-      <Pressable onPress={() => router.navigate('/conquistas')}>
+      <SectionTitle name="target">Metas</SectionTitle>
+      <PressableScale onPress={() => router.navigate('/conquistas')}>
         <Card style={styles.row}>
           <View style={styles.flex}>
             <Text style={[styles.cardTitle, { color: c.text }]}>Metas e conquistas</Text>
@@ -162,10 +181,10 @@ export default function ProfileScreen() {
           </View>
           <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
         </Card>
-      </Pressable>
+      </PressableScale>
 
-      <SectionTitle icon="💬">Vocabulário</SectionTitle>
-      <Pressable onPress={() => setShowVocab(true)}>
+      <SectionTitle name="chat">Vocabulário</SectionTitle>
+      <PressableScale onPress={() => setShowVocab(true)}>
         <Card style={styles.row}>
           <View style={styles.flex}>
             <Text style={[styles.cardTitle, { color: c.text }]}>Banco de palavras</Text>
@@ -176,7 +195,11 @@ export default function ProfileScreen() {
           </View>
           <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
         </Card>
-      </Pressable>
+      </PressableScale>
+
+      {/* Minha estante (catálogo Skoob) — saiu do hub (era redundante com a Biblioteca);
+          aqui no perfil também é o que os outros veem quando o perfil é público. */}
+      <MyShelf />
 
       <Modal visible={showVocab} animationType="slide" onRequestClose={() => setShowVocab(false)}>
         <View style={[styles.flex, { backgroundColor: c.bg }]}>

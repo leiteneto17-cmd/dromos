@@ -7,11 +7,14 @@
  * Rota EMPILHADA `/conquistas` (mantida p/ não regenerar typed routes), acessada por
  * Perfil → Metas. Base neutra; verde = ação/concluído, roxo = detalhe (CLAUDE.md §2.7).
  */
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { PressableScale } from '@/components/pressable-scale';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
+import { medalImage } from '@/theme/medals';
 import { useUI } from '@/hooks/use-ui';
 import { suggestGoal, reminderText } from '@/services/ai/goal-coach';
 import {
@@ -28,6 +31,7 @@ import {
   remindersUnsupported,
   scheduleDailyReminder,
 } from '@/services/reminders';
+import { evaluateGoals } from '@/services/goals';
 import { useAI } from '@/store/ai';
 import { useLibrary, type Goal, type GoalKind, type ReminderConfig } from '@/store/library';
 
@@ -52,12 +56,12 @@ export default function GoalsScreen() {
   const booksList = useLibrary((s) => s.books);
   const vocab = useLibrary((s) => s.vocab.length);
   const stats = useLibrary((s) => s.stats);
+  const sessions = useLibrary((s) => s.sessions);
   const goals = useLibrary((s) => s.goals);
   const bookProgress = useLibrary((s) => s.progress);
   const bookPages = useLibrary((s) => s.bookPages);
   const addGoal = useLibrary((s) => s.addGoal);
   const removeGoal = useLibrary((s) => s.removeGoal);
-  const completeGoal = useLibrary((s) => s.completeGoal);
   const reminder = useLibrary((s) => s.reminder);
   const setReminder = useLibrary((s) => s.setReminder);
   const currentBookId = useLibrary((s) => s.currentBookId);
@@ -73,7 +77,13 @@ export default function GoalsScreen() {
   const [aiRationale, setAiRationale] = useState('');
 
   const derived = deriveStats(stats);
-  const achievements = computeAchievements({ booksCount: booksList.length, vocabCount: vocab, derived });
+  const achievements = computeAchievements({
+    booksCount: booksList.length,
+    vocabCount: vocab,
+    derived,
+    sessions,
+    progress: bookProgress,
+  });
   const unlocked = achievements.filter((a) => a.unlocked).length;
 
   // Dados do livro-alvo (progresso/páginas) p/ as metas por livro.
@@ -83,11 +93,10 @@ export default function GoalsScreen() {
   const active = goals.filter((g) => !g.doneAt);
   const completed = goals.filter((g) => g.doneAt);
 
-  // Auto-conclui metas que bateram o alvo (vira conquista).
+  // Auto-conclui metas que bateram o alvo (vira conquista) e comemora (§7), via a
+  // mesma função central usada pelo reader.
   useEffect(() => {
-    for (const g of active) {
-      if (deriveGoal(g, stats, bookFor(g)).done) completeGoal(g.id, Date.now());
-    }
+    evaluateGoals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goals, stats, bookProgress]);
 
@@ -228,14 +237,14 @@ export default function GoalsScreen() {
 
       <View style={styles.titleRow}>
         <Text style={[styles.title, { color: c.text }]}>Metas</Text>
-        <Pressable
+        <PressableScale
           onPress={() => {
             setAiRationale('');
             setShowNew(true);
           }}
           style={[styles.newBtn, { backgroundColor: c.green }]}>
           <Text style={[styles.newBtnText, { color: c.onGreen }]}>+ Nova meta</Text>
-        </Pressable>
+        </PressableScale>
       </View>
 
       {/* Sugestão por IA (BYOK) — só aparece com chave configurada (§1b) */}
@@ -347,7 +356,7 @@ export default function GoalsScreen() {
       {/* Concluídas (conquistas personalizadas) */}
       {completed.length > 0 ? (
         <>
-          <SectionTitle icon="🏅">Metas concluídas</SectionTitle>
+          <SectionTitle name="medal">Metas concluídas</SectionTitle>
           {completed.map((g) => (
             <Card key={g.id} glow style={styles.medal}>
               <Text style={styles.medalIcon}>🏅</Text>
@@ -369,30 +378,63 @@ export default function GoalsScreen() {
 
       {/* Emblemas automáticos (gamificação de sempre) */}
       <View style={styles.embHead}>
-        <SectionTitle icon="🏆">Emblemas</SectionTitle>
+        <SectionTitle name="trophy">Emblemas</SectionTitle>
         <Text style={[styles.embCount, { color: c.textFaint }]}>
           {unlocked}/{achievements.length}
         </Text>
       </View>
       <View style={styles.grid}>
-        {achievements.map((a) => (
-          <Card key={a.id} glow={a.unlocked} style={[styles.cell, !a.unlocked && styles.cellLocked]}>
-            <Text style={[styles.icon, !a.unlocked && styles.iconLocked]}>{a.icon}</Text>
-            <Text style={[styles.cellTitle, { color: a.unlocked ? c.text : c.textDim }]} numberOfLines={1}>
+        {achievements.map((a) => {
+          const img = medalImage(a.id);
+          return (
+          <PressableScale
+            key={a.id}
+            onPress={() =>
+              Alert.alert(
+                `${a.title}`,
+                `${a.desc}\n\n${a.unlocked ? '✓ Desbloqueada' : `Progresso: ${Math.round(a.progress * 100)}%`}`,
+              )
+            }
+            style={[
+              styles.cell,
+              { backgroundColor: c.card, borderColor: a.unlocked ? c.green : c.border },
+              a.unlocked && { shadowColor: c.green, shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 0 }, elevation: 6 },
+              !a.unlocked && styles.cellLocked,
+            ]}>
+            <View style={styles.iconWrap}>
+              {img ? (
+                // Arte da medalha; bloqueada fica apagada (a célula já tem opacity + 🔒).
+                <Image
+                  source={img}
+                  style={[styles.medalImg, !a.unlocked && styles.medalImgLocked]}
+                  contentFit="contain"
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.icon,
+                    a.unlocked
+                      ? { textShadowColor: c.green, textShadowRadius: 16, textShadowOffset: { width: 0, height: 0 } }
+                      : styles.iconLocked,
+                  ]}>
+                  {a.icon}
+                </Text>
+              )}
+              {!a.unlocked ? <Text style={styles.lockBadge}>🔒</Text> : null}
+            </View>
+            <Text style={[styles.cellTitle, { color: a.unlocked ? c.text : c.textDim }]} numberOfLines={2}>
               {a.title}
             </Text>
-            <Text style={[styles.cellDesc, { color: c.textFaint }]} numberOfLines={2}>
-              {a.desc}
-            </Text>
             {a.unlocked ? (
-              <Text style={[styles.done, { color: c.green }]}>✓ Desbloqueada</Text>
+              <Text style={[styles.done, { color: c.green }]}>✓</Text>
             ) : (
               <View style={[styles.miniTrack, { backgroundColor: c.cardElevated }]}>
                 <View style={[styles.miniFill, { backgroundColor: c.purple, width: `${Math.round(a.progress * 100)}%` }]} />
               </View>
             )}
-          </Card>
-        ))}
+          </PressableScale>
+          );
+        })}
       </View>
 
       {/* Criar meta */}
@@ -471,9 +513,9 @@ export default function GoalsScreen() {
               ))}
             </View>
 
-            <Pressable onPress={create} style={[styles.createBtn, { backgroundColor: c.green }]}>
+            <PressableScale onPress={create} style={[styles.createBtn, { backgroundColor: c.green }]}>
               <Text style={[styles.createText, { color: c.onGreen }]}>Criar meta</Text>
-            </Pressable>
+            </PressableScale>
           </Pressable>
         </Pressable>
       </Modal>
@@ -518,15 +560,29 @@ const styles = StyleSheet.create({
   embHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   embCount: { fontSize: 13, fontWeight: '700' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  cell: { width: '47.8%', flexGrow: 1, minHeight: 132 },
-  cellLocked: { opacity: 0.7 },
-  icon: { fontSize: 30 },
-  iconLocked: { opacity: 0.5 },
-  cellTitle: { fontSize: 15, fontWeight: '800', marginTop: 8 },
-  cellDesc: { fontSize: 12, marginTop: 3, lineHeight: 17 },
-  done: { fontSize: 12, fontWeight: '800', marginTop: 8 },
-  miniTrack: { height: 5, borderRadius: 3, marginTop: 10, overflow: 'hidden' },
-  miniFill: { height: '100%', borderRadius: 3 },
+  // Célula quadrada estilo Steam (3 por linha). Quadrado via aspectRatio (sem flexGrow,
+  // p/ a última linha não esticar). Conteúdo centralizado: ícone + título + status.
+  cell: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cellLocked: { opacity: 0.55 },
+  iconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  medalImg: { width: 56, height: 56 },
+  medalImgLocked: { opacity: 0.55 },
+  icon: { fontSize: 38, textAlign: 'center' },
+  iconLocked: { opacity: 0.85 },
+  lockBadge: { position: 'absolute', right: -12, bottom: -2, fontSize: 13 },
+  cellTitle: { fontSize: 11.5, fontWeight: '800', textAlign: 'center', marginTop: 8, lineHeight: 14 },
+  done: { fontSize: 14, fontWeight: '900', marginTop: 6 },
+  miniTrack: { height: 4, width: '78%', borderRadius: 2, marginTop: 8, overflow: 'hidden' },
+  miniFill: { height: '100%', borderRadius: 2 },
   backdrop: { flex: 1, backgroundColor: '#0008', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, padding: 20, paddingBottom: 34 },
   sheetTitle: { fontSize: 18, fontWeight: '800' },

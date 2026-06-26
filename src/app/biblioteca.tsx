@@ -8,9 +8,10 @@ import { File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BookCover } from '@/components/book-cover';
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
-import { deletePreparedCache, openEpub } from '@/services/epub-parser';
+import { deleteCoverFile, deletePreparedCache, openEpub, saveEpubCover } from '@/services/epub-parser';
 import { readPdfTitle } from '@/services/pdf-metadata';
 import { useLibrary, type BookFormat, type ImportedBook } from '@/store/library';
 
@@ -82,20 +83,25 @@ export async function importBookFlow(
     // Cópia + adição na biblioteca (extraída p/ poder reusar no "Importar mesmo assim").
     const fmt = format;
     async function commit() {
-      const dest = new File(Paths.document, `book-${Date.now()}.${fmt}`);
+      const id = `${Date.now()}`;
+      const dest = new File(Paths.document, `book-${id}.${fmt}`);
       await picked.copy(dest);
-      // Captura o título real já na importação — assim a biblioteca/comunidade mostram o
-      // nome do livro, não "Documento EPUB/PDF". EPUB: metadado do OPF. PDF: entrada
-      // /Title do dicionário Info. Em ambos, se não houver metadado, cai no nome do arquivo.
+      // Captura o título real e a CAPA já na importação — assim biblioteca/hub mostram o
+      // nome e a capa do livro, não "Documento EPUB/PDF" + bloco 📖. EPUB: metadado do OPF
+      // + imagem de capa embutida. PDF: entrada /Title do dicionário Info (capa fica TODO).
       let title: string | undefined;
+      let coverUrl: string | undefined;
       try {
-        if (fmt === 'epub') title = (await openEpub(dest.uri)).title;
-        else if (fmt === 'pdf') title = (await readPdfTitle(dest.uri)) ?? undefined;
+        if (fmt === 'epub') {
+          const handle = await openEpub(dest.uri);
+          title = handle.title;
+          coverUrl = (await saveEpubCover(handle, id)) ?? undefined;
+        } else if (fmt === 'pdf') title = (await readPdfTitle(dest.uri)) ?? undefined;
       } catch {
-        // sem metadado legível → mantém o nome do arquivo
+        // sem metadado/capa legível → mantém o nome do arquivo e o bloco 📖
       }
       const book: ImportedBook = {
-        id: `${Date.now()}`,
+        id,
         name: displayName,
         title,
         fileName: picked.name,
@@ -103,6 +109,7 @@ export async function importBookFlow(
         size: dest.size || size,
         format: fmt,
         addedAt: Date.now(),
+        coverUrl,
       };
       addBook(book);
       onDone?.();
@@ -161,6 +168,7 @@ export default function LibraryScreen() {
             // arquivo já pode não existir; segue removendo da lista
           }
           deletePreparedCache(book.id);
+          deleteCoverFile(book.id);
           removeBook(book.id);
         },
       },
@@ -213,9 +221,15 @@ export default function LibraryScreen() {
           renderItem={({ item }) => (
             <Pressable onPress={() => open(item)} onLongPress={() => confirmDelete(item)}>
               <Card style={styles.row}>
-                <View style={[styles.badge, { backgroundColor: c.cardElevated, borderColor: c.border }]}>
-                  <Text style={[styles.badgeText, { color: c.textDim }]}>{item.format.toUpperCase()}</Text>
-                </View>
+                <BookCover
+                  uri={item.coverUrl}
+                  format={item.format}
+                  style={styles.badge}
+                  rounded={8}
+                  fallbackBg={c.cardElevated}
+                  fallbackBorder={c.border}
+                  fallbackColor={c.textDim}
+                />
                 <View style={styles.rowBody}>
                   <Text style={[styles.bookName, { color: c.text }]} numberOfLines={1}>
                     {item.title ?? item.name}

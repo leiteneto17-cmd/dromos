@@ -42,40 +42,46 @@ function Node({ x, y, size = 16 }: { x: number; y: number; size?: number }) {
   );
 }
 
-export function BookTrail() {
+export function BookTrail({ label = 'Maratona do Clássico' }: { label?: string }) {
   return (
     <View style={styles.wrap}>
-      <Svg viewBox="0 0 300 250" width="100%" height="100%">
-        {/* glow (traços largos e translúcidos) → linha brilhante fina por cima */}
-        <Path d={ROUTE} stroke={Social.green} strokeWidth={16} opacity={0.12} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        <Path d={ROUTE} stroke={Social.green} strokeWidth={9} opacity={0.28} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        <Path d={ROUTE} stroke={Social.green} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        <Node x={178} y={124} size={18} />
-        <Node x={240} y={146} />
-        <Node x={198} y={170} />
-        <Node x={132} y={182} />
-      </Svg>
+      <View style={styles.canvas}>
+        <Svg viewBox="0 0 300 250" width="100%" height="100%">
+          {/* glow (traços largos e translúcidos) → linha brilhante fina por cima */}
+          <Path d={ROUTE} stroke={Social.green} strokeWidth={16} opacity={0.12} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <Path d={ROUTE} stroke={Social.green} strokeWidth={9} opacity={0.28} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <Path d={ROUTE} stroke={Social.green} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <Node x={178} y={124} size={18} />
+          <Node x={240} y={146} />
+          <Node x={198} y={170} />
+          <Node x={132} y={182} />
+        </Svg>
 
-      {/* ícones e rótulo sobrepostos (emoji é mais simples que desenhar no SVG) */}
-      <Text style={[styles.emoji, styles.book]}>📗</Text>
-      <Text style={[styles.emoji, styles.coffee]}>☕</Text>
-      <Text style={styles.label}>Maratona{'\n'}do Clássico</Text>
+        {/* ícones de início/fim sobre a rota (emoji é mais simples que desenhar no SVG) */}
+        <Text style={[styles.emoji, styles.book]}>📗</Text>
+        <Text style={[styles.emoji, styles.coffee]}>☕</Text>
+      </View>
+
+      {/* rótulo como LEGENDA abaixo da trilha (não mais por cima da linha) */}
+      <Text style={styles.label} numberOfLines={1}>
+        🏁 {label}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { width: '100%', aspectRatio: 300 / 250, alignSelf: 'center' },
+  wrap: { width: '100%', alignItems: 'center' },
+  canvas: { width: '100%', aspectRatio: 300 / 250 },
   emoji: { position: 'absolute', fontSize: 22 },
   book: { left: '17%', top: '44%' },
   coffee: { left: '60%', top: '83%' },
   label: {
-    position: 'absolute',
-    right: '4%',
-    top: '34%',
+    marginTop: 8,
     color: Social.lavender,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
 });

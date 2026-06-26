@@ -347,7 +347,7 @@ export default function CommunityScreen() {
             <>
               {featured.length > 0 ? (
                 <>
-                  <SectionTitle icon="📈">Em alta</SectionTitle>
+                  <SectionTitle name="trendingUp">Em alta</SectionTitle>
                   <View style={styles.grid}>
                     {featured.map((b) => (
                       <Pressable key={`${b.source}-${b.id}`} style={styles.gridCell} onPress={() => openCatalog(b)}>
@@ -375,7 +375,7 @@ export default function CommunityScreen() {
                 </Pressable>
               ) : popular.length > 0 ? (
                 <>
-                  <SectionTitle icon="🔥">Populares na comunidade</SectionTitle>
+                  <SectionTitle name="flame">Populares na comunidade</SectionTitle>
                   {popular.slice(0, 10).map((p) => (
                     <Pressable key={p.book_key} onPress={() => openPopular(p)}>
                       <Card style={styles.row}>

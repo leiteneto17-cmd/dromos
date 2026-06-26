@@ -9,7 +9,7 @@
  * sozinho ao marcar/desmarcar.
  */
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { contextualLookup, type ContextualMeaning } from '@/services/ai/dictionary';
@@ -26,9 +26,11 @@ type Props = {
   onClose: () => void;
   /** Inicia o áudio a partir deste parágrafo (escolher de onde ouvir). */
   onListenFromHere?: () => void;
+  /** Dispara automaticamente uma ação ao abrir (vindo do menu contextual). */
+  autoAction?: 'significado' | 'ia';
 };
 
-export function WordPanel({ word, context, bookId, bookName, t, onClose, onListenFromHere }: Props) {
+export function WordPanel({ word, context, bookId, bookName, t, onClose, onListenFromHere, autoAction }: Props) {
   const vocab = useLibrary((s) => s.vocab);
   const addVocab = useLibrary((s) => s.addVocab);
   const removeVocab = useLibrary((s) => s.removeVocab);
@@ -86,6 +88,13 @@ export function WordPanel({ word, context, bookId, bookName, t, onClose, onListe
       if (res.needsKey) setNeedsKey(true);
     }
   }
+
+  // Vindo do menu contextual: já abre executando a ação escolhida (Significado / ✨ IA).
+  useEffect(() => {
+    if (autoAction === 'significado') void lookup();
+    else if (autoAction === 'ia') void explainAI();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>

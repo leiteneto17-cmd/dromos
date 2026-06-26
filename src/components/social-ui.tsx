@@ -3,22 +3,31 @@
  * com roxo+verde só como acento (CLAUDE.md §2.7). Cada bloco lê a paleta ativa via
  * useUI(), então responde ao tema claro/escuro automaticamente.
  */
+import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Icon, type IconName } from '@/components/icon';
 import { BottomTabInset } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
+import { HUB } from '@/theme/hub';
 
-/** Fundo neutro + área segura + rolagem. Base de toda tela social. */
+/**
+ * Fundo + área segura + rolagem. Base de toda tela social.
+ * `hub` pinta o gradiente verde do hub (em vez do fundo neutro do tema) para
+ * as abas que devem casar com o hub (Atividades, Comunidade, Perfil).
+ */
 export function ScreenBG({
   children,
   scroll = true,
   contentStyle,
+  hub = false,
 }: {
   children: ReactNode;
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  hub?: boolean;
 }) {
   const c = useUI();
   const inner = scroll ? (
@@ -33,7 +42,8 @@ export function ScreenBG({
   );
 
   return (
-    <View style={[s.flex, { backgroundColor: c.bg }]}>
+    <View style={[s.flex, { backgroundColor: hub ? HUB.base : c.bg }]}>
+      {hub ? <LinearGradient colors={HUB.grad} style={StyleSheet.absoluteFill} /> : null}
       <SafeAreaView style={s.flex} edges={['top', 'left', 'right']}>
         {inner}
       </SafeAreaView>
@@ -41,17 +51,27 @@ export function ScreenBG({
   );
 }
 
-/** Card neutro (camada 30%). `glow` destaca em verde (ação/conquista). */
+/**
+ * Card (camada 30%). `glow` destaca em verde (ação/conquista).
+ * `hub` força o card BRANCO com sombra (pele do hub), independente do tema.
+ */
 export function Card({
   children,
   style,
   glow = false,
+  hub = false,
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   glow?: boolean;
+  hub?: boolean;
 }) {
   const c = useUI();
+  if (hub) {
+    return (
+      <View style={[s.card, s.cardHub, glow && s.cardHubGlow, style]}>{children}</View>
+    );
+  }
   return (
     <View
       style={[
@@ -65,13 +85,32 @@ export function Card({
   );
 }
 
-/** Título de seção — acento ROXO (detalhe 10%), com ícone (emoji) opcional. */
-export function SectionTitle({ children, icon }: { children: string; icon?: string }) {
+/**
+ * Título de seção — acento ROXO (detalhe 10%). Prefira `name` (ícone SVG do chrome,
+ * design system 2026); `icon` (emoji) fica como fallback p/ casos sem SVG.
+ * `hub` usa branco (o título fica sobre o fundo verde do hub).
+ */
+export function SectionTitle({
+  children,
+  name,
+  icon,
+  hub = false,
+}: {
+  children: string;
+  name?: IconName;
+  icon?: string;
+  hub?: boolean;
+}) {
   const c = useUI();
+  const color = hub ? HUB.onBg : c.purple;
   return (
     <View style={s.sectionRow}>
-      {icon ? <Text style={s.sectionIcon}>{icon}</Text> : null}
-      <Text style={[s.sectionTitle, { color: c.purple }]}>{children}</Text>
+      {name ? (
+        <Icon name={name} size={17} color={color} />
+      ) : icon ? (
+        <Text style={s.sectionIcon}>{icon}</Text>
+      ) : null}
+      <Text style={[s.sectionTitle, { color }]}>{children}</Text>
     </View>
   );
 }
@@ -91,6 +130,16 @@ const s = StyleSheet.create({
   flex: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: BottomTabInset + 32 },
   card: { borderRadius: 18, borderWidth: 1, padding: 16 },
+  cardHub: {
+    backgroundColor: HUB.cardBg,
+    borderWidth: 0,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  cardHubGlow: { shadowColor: HUB.greenInk, shadowOpacity: 0.3, shadowRadius: 14 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22, marginBottom: 10 },
   sectionIcon: { fontSize: 18 },
   sectionTitle: { fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },

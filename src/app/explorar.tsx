@@ -105,14 +105,28 @@ export default function ExplorarScreen() {
         }
       }
       if (!f) throw lastErr ?? new Error('Falha no download.');
+      const id = `${Date.now()}`;
+      // Capa: baixa a imagem do catálogo para um arquivo local (offline-first). Se falhar,
+      // guarda a própria URL remota como fallback (expo-image ainda cacheia ao carregar).
+      let coverUrl: string | undefined = book.coverUrl ?? undefined;
+      if (book.coverUrl) {
+        try {
+          const cDest = new File(Paths.document, `cover-${id}.jpg`);
+          const cf = await File.downloadFileAsync(book.coverUrl, cDest);
+          coverUrl = cf.uri;
+        } catch {
+          // mantém a URL remota
+        }
+      }
       const imported: ImportedBook = {
-        id: `${Date.now()}`,
+        id,
         name: book.title,
         fileName: `${book.title}.epub`,
         uri: f.uri,
         size: f.size ?? undefined,
         format: 'epub',
         addedAt: Date.now(),
+        coverUrl,
       };
       addBook(imported); // store já marca como livro atual
       setDownloadingId(null);

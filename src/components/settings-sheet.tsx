@@ -105,7 +105,7 @@ export function SettingsSheet({
 
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           {/* Conta */}
-          <SectionTitle icon="👤">Conta</SectionTitle>
+          <SectionTitle name="user">Conta</SectionTitle>
           <Pressable onPress={onEditProfile}>
             <Card style={styles.row}>
               <View style={styles.flex}>
@@ -120,7 +120,7 @@ export function SettingsSheet({
           </Pressable>
 
           {/* Aparência */}
-          <SectionTitle icon="🎨">Aparência</SectionTitle>
+          <SectionTitle name="palette">Aparência</SectionTitle>
           <View style={[styles.segment, { backgroundColor: c.card, borderColor: c.border }]}>
             {THEME_OPTIONS.map((opt) => {
               const active = uiTheme === opt.id;
@@ -136,7 +136,7 @@ export function SettingsSheet({
           </View>
 
           {/* Privacidade */}
-          <SectionTitle icon="🌐">Privacidade</SectionTitle>
+          <SectionTitle name="globe">Privacidade</SectionTitle>
           <Card style={styles.row}>
             <View style={styles.flex}>
               <Text style={[styles.itemTitle, { color: c.text }]}>Perfil público</Text>
@@ -156,7 +156,7 @@ export function SettingsSheet({
           </Card>
 
           {/* IA */}
-          <SectionTitle icon="✨">Inteligência Artificial</SectionTitle>
+          <SectionTitle name="sparkles">Inteligência Artificial</SectionTitle>
           <Pressable onPress={goIntegracoes}>
             <Card style={styles.row}>
               <View style={styles.flex}>
@@ -176,7 +176,7 @@ export function SettingsSheet({
           </Pressable>
 
           {/* Sessão / conta */}
-          <SectionTitle icon="🚪">Sessão</SectionTitle>
+          <SectionTitle name="logout">Sessão</SectionTitle>
           <Pressable
             onPress={() => {
               onClose();

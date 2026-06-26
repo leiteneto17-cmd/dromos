@@ -14,7 +14,34 @@
 import { File, Paths } from 'expo-file-system';
 import { create } from 'zustand';
 
+import { FontSizeRange, type ReadingThemeName } from '@/theme/reading';
 import { useAuth } from './auth';
+
+/**
+ * Preferências do LEITOR (persistidas) — antes eram estado local que resetava a cada
+ * abertura. Inclui tema/fonte/Bionic e os controles de ACESSIBILIDADE (intensidade do
+ * Bionic, entrelinha e espaço entre letras — apoio a Dislexia/TDAH, IDEIAS-FUTURAS §4).
+ */
+export type ReaderPrefs = {
+  theme: ReadingThemeName; // 'claro' | 'sepia' | 'escuro'
+  fontSize: number;
+  bionic: boolean;
+  /** Fração das letras em negrito no Bionic (0.35 leve · 0.45 médio · 0.55 forte). */
+  bionicRatio: number;
+  /** Multiplicador da entrelinha (1.0 normal · 1.2 amplo · 1.45 muito amplo). */
+  lineSpacing: number;
+  /** Espaço entre letras em px (0 normal · 0.6 médio · 1.2 amplo). */
+  letterSpacing: number;
+};
+
+const DEFAULT_READER_PREFS: ReaderPrefs = {
+  theme: 'sepia',
+  fontSize: FontSizeRange.default,
+  bionic: true,
+  bionicRatio: 0.4,
+  lineSpacing: 1.0,
+  letterSpacing: 0,
+};
 
 export type BookFormat = 'epub' | 'pdf';
 
@@ -31,6 +58,8 @@ export type ImportedBook = {
   addedAt: number;
   text?: string;
   extractError?: string;
+  /** Capa real (uri local extraída do EPUB ou baixada do catálogo). Sem isso, cai no bloco 📖. */
+  coverUrl?: string;
 };
 
 export type VocabWord = {
@@ -54,6 +83,21 @@ export type Bookmark = {
   snippet: string;
   /** Progresso (0–1) no momento da marcação. */
   progress: number;
+  createdAt: number;
+};
+
+/** Grifo (highlight) — trecho EXATO selecionado pelo usuário no leitor, dentro de um
+ * parágrafo. Base do "card de citação de verdade" (§2.6) e do marca-texto persistente. */
+export type Highlight = {
+  id: string;
+  /** Índice do parágrafo onde está o grifo. */
+  index: number;
+  /** Offset (char) de início no parágrafo. */
+  start: number;
+  /** Offset (char) de fim (exclusivo) no parágrafo. */
+  end: number;
+  /** O trecho exato grifado (já limpo) — vai direto pro card de citação. */
+  text: string;
   createdAt: number;
 };
 
@@ -129,12 +173,15 @@ type Persisted = {
   /** Páginas equivalentes estimadas por livro — p/ "páginas/dia" das metas. */
   bookPages: Record<string, number>;
   bookmarks: Record<string, Bookmark[]>;
+  /** Grifos (citações) por livro — o [0] é o mais recente. */
+  highlights: Record<string, Highlight[]>;
   vocab: VocabWord[];
   stats: ReadingStats;
   sessions: ReadingSession[];
   goals: Goal[];
   uiTheme: UITheme;
   reminder: ReminderConfig;
+  readerPrefs: ReaderPrefs;
 };
 
 const DEFAULT_REMINDER: ReminderConfig = { enabled: false, hour: 20, minute: 0 };
@@ -157,12 +204,14 @@ function emptyPersisted(): Persisted {
     progress: {},
     bookPages: {},
     bookmarks: {},
+    highlights: {},
     vocab: [],
     stats: { totalSeconds: 0, perDay: {} },
     sessions: [],
     goals: [],
     uiTheme: 'system',
     reminder: { ...DEFAULT_REMINDER },
+    readerPrefs: { ...DEFAULT_READER_PREFS },
   };
 }
 
@@ -177,6 +226,7 @@ function parsePersisted(f: File): Persisted {
       progress: parsed.progress ?? {},
       bookPages: parsed.bookPages ?? {},
       bookmarks: parsed.bookmarks ?? {},
+      highlights: parsed.highlights ?? {},
       vocab: Array.isArray(parsed.vocab) ? parsed.vocab : [],
       stats: {
         totalSeconds: parsed.stats?.totalSeconds ?? 0,
@@ -190,6 +240,7 @@ function parsePersisted(f: File): Persisted {
         hour: typeof parsed.reminder?.hour === 'number' ? parsed.reminder.hour : DEFAULT_REMINDER.hour,
         minute: typeof parsed.reminder?.minute === 'number' ? parsed.reminder.minute : DEFAULT_REMINDER.minute,
       },
+      readerPrefs: { ...DEFAULT_READER_PREFS, ...(parsed.readerPrefs ?? {}) },
     };
   } catch {
     return emptyPersisted();
@@ -225,11 +276,14 @@ type LibraryState = Persisted & {
   setBookText: (id: string, text: string) => void;
   setBookError: (id: string, message: string) => void;
   setBookTitle: (id: string, title: string) => void;
+  setBookCover: (id: string, coverUrl: string) => void;
   setPosition: (id: string, offset: number) => void;
   setBookProgress: (id: string, progress: number) => void;
   setBookPages: (id: string, pages: number) => void;
   addBookmark: (bookId: string, bm: Bookmark) => void;
   removeBookmark: (bookId: string, id: string) => void;
+  addHighlight: (bookId: string, hl: Highlight) => void;
+  removeHighlight: (bookId: string, id: string) => void;
   addVocab: (entry: VocabWord) => void;
   removeVocab: (id: string) => void;
   addReadingTime: (seconds: number) => void;
@@ -240,6 +294,7 @@ type LibraryState = Persisted & {
   completeGoal: (id: string, doneAt: number) => void;
   setUiTheme: (theme: UITheme) => void;
   setReminder: (reminder: ReminderConfig) => void;
+  setReaderPrefs: (prefs: Partial<ReaderPrefs>) => void;
 };
 
 // Usuário ativo (escopo do arquivo). No boot a sessão ainda não resolveu → undefined
@@ -254,12 +309,14 @@ export const useLibrary = create<LibraryState>((set) => ({
   progress: initial.progress,
   bookPages: initial.bookPages,
   bookmarks: initial.bookmarks,
+  highlights: initial.highlights,
   vocab: initial.vocab,
   stats: initial.stats,
   sessions: initial.sessions,
   goals: initial.goals,
   uiTheme: initial.uiTheme,
   reminder: initial.reminder,
+  readerPrefs: initial.readerPrefs,
   addBook: (book) =>
     set((s) => ({
       books: [book, ...s.books.filter((b) => b.uri !== book.uri)],
@@ -281,6 +338,8 @@ export const useLibrary = create<LibraryState>((set) => ({
     })),
   setBookTitle: (id, title) =>
     set((s) => ({ books: s.books.map((b) => (b.id === id ? { ...b, title } : b)) })),
+  setBookCover: (id, coverUrl) =>
+    set((s) => ({ books: s.books.map((b) => (b.id === id ? { ...b, coverUrl } : b)) })),
   setPosition: (id, offset) => set((s) => ({ positions: { ...s.positions, [id]: offset } })),
   setBookProgress: (id, p) => set((s) => ({ progress: { ...s.progress, [id]: p } })),
   setBookPages: (id, pages) => set((s) => ({ bookPages: { ...s.bookPages, [id]: pages } })),
@@ -291,6 +350,14 @@ export const useLibrary = create<LibraryState>((set) => ({
   removeBookmark: (bookId, id) =>
     set((s) => ({
       bookmarks: { ...s.bookmarks, [bookId]: (s.bookmarks[bookId] ?? []).filter((b) => b.id !== id) },
+    })),
+  addHighlight: (bookId, hl) =>
+    set((s) => ({
+      highlights: { ...s.highlights, [bookId]: [hl, ...(s.highlights[bookId] ?? [])] },
+    })),
+  removeHighlight: (bookId, id) =>
+    set((s) => ({
+      highlights: { ...s.highlights, [bookId]: (s.highlights[bookId] ?? []).filter((h) => h.id !== id) },
     })),
   addVocab: (entry) =>
     set((s) => {
@@ -319,6 +386,7 @@ export const useLibrary = create<LibraryState>((set) => ({
     }),
   setUiTheme: (uiTheme) => set({ uiTheme }),
   setReminder: (reminder) => set({ reminder }),
+  setReaderPrefs: (prefs) => set((s) => ({ readerPrefs: { ...s.readerPrefs, ...prefs } })),
 }));
 
 // Salva no arquivo DA CONTA ATIVA a cada mudança (escrita síncrona; arquivo pequeno).
@@ -326,12 +394,12 @@ let switchingUser = false;
 function persist() {
   if (switchingUser) return; // não regravar durante a troca de conta
   try {
-    const { books, currentBookId, positions, progress, bookPages, bookmarks, vocab, stats, sessions, goals, uiTheme, reminder } =
+    const { books, currentBookId, positions, progress, bookPages, bookmarks, highlights, vocab, stats, sessions, goals, uiTheme, reminder, readerPrefs } =
       useLibrary.getState();
     const f = fileFor(currentUserId);
     if (!f.exists) f.create();
     f.write(
-      JSON.stringify({ books, currentBookId, positions, progress, bookPages, bookmarks, vocab, stats, sessions, goals, uiTheme, reminder }),
+      JSON.stringify({ books, currentBookId, positions, progress, bookPages, bookmarks, highlights, vocab, stats, sessions, goals, uiTheme, reminder, readerPrefs }),
     );
   } catch {
     // ignora falha de escrita

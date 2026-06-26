@@ -19,6 +19,8 @@ export type EpubHandle = {
   title?: string;
   author?: string;
   chapters: EpubChapterRef[];
+  /** Caminho (dentro do zip) da imagem de capa, quando o EPUB declara uma. */
+  coverPath?: string;
   zip: JSZip;
 };
 
@@ -121,8 +123,70 @@ export async function openEpub(uri: string): Promise<EpubHandle> {
     if (zip.file(path)) chapters.push({ path });
   }
 
+  // Capa: 1) <meta name="cover" content="ID"> → manifest; 2) item EPUB3 com
+  // properties="cover-image"; 3) um item de imagem cujo id contém "cover".
+  let coverHref: string | undefined;
+  const coverId = attr(opf.match(/<meta\b[^>]*name\s*=\s*"cover"[^>]*>/i)?.[0] ?? '', 'content');
+  if (coverId && manifest[coverId]) coverHref = manifest[coverId];
+  if (!coverHref) {
+    const itRe = /<item\b[^>]*>/gi;
+    let it: RegExpExecArray | null;
+    while ((it = itRe.exec(opf))) {
+      const href = attr(it[0], 'href');
+      if (!href) continue;
+      const props = attr(it[0], 'properties');
+      const mt = attr(it[0], 'media-type');
+      const id = attr(it[0], 'id');
+      if (props && /cover-image/i.test(props)) {
+        coverHref = href;
+        break;
+      }
+      if (!coverHref && id && /cover/i.test(id) && mt && /^image\//i.test(mt)) coverHref = href;
+    }
+  }
+  const coverPath =
+    coverHref && zip.file(joinPath(opfDir, decodeEntities(coverHref.split('#')[0])))
+      ? joinPath(opfDir, decodeEntities(coverHref.split('#')[0]))
+      : undefined;
+
   if (chapters.length === 0) throw new Error('Não encontramos capítulos neste EPUB.');
-  return { title: title || undefined, author: author || undefined, chapters, zip };
+  return { title: title || undefined, author: author || undefined, chapters, coverPath, zip };
+}
+
+/**
+ * Salva a capa embutida do EPUB num arquivo local (`cover-<bookId>.<ext>`) e
+ * devolve a uri — para mostrar a capa real na biblioteca/hub (offline). Retorna
+ * null se o EPUB não declara capa ou a imagem não pôde ser lida.
+ */
+export async function saveEpubCover(handle: EpubHandle, bookId: string): Promise<string | null> {
+  try {
+    if (!handle.coverPath) return null;
+    const entry = handle.zip.file(handle.coverPath);
+    if (!entry) return null;
+    const bytes = await entry.async('uint8array');
+    if (!bytes.length) return null;
+    const raw = handle.coverPath.match(/\.(jpe?g|png|gif|webp)$/i)?.[1]?.toLowerCase() ?? 'jpg';
+    const ext = raw === 'jpeg' ? 'jpg' : raw;
+    const dest = new File(Paths.document, `cover-${bookId}.${ext}`);
+    if (dest.exists) dest.delete();
+    dest.create();
+    dest.write(bytes);
+    return dest.uri;
+  } catch {
+    return null;
+  }
+}
+
+/** Remove o arquivo de capa local do livro (qualquer extensão), ao excluí-lo. */
+export function deleteCoverFile(bookId: string): void {
+  for (const ext of ['jpg', 'png', 'gif', 'webp']) {
+    try {
+      const f = new File(Paths.document, `cover-${bookId}.${ext}`);
+      if (f.exists) f.delete();
+    } catch {
+      // ignora
+    }
+  }
 }
 
 /** Lê e converte UM capítulo em texto (sob demanda). */

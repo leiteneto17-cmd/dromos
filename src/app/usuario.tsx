@@ -12,11 +12,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmblemStrip } from '@/components/emblem-strip';
 import { ProfileScraps } from '@/components/profile-scraps';
 import { Card, SectionTitle } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import type { BookReview, ShelfItem } from '@/services/community';
 import { SHELF_LABEL } from '@/services/community';
+import { achievementsFromIds } from '@/services/progress';
 import {
   followUser,
   getFollowCounts,
@@ -145,10 +147,18 @@ export default function UserScreen() {
               </Card>
             ) : (
               <>
+                {/* Emblemas conquistados (vêm de profiles.badges no backend) */}
+                {(profile?.badges?.length ?? 0) > 0 ? (
+                  <>
+                    <SectionTitle name="trophy">{`Emblemas (${profile!.badges.length})`}</SectionTitle>
+                    <EmblemStrip achievements={achievementsFromIds(profile!.badges)} />
+                  </>
+                ) : null}
+
                 {/* Estante */}
                 {shelf.length > 0 ? (
                   <>
-                    <SectionTitle icon="📚">{`Estante (${shelf.length})`}</SectionTitle>
+                    <SectionTitle name="books">{`Estante (${shelf.length})`}</SectionTitle>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
                       {shelf.map((s) => (
                         <Pressable
@@ -177,7 +187,7 @@ export default function UserScreen() {
                 {/* Resenhas */}
                 {reviews.length > 0 ? (
                   <>
-                    <SectionTitle icon="⭐">{`Resenhas (${reviews.length})`}</SectionTitle>
+                    <SectionTitle name="star">{`Resenhas (${reviews.length})`}</SectionTitle>
                     {reviews.map((r) => (
                       <Card key={r.id} style={styles.review}>
                         {r.book_title ? (

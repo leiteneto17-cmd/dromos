@@ -4,22 +4,25 @@
  * que abre a leitura atual. Substitui as abas nativas por tab bar customizada (expo-router
  * Tabs + tabBar próprio), com ícones vetoriais (react-native-svg).
  */
+import { BlurView } from 'expo-blur';
 import { router, Tabs } from 'expo-router';
 import type { ComponentType, ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useLibrary } from '@/store/library';
 
-// Paleta da nav (clara, fiel à imagem) — independe do tema claro/escuro do app.
+// Paleta da nav — OLED dark-first (vidro escuro + verde-neon). Independe do tema do app.
 const NAV = {
-  pill: '#FFFFFF',
-  border: 'rgba(0,0,0,0.06)',
-  inactive: '#8A968F',
-  active: '#0FA968',
-  centerBg: '#16A06B',
-  centerIcon: '#FFFFFF',
+  pill: 'rgba(20, 20, 25, 0.55)', // fundo escuro ultra-translúcido (vidro)
+  border: 'rgba(255, 255, 255, 0.12)', // linha de brilho reflexivo (border gloss)
+  inactive: '#8A968F', // ícones inativos
+  active: '#00FF66', // verde-neon brilhante (aba ativa)
+  centerBg: '#052E16', // botão central (verde escuro profundo)
+  centerGlow: '#00FF66', // halo verde-neon intenso (glow)
+  centerIcon: '#00FF66', // ícone central neon combinando
+  pillFallback: 'rgba(15, 15, 15, 0.85)', // fallback OLED escuro se o blur falhar
 };
 
 type IconProps = { color: string; size?: number };
@@ -145,7 +148,12 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
 
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]} pointerEvents="box-none">
-      <View style={[styles.bar, { backgroundColor: NAV.pill, borderColor: NAV.border }]}>{slots}</View>
+      <View style={[styles.bar, { borderColor: NAV.border, backgroundColor: NAV.pillFallback }]}>
+        {/* iOS: desfoque nativo real. Android: frost escuro translúcido (o blur real exigiria
+            blurTarget + snapshot que não atualiza ao rolar e pesa — não vale p/ a nav). */}
+        <BlurView intensity={64} tint="dark" style={styles.barBlur} />
+        {slots}
+      </View>
     </View>
   );
 }
@@ -164,36 +172,52 @@ export default function AppTabs() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { backgroundColor: 'transparent', paddingHorizontal: 18, paddingTop: 6 },
+  // O wrap só posiciona (área segura + espaço p/ o botão central que sobe). As margens
+  // laterais/inferiores da pílula ficam no `bar` (flutua suspensa).
+  wrap: { backgroundColor: 'transparent', paddingTop: 6 },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
+    marginHorizontal: 16,
+    marginBottom: 8,
     borderRadius: 34,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     paddingVertical: 10,
     paddingHorizontal: 10,
     shadowColor: '#000',
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.3,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
     elevation: 12,
   },
+  // Vidro (Liquid Glass): desfoque + véu ESCURO sutil, recortado ao formato da pílula.
+  // Fica ATRÁS dos ícones; o botão central (que sobe) NÃO é recortado (overflow só aqui).
+  barBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 34,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(10, 10, 12, 0.35)', // véu escuro sutil (legibilidade dos ícones)
+  },
   item: { alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 6, paddingVertical: 2 },
   dot: { width: 16, height: 3, borderRadius: 2, backgroundColor: 'transparent' },
   center: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -26,
-    borderWidth: 4,
-    borderColor: NAV.pill,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    marginTop: -28,
+    borderWidth: 2,
+    borderColor: NAV.border,
+    shadowColor: NAV.centerGlow, // halo verde-neon intenso (glow do design system)
+    shadowOpacity: 0.8,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
     elevation: 14,
   },
 });

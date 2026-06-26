@@ -186,7 +186,7 @@ export function BookReviews({ bookKey, bookTitle }: { bookKey: string; bookTitle
 
   return (
     <>
-      <SectionTitle icon="⭐">Resenhas</SectionTitle>
+      <SectionTitle name="star">Resenhas</SectionTitle>
 
       {rating.n > 0 ? (
         <View style={styles.ratingHead}>

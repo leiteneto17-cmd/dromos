@@ -129,7 +129,7 @@ export function ProfileScraps({
 
   return (
     <>
-      <SectionTitle icon="💬">Recados</SectionTitle>
+      <SectionTitle name="chat">Recados</SectionTitle>
 
       {!isMe && canSend ? (
         <Card style={styles.composer}>

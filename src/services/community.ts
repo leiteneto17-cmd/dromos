@@ -171,6 +171,29 @@ export async function setShelf(input: {
   return error ? error.message : null;
 }
 
+/**
+ * Auto-estante: marca um livro que o usuário ESTÁ LENDO de verdade como 'lendo' —
+ * mas só se ele AINDA NÃO está na estante. Assim não rebaixa um status manual ('lido',
+ * 'quero_ler'…) nem reescreve a cada sessão. No-op silencioso se deslogado/sem backend
+ * (não é erro: a estante é uma feature social, leitura local funciona sem conta).
+ *
+ * Chamado pelo reader ao registrar uma sessão real (≥1 min). A visibilidade segue o
+ * perfil (privado por padrão, §4.8) — só vira público se o usuário tornar o perfil público.
+ */
+export async function markBookReading(input: {
+  title: string;
+  coverUrl?: string | null;
+}): Promise<void> {
+  if (!supabase) return;
+  const userId = await uid();
+  if (!userId) return;
+  const key = bookKeyOf(input.title);
+  if (!key) return;
+  const existing = await getShelfStatusFor(key);
+  if (existing) return; // já catalogado: o status manual do usuário manda
+  await setShelf({ title: input.title, coverUrl: input.coverUrl ?? null, status: 'lendo' });
+}
+
 /** Tira um livro da estante. Retorna `null` em sucesso ou a mensagem de erro. */
 export async function removeShelf(bookKey: string): Promise<string | null> {
   if (!supabase) return 'Backend não configurado (Supabase).';

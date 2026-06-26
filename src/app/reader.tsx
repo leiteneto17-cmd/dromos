@@ -15,13 +15,16 @@
  * montados, e nada é reprocessado ao navegar (CLAUDE.md §4.6).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 
 import { BionicParagraph } from '@/components/bionic-text';
 import { BookmarksSheet } from '@/components/bookmarks-sheet';
+import { ReadingA11ySheet } from '@/components/reading-a11y-sheet';
+import { SelectionBar } from '@/components/selection-bar';
 import { WordPanel } from '@/components/word-panel';
+import { WordPopover } from '@/components/word-popover';
 import { BottomTabInset, Fonts } from '@/constants/theme';
 import { useReadAloud } from '@/hooks/use-read-aloud';
 import {
@@ -32,10 +35,15 @@ import {
 } from '@/services/epub-parser';
 import { getUsage } from '@/services/ai/tts';
 import { PdfExtractor, type ExtractProgress } from '@/services/pdf-extractor';
-import { cleanWord, splitParagraphs } from '@/services/text-utils';
+import { evaluateGoals } from '@/services/goals';
+import { computeAchievements, deriveStats } from '@/services/progress';
+import { cleanSnippet, cleanWord, splitParagraphs } from '@/services/text-utils';
 import { syncActivities } from '@/services/activity-sync';
+import { markBookReading } from '@/services/community';
+import { syncBadges } from '@/store/profile';
 import { getTtsKey, useAI } from '@/store/ai';
 import { useLibrary } from '@/store/library';
+import { useSession } from '@/store/session';
 import {
   FontSizeRange,
   LineHeightRatio,
@@ -48,9 +56,47 @@ import {
 
 const EMPTY: string[] = [];
 const EMPTY_BM: import('@/store/library').Bookmark[] = [];
+const EMPTY_HL: import('@/store/library').Highlight[] = [];
 
 /** ~parágrafos por "página equivalente" (EPUB/PDF reflow não têm páginas reais — §4.9). */
 const PARAS_PER_PAGE = 4;
+
+/** Conquistas no estado ATUAL da biblioteca (livros + vocabulário + stats). */
+function currentAchievements() {
+  const s = useLibrary.getState();
+  return computeAchievements({
+    booksCount: s.books.length,
+    vocabCount: s.vocab.length,
+    derived: deriveStats(s.stats),
+    sessions: s.sessions,
+    progress: s.progress,
+  });
+}
+
+/** Ids das conquistas já desbloqueadas agora — foto p/ comparar ao fim da sessão. */
+function unlockedAchievementIds(): Set<string> {
+  return new Set(currentAchievements().filter((a) => a.unlocked).map((a) => a.id));
+}
+
+/**
+ * Cronômetro AO VIVO da sessão. Isolado de propósito: tem o próprio interval e
+ * estado, então o tique a cada 1s re-renderiza só este número — não a lista de
+ * parágrafos (CLAUDE.md §4.6). Remonta (zera) ao trocar de livro via `key`.
+ */
+function SessionTimer({ color }: { color: string }) {
+  const [sec, setSec] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setSec((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+  const ss = String(sec % 60).padStart(2, '0');
+  return (
+    <Text style={[styles.timer, { color }]}>
+      ⏱ {mm}:{ss}
+    </Text>
+  );
+}
 
 const SAMPLE_BOOK = 'Dom Casmurro · Machado de Assis';
 const SAMPLE_CHAPTER = 'I — Do título';
@@ -100,9 +146,15 @@ function PrepStatus({ t, progress }: { t: ReadingPalette; progress: number }) {
 }
 
 export default function ReaderScreen() {
-  const [themeName, setThemeName] = useState<ReadingThemeName>('sepia');
-  const [fontSize, setFontSize] = useState<number>(FontSizeRange.default);
-  const [bionic, setBionic] = useState<boolean>(true);
+  // Preferências do leitor agora PERSISTEM (tema/fonte/Bionic + acessibilidade) — antes
+  // eram estado local e resetavam a cada abertura.
+  const prefs = useLibrary((s) => s.readerPrefs);
+  const setReaderPrefs = useLibrary((s) => s.setReaderPrefs);
+  const themeName = prefs.theme;
+  const fontSize = prefs.fontSize;
+  const bionic = prefs.bionic;
+  const setThemeName = (theme: ReadingThemeName) => setReaderPrefs({ theme });
+  const [showA11y, setShowA11y] = useState(false); // folha de Acessibilidade/Leitura
   // Realça o PARÁGRAFO que o áudio está lendo (leitura direcionada). Leve: muda no
   // máximo 1× por parágrafo. Pode ser desligado por quem prefere ouvir sem destaque.
   const [highlightReading, setHighlightReading] = useState<boolean>(true);
@@ -124,14 +176,31 @@ export default function ReaderScreen() {
     context: string;
     index: number;
     charOffset: number;
+    /** Comprimento do token CRU (com pontuação) — p/ ancorar a seleção de trecho. */
+    rawLen: number;
+    /** Posição do toque (p/ ancorar o menu contextual). */
+    x: number;
+    y: number;
   } | null>(null);
+  // Seleção de trecho (citação de verdade) — âncora/foco em offsets de char, no MESMO parágrafo.
+  const [selection, setSelection] = useState<{
+    index: number;
+    aStart: number;
+    aEnd: number;
+    fStart: number;
+    fEnd: number;
+  } | null>(null);
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+  // 'menu' = popover contextual flutuante; 'full' = painel completo (Significado/IA).
+  const [wordMode, setWordMode] = useState<'menu' | 'full'>('menu');
+  const [wordAuto, setWordAuto] = useState<'significado' | 'ia' | undefined>(undefined);
   const [showBookmarks, setShowBookmarks] = useState(false);
 
   const listRef = useRef<FlatList<string>>(null);
   const topIndexRef = useRef(0);
   topIndexRef.current = topIndex;
   const offsetRef = useRef(0); // offset de rolagem atual (p/ salvar marcador/posição)
-  const restoredRef = useRef(false); // posição já restaurada ao abrir?
   const followRef = useRef(true); // espelho de `follow` para os callbacks/efeitos
   const sessionTitleRef = useRef(''); // título "limpo" do livro (p/ a sessão de leitura)
   followRef.current = follow;
@@ -143,19 +212,26 @@ export default function ReaderScreen() {
   const setBookProgress = useLibrary((s) => s.setBookProgress);
   const setBookPages = useLibrary((s) => s.setBookPages);
   const vocab = useLibrary((s) => s.vocab);
+  const addVocab = useLibrary((s) => s.addVocab);
+  const removeVocab = useLibrary((s) => s.removeVocab);
   const addReadingTime = useLibrary((s) => s.addReadingTime);
   const addSession = useLibrary((s) => s.addSession);
   const bookmarks = useLibrary((s) => (currentBook ? s.bookmarks[currentBook.id] ?? EMPTY_BM : EMPTY_BM));
   const addBookmark = useLibrary((s) => s.addBookmark);
   const removeBookmark = useLibrary((s) => s.removeBookmark);
+  const highlights = useLibrary((s) => (currentBook ? s.highlights[currentBook.id] ?? EMPTY_HL : EMPTY_HL));
+  const addHighlight = useLibrary((s) => s.addHighlight);
+  const removeHighlight = useLibrary((s) => s.removeHighlight);
   const hasPremiumVoice = useAI((s) => s.hasTtsKey);
 
   const t = ReadingThemes[themeName];
-  const lineHeight = Math.round(fontSize * LineHeightRatio);
+  const { width: winWidth } = useWindowDimensions();
+  // Entrelinha agora respeita o multiplicador de acessibilidade (entrelinha ampla).
+  const lineHeight = Math.round(fontSize * LineHeightRatio * prefs.lineSpacing);
   const paragraphSpacing = Math.round(fontSize * 0.9);
 
-  const decFont = () => setFontSize((s) => Math.max(FontSizeRange.min, s - FontSizeRange.step));
-  const incFont = () => setFontSize((s) => Math.min(FontSizeRange.max, s + FontSizeRange.step));
+  const decFont = () => setReaderPrefs({ fontSize: Math.max(FontSizeRange.min, fontSize - FontSizeRange.step) });
+  const incFont = () => setReaderPrefs({ fontSize: Math.min(FontSizeRange.max, fontSize + FontSizeRange.step) });
 
   const isPdf = currentBook?.format === 'pdf';
   const isEpub = currentBook?.format === 'epub';
@@ -180,7 +256,6 @@ export default function ReaderScreen() {
     setPrepError(null);
     setPrepProgress(0);
     setTopIndex(0);
-    restoredRef.current = false;
 
     (async () => {
       // tenta o cache (preparado antes) → abre instantâneo, sem "Preparando…"
@@ -220,27 +295,64 @@ export default function ReaderScreen() {
       const startIndex = topIndexRef.current;
       let sessionSeconds = 0;
       const TICK = 15;
+      // Foto das conquistas JÁ desbloqueadas no início — p/ descobrir, ao terminar,
+      // quais foram desbloqueadas NESTA sessão (a tela "Conquista desbloqueada").
+      const unlockedAtStart = unlockedAchievementIds();
       const id = setInterval(() => {
         addReadingTime(TICK);
         sessionSeconds += TICK;
+        evaluateGoals(); // conclui/celebra metas no momento EXATO em que o alvo é batido
       }, TICK * 1000);
       return () => {
         clearInterval(id);
         if (sessionSeconds < TICK) return; // ignora "passadas" curtas (não vira atividade)
+        const sessionId = `s-${startedAt}`;
         const parasRead = Math.max(0, topIndexRef.current - startIndex);
+        const pages = Math.round(parasRead / PARAS_PER_PAGE);
         addSession({
-          id: `s-${startedAt}`,
+          id: sessionId,
           bookId: currentBook.id,
           bookTitle: sessionTitleRef.current || currentBook.name,
           format: currentBook.format,
           seconds: sessionSeconds,
-          pages: Math.round(parasRead / PARAS_PER_PAGE),
+          pages,
           startedAt,
           createdAt: Date.now(),
           synced: false,
         });
         // Sobe pro Supabase se logado (no-op se deslogado/offline — tenta de novo depois).
         void syncActivities();
+
+        // Auto-estante: leu de verdade (≥1 min) → entra como "lendo" na estante (se ainda
+        // não estiver lá). No-op se deslogado. Visibilidade segue o perfil (privado por padrão).
+        if (sessionSeconds >= 60) {
+          void markBookReading({
+            title: sessionTitleRef.current || currentBook.name,
+            coverUrl: currentBook.coverUrl,
+          });
+        }
+
+        // Metas: avalia uma última vez ao sair. Se uma meta foi concluída AGORA, a
+        // celebração "Meta concluída" tem prioridade sobre o resumo da sessão.
+        const goalJustCelebrated = evaluateGoals();
+
+        // Celebração da sessão (fecha o laço Strava): conquistas novas + resumo. Mostra
+        // se desbloqueou algo OU a sessão foi de ao menos 1 min (evita "pop" em passadas).
+        const allNow = currentAchievements();
+        const newAchievements = allNow.filter((a) => a.unlocked && !unlockedAtStart.has(a.id));
+        // Espelha os emblemas no perfil do banco (aparecem no perfil público). No-op se
+        // deslogado ou se nada mudou desde a última sincronização.
+        void syncBadges(allNow.filter((a) => a.unlocked).map((a) => a.id));
+        if (!goalJustCelebrated && (newAchievements.length > 0 || sessionSeconds >= 60)) {
+          useSession.getState().celebrate({
+            kind: 'session',
+            sessionId,
+            bookTitle: sessionTitleRef.current || currentBook.name,
+            seconds: sessionSeconds,
+            pages,
+            newAchievements,
+          });
+        }
       };
     }, [currentBook, addReadingTime, addSession]),
   );
@@ -324,18 +436,59 @@ export default function ReaderScreen() {
   const readRef = useRef(read.state);
   readRef.current = read.state;
 
-  // Restaura a posição de leitura por OFFSET de rolagem (não por scrollToIndex, que
-  // numa lista gigante renderiza tudo até o alvo e trava). Uma vez, ao abrir o livro.
-  useEffect(() => {
-    if (restoredRef.current || !currentBook || paragraphs.length === 0) return;
-    restoredRef.current = true;
-    const savedY = useLibrary.getState().positions[currentBook.id] ?? 0;
-    if (savedY > 0) {
-      requestAnimationFrame(() =>
-        listRef.current?.scrollToOffset({ offset: savedY, animated: false }),
-      );
+  // Restaura a posição de leitura SEM travar. Antes tentávamos rolar até o parágrafo
+  // depois de montar a lista — numa lista virtualizada isso renderiza todos os parágrafos
+  // do caminho (rola da pág. 1 até a 100 = o travamento). A forma certa de "abrir já num
+  // ponto fundo" é `initialScrollIndex`: o FlatList MONTA direto naquele índice, sem
+  // renderizar os anteriores (o espaço acima vira altura estimada). Calculamos o índice a
+  // partir do progresso salvo; a lista remonta (via `key`) quando os parágrafos chegam,
+  // aplicando o índice no 1º render. Veja `listKey` e `initialScrollIndex` no FlatList.
+  const initialScrollIndex = useMemo(() => {
+    if (!currentBook || paragraphs.length === 0) return undefined;
+    const saved = useLibrary.getState().progress[currentBook.id] ?? 0;
+    const idx = Math.min(
+      paragraphs.length - 1,
+      Math.max(0, Math.round(saved * (paragraphs.length - 1))),
+    );
+    return idx > 0 ? idx : undefined;
+    // recalcula quando o livro ou a quantidade de parágrafos muda (0 → N ao preparar)
+  }, [currentBook?.id, paragraphs.length]);
+
+  // Chave da lista: muda quando os parágrafos ficam prontos, forçando UM remount para o
+  // `initialScrollIndex` valer. Sem isso, a lista já estaria montada (vazia) e ignoraria o índice.
+  const listKey = `${currentBook?.id ?? 'sample'}:${paragraphs.length > 0 ? 'ready' : 'loading'}`;
+
+  // getItemLayout com altura ESTIMADA por parágrafo. É o que faz o `initialScrollIndex`
+  // pular DIRETO para o índice (O(1)) sem medir nem renderizar os parágrafos do caminho —
+  // sem isso o FlatList tentava montar tudo até lá (o travamento de ~9 s + "volta ao topo").
+  // A estimativa (linhas ≈ caracteres ÷ caracteres-por-linha) não é exata, então a rolagem
+  // pode ter pequenas correções, mas cai no parágrafo certo e é instantânea.
+  const layout = useMemo(() => {
+    const usableW = Math.max(120, winWidth - 44); // content paddingHorizontal 22 × 2
+    const charsPerLine = Math.max(8, Math.floor(usableW / (fontSize * 0.5)));
+    const headingH = Math.round(fontSize * 1.6) + 32; // inlineChapter (marginTop+Bottom)
+    const base = 90; // ListHeaderComponent (rótulo + subtítulo) + paddingTop, aprox
+    const offsets = new Array<number>(paragraphs.length);
+    const lengths = new Array<number>(paragraphs.length);
+    let acc = base;
+    for (let i = 0; i < paragraphs.length; i++) {
+      const lines = Math.max(1, Math.ceil((paragraphs[i]?.length ?? 0) / charsPerLine));
+      const h = lines * lineHeight + paragraphSpacing + (chapterTitleAt.has(i) ? headingH : 0);
+      lengths[i] = h;
+      offsets[i] = acc;
+      acc += h;
     }
-  }, [currentBook, paragraphs.length]);
+    return { offsets, lengths };
+  }, [paragraphs, winWidth, fontSize, lineHeight, paragraphSpacing, chapterTitleAt]);
+
+  const getItemLayout = useCallback(
+    (_: ArrayLike<string> | null | undefined, index: number) => ({
+      length: layout.lengths[index] ?? lineHeight * 4,
+      offset: layout.offsets[index] ?? 0,
+      index,
+    }),
+    [layout, lineHeight],
+  );
 
   // Caracteres restantes da voz premium (ElevenLabs) — busca uma vez ao iniciar a
   // sessão premium e mostra na barra de áudio (é só um termômetro da cota, §5).
@@ -403,12 +556,105 @@ export default function ReaderScreen() {
   const markedSet = useMemo(() => new Set(vocab.map((v) => v.word.toLowerCase())), [vocab]);
 
   const handleWord = useCallback(
-    (word: string, paragraph: string, index: number, charOffset: number) => {
+    (word: string, paragraph: string, index: number, charOffset: number, x: number, y: number) => {
+      // Em modo de seleção: tocar outra palavra do MESMO parágrafo amplia o trecho.
+      const sel = selectionRef.current;
+      if (sel) {
+        if (index === sel.index) setSelection({ ...sel, fStart: charOffset, fEnd: charOffset + word.length });
+        return;
+      }
       const clean = cleanWord(word);
-      if (clean) setSelectedWord({ word: clean, context: paragraph, index, charOffset });
+      if (!clean) return;
+      setWordMode('menu'); // sempre abre no menu contextual flutuante
+      setWordAuto(undefined);
+      setSelectedWord({ word: clean, context: paragraph, index, charOffset, rawLen: word.length, x, y });
     },
     [],
   );
+
+  const closeWord = useCallback(() => setSelectedWord(null), []);
+
+  // Grifos salvos do livro agrupados por parágrafo (estável → não re-renderiza a lista à toa).
+  const savedRangesByPara = useMemo(() => {
+    const m = new Map<number, { start: number; end: number }[]>();
+    for (const h of highlights) {
+      const arr = m.get(h.index);
+      if (arr) arr.push({ start: h.start, end: h.end });
+      else m.set(h.index, [{ start: h.start, end: h.end }]);
+    }
+    return m;
+  }, [highlights]);
+
+  // Faixa atual da seleção (citação) — derivada da âncora/foco.
+  const selStart = selection ? Math.min(selection.aStart, selection.fStart) : 0;
+  const selEnd = selection ? Math.max(selection.aEnd, selection.fEnd) : 0;
+  const selPreview = selection ? cleanSnippet(paragraphs[selection.index]?.slice(selStart, selEnd) ?? '', 220) : '';
+
+  // Grifo salvo que contém a palavra tocada (p/ oferecer "remover grifo" no popover).
+  const selectedHl =
+    selectedWord && currentBook
+      ? highlights.find(
+          (h) =>
+            h.index === selectedWord.index &&
+            selectedWord.charOffset < h.end &&
+            selectedWord.charOffset + selectedWord.rawLen > h.start,
+        )
+      : undefined;
+
+  // Entra no modo seleção a partir da palavra do popover.
+  const startSelection = useCallback(() => {
+    if (!selectedWord) return;
+    const { index, charOffset, rawLen } = selectedWord;
+    setSelection({ index, aStart: charOffset, aEnd: charOffset + rawLen, fStart: charOffset, fEnd: charOffset + rawLen });
+    setSelectedWord(null);
+  }, [selectedWord]);
+
+  const cancelSelection = useCallback(() => setSelection(null), []);
+
+  // Salva o trecho selecionado como grifo. Retorna o texto salvo (ou null).
+  const saveHighlight = useCallback((): string | null => {
+    const sel = selectionRef.current;
+    if (!sel || !currentBook) return null;
+    const start = Math.min(sel.aStart, sel.fStart);
+    const end = Math.max(sel.aEnd, sel.fEnd);
+    const text = cleanSnippet(paragraphs[sel.index]?.slice(start, end) ?? '', 300);
+    if (!text) return null;
+    addHighlight(currentBook.id, { id: `${Date.now()}`, index: sel.index, start, end, text, createdAt: Date.now() });
+    return text;
+  }, [currentBook, paragraphs, addHighlight]);
+
+  const confirmHighlight = useCallback(() => {
+    saveHighlight();
+    setSelection(null);
+  }, [saveHighlight]);
+
+  // "Citar": salva o grifo e abre o card de compartilhar já no modelo de citação.
+  const quoteSelection = useCallback(() => {
+    saveHighlight();
+    setSelection(null);
+    router.push('/compartilhar?model=citacao');
+  }, [saveHighlight]);
+
+  const removeSelectedHighlight = useCallback(() => {
+    if (selectedHl && currentBook) removeHighlight(currentBook.id, selectedHl.id);
+    setSelectedWord(null);
+  }, [selectedHl, currentBook, removeHighlight]);
+
+  // Alterna a palavra no banco de vocabulário (ação rápida do menu contextual).
+  const toggleMarkWord = useCallback(() => {
+    if (!selectedWord) return;
+    const existing = vocab.find((v) => v.word.toLowerCase() === selectedWord.word.toLowerCase());
+    if (existing) removeVocab(existing.id);
+    else
+      addVocab({
+        id: `${Date.now()}`,
+        word: selectedWord.word,
+        context: selectedWord.context,
+        bookId: currentBook?.id,
+        bookName: currentBook?.name,
+        addedAt: Date.now(),
+      });
+  }, [selectedWord, vocab, addVocab, removeVocab, currentBook]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: string; index: number }) => {
@@ -425,22 +671,28 @@ export default function ReaderScreen() {
           <BionicParagraph
             text={item}
             bionic={bionic}
+            ratio={prefs.bionicRatio}
             color={t.text}
             fontSize={fontSize}
             lineHeight={lineHeight}
+            letterSpacing={prefs.letterSpacing}
             fontFamily={Fonts?.serif}
             marginBottom={paragraphSpacing}
             paraIndex={index}
             onWordPress={handleWord}
             markedSet={markedSet}
             highlightColor={t.highlight}
+            selRange={selection && selection.index === index ? { start: selStart, end: selEnd } : undefined}
+            selColor={t.accent + '55'}
+            savedRanges={savedRangesByPara.get(index)}
+            savedColor={t.accent + '2E'}
             activePara={activePara}
             activeColor={t.accent + '22'}
           />
         </View>
       );
     },
-    [bionic, t, fontSize, lineHeight, paragraphSpacing, handleWord, markedSet, chapterTitleAt, highlightReading],
+    [bionic, prefs.bionicRatio, prefs.letterSpacing, t, fontSize, lineHeight, paragraphSpacing, handleWord, markedSet, chapterTitleAt, highlightReading, selection, selStart, selEnd, savedRangesByPara],
   );
 
   // Rastreia o parágrafo no topo (progresso/capítulo) — estável p/ a FlatList.
@@ -457,9 +709,11 @@ export default function ReaderScreen() {
     offsetRef.current = e.nativeEvent.contentOffset.y;
   }, []);
 
-  // O usuário pegou a lista com o dedo → para de acompanhar (não arrancar a tela de volta).
+  // O usuário pegou a lista com o dedo → para de acompanhar (não arrancar a tela de volta)
+  // e FECHA o menu contextual da palavra (interface invisível: some no scroll).
   const onScrollBeginDrag = useCallback(() => {
     if (followRef.current) setFollow(false);
+    setSelectedWord((w) => (w ? null : w));
   }, []);
 
   // Liga/desliga o "Acompanhar". Ao religar durante a leitura, volta ao parágrafo falado.
@@ -508,7 +762,8 @@ export default function ReaderScreen() {
       id: `${Date.now()}`,
       offset: Math.round(offsetRef.current),
       index: idx,
-      snippet: (paragraphs[idx] ?? '').slice(0, 90),
+      // Trecho maior e cortado na fronteira de palavra → vira uma citação legível (card §2.6).
+      snippet: cleanSnippet(paragraphs[idx] ?? '', 180),
       progress: paragraphs.length > 1 ? idx / (paragraphs.length - 1) : 0,
       createdAt: Date.now(),
     });
@@ -585,10 +840,17 @@ export default function ReaderScreen() {
               style={[styles.btn, { borderColor: t.border }]}>
               <Text style={{ color: t.text, fontSize: 18 }}>A+</Text>
             </Pressable>
+            <Pressable
+              onPress={() => setShowA11y(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Ajustes de leitura e acessibilidade"
+              style={[styles.btn, { borderColor: t.border }]}>
+              <Text style={{ color: t.text, fontSize: 14, fontWeight: '700' }}>Aa</Text>
+            </Pressable>
           </View>
 
           <Pressable
-            onPress={() => setBionic((b) => !b)}
+            onPress={() => setReaderPrefs({ bionic: !bionic })}
             accessibilityRole="switch"
             accessibilityState={{ checked: bionic }}
             accessibilityLabel="Leitura biônica"
@@ -643,6 +905,7 @@ export default function ReaderScreen() {
           accessibilityLabel="Progresso e marcadores"
           style={[styles.progressBar, { backgroundColor: t.surface, borderBottomColor: t.border }]}>
           <Text style={{ fontSize: 15 }}>🔖{bookmarks.length > 0 ? ` ${bookmarks.length}` : ''}</Text>
+          <SessionTimer key={currentBook?.id ?? 'sample'} color={t.accent} />
           <Text style={[styles.progressLabel, { color: t.textSecondary }]} numberOfLines={1}>
             {barChapter || 'Lendo'}
           </Text>
@@ -656,14 +919,19 @@ export default function ReaderScreen() {
       ) : null}
 
       <FlatList
+        key={listKey}
         ref={listRef}
         data={paragraphs}
         keyExtractor={(_, i) => String(i)}
         renderItem={renderItem}
-        extraData={highlightReading && read.state.active ? read.state.paraIndex : -1}
+        extraData={`${highlightReading && read.state.active ? read.state.paraIndex : -1}|${
+          selection ? `${selection.index}:${selStart}:${selEnd}` : ''
+        }|${highlights.length}`}
         ListHeaderComponent={listHeader}
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: BottomTabInset + 48 }]}
+        getItemLayout={getItemLayout}
+        initialScrollIndex={initialScrollIndex}
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={11}
@@ -674,8 +942,11 @@ export default function ReaderScreen() {
         scrollEventThrottle={64}
         onMomentumScrollEnd={saveOffset}
         onScrollEndDrag={saveOffset}
-        onScrollToIndexFailed={() => {
-          /* índice fora do alcance medido — ignora (a leitura continua) */
+        onScrollToIndexFailed={(info) => {
+          // Tiro ÚNICO (sem loop): salta para um offset estimado. Não re-tentamos
+          // scrollToIndex aqui de propósito — o retry é o que renderizava tudo no
+          // caminho e travava. Com initialScrollIndex isto quase nunca dispara.
+          listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
         }}
       />
 
@@ -746,19 +1017,64 @@ export default function ReaderScreen() {
         </View>
       ) : null}
 
-      {selectedWord ? (
+      {/* Menu CONTEXTUAL flutuante (perto do toque) — interface invisível */}
+      {selectedWord && wordMode === 'menu' ? (
+        <WordPopover
+          word={selectedWord.word}
+          marked={markedSet.has(selectedWord.word.toLowerCase())}
+          t={t}
+          x={selectedWord.x}
+          y={selectedWord.y}
+          onMark={toggleMarkWord}
+          onMeaning={() => {
+            setWordAuto('significado');
+            setWordMode('full');
+          }}
+          onExplainAI={() => {
+            setWordAuto('ia');
+            setWordMode('full');
+          }}
+          onListen={() => {
+            setFollow(true);
+            read.start(selectedWord.index, selectedWord.charOffset);
+            closeWord();
+          }}
+          onSelect={startSelection}
+          highlighted={!!selectedHl}
+          onRemoveHighlight={removeSelectedHighlight}
+        />
+      ) : null}
+
+      {/* Barra de SELEÇÃO de trecho (citação de verdade) */}
+      {selection ? (
+        <SelectionBar
+          preview={selPreview}
+          t={t}
+          onCancel={cancelSelection}
+          onHighlight={confirmHighlight}
+          onQuote={quoteSelection}
+        />
+      ) : null}
+
+      {/* Painel COMPLETO (resultado de Significado / ✨ IA) */}
+      {selectedWord && wordMode === 'full' ? (
         <WordPanel
           word={selectedWord.word}
           context={selectedWord.context}
           bookId={currentBook?.id}
           bookName={currentBook?.name}
+          autoAction={wordAuto}
           t={t}
-          onClose={() => setSelectedWord(null)}
+          onClose={closeWord}
           onListenFromHere={() => {
             setFollow(true);
             read.start(selectedWord.index, selectedWord.charOffset);
           }}
         />
+      ) : null}
+
+      {showA11y ? (
+        <ReadingA11ySheet t={t} prefs={prefs} setPrefs={setReaderPrefs} onClose={() => setShowA11y(false)} />
       ) : null}
 
       {showBookmarks ? (
@@ -796,7 +1112,8 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  progressLabel: { fontSize: 12, flexShrink: 1, maxWidth: '45%' },
+  timer: { fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'], minWidth: 52 },
+  progressLabel: { fontSize: 12, flexShrink: 1, maxWidth: '32%' },
   progressTrack: { flex: 1, height: 3, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%' },
   progressPct: { fontSize: 12, fontWeight: '700', minWidth: 34, textAlign: 'right' },

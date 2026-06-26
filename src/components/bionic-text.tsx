@@ -22,7 +22,20 @@ function boldPrefixLength(word: string, ratio: number): number {
   return Math.max(1, Math.ceil(word.length * ratio));
 }
 
-type WordPress = (word: string, paragraph: string, paraIndex: number, charOffset: number) => void;
+/** O token [start, start+len) cruza a faixa [r.start, r.end)? */
+function overlaps(start: number, len: number, r: { start: number; end: number }): boolean {
+  return start < r.end && start + len > r.start;
+}
+
+type WordPress = (
+  word: string,
+  paragraph: string,
+  paraIndex: number,
+  charOffset: number,
+  /** Posição do toque na tela (p/ ancorar o menu contextual perto da palavra). */
+  x: number,
+  y: number,
+) => void;
 
 type ParaProps = {
   text: string;
@@ -32,6 +45,8 @@ type ParaProps = {
   color: string;
   fontSize: number;
   lineHeight: number;
+  /** Espaço entre letras (acessibilidade — apoio a dislexia). */
+  letterSpacing?: number;
   fontFamily?: string;
   marginBottom?: number;
   /** Índice do parágrafo na lista (p/ ações como "ouvir a partir daqui"). */
@@ -41,6 +56,12 @@ type ParaProps = {
   /** Palavras do vocabulário (minúsculas) a realçar (marca-texto). */
   markedSet?: Set<string>;
   highlightColor?: string;
+  /** Faixa de caracteres em SELEÇÃO ativa (grifo sendo criado neste parágrafo). */
+  selRange?: { start: number; end: number };
+  selColor?: string;
+  /** Faixas já GRIFADAS (salvas) deste parágrafo — marca-texto persistente. */
+  savedRanges?: { start: number; end: number }[];
+  savedColor?: string;
   /** Este parágrafo está sendo lido pelo áudio agora → realça o fundo (leitura direcionada). */
   activePara?: boolean;
   /** Cor de fundo do parágrafo em leitura (§2.1). */
@@ -83,7 +104,11 @@ const Word = memo(function Word({
   return (
     <Text
       suppressHighlighting
-      onPress={onWordPress ? () => onWordPress(token, paragraph, paraIndex, start) : undefined}
+      onPress={
+        onWordPress
+          ? (e) => onWordPress(token, paragraph, paraIndex, start, e.nativeEvent.pageX, e.nativeEvent.pageY)
+          : undefined
+      }
       style={bg ? { backgroundColor: bg } : undefined}>
       {bold > 0 ? <Text style={styles.bold}>{token.slice(0, bold)}</Text> : null}
       {token.slice(bold)}
@@ -98,12 +123,17 @@ export const BionicParagraph = memo(function BionicParagraph({
   color,
   fontSize,
   lineHeight,
+  letterSpacing,
   fontFamily,
   marginBottom,
   paraIndex = 0,
   onWordPress,
   markedSet,
   highlightColor,
+  selRange,
+  selColor,
+  savedRanges,
+  savedColor,
   activePara,
   activeColor,
 }: ParaProps) {
@@ -130,15 +160,20 @@ export const BionicParagraph = memo(function BionicParagraph({
   const bg = activePara && activeColor ? { backgroundColor: activeColor } : null;
 
   return (
-    <Text style={[{ color, fontSize, lineHeight, fontFamily, marginBottom }, bg]}>
+    <Text style={[{ color, fontSize, lineHeight, letterSpacing, fontFamily, marginBottom }, bg]}>
       {tokens.map((tk, i) => {
         if (tk.isSpace) return tk.text;
+        // Prioridade do fundo: seleção ativa > grifo salvo > marca-texto do vocabulário.
+        let bg: string | undefined;
+        if (selRange && selColor && overlaps(tk.start, tk.len, selRange)) bg = selColor;
+        else if (savedColor && savedRanges?.some((r) => overlaps(tk.start, tk.len, r))) bg = savedColor;
+        else if (tk.marked) bg = highlightColor;
         return (
           <Word
             key={i}
             token={tk.text}
             bold={tk.bold}
-            bg={tk.marked ? highlightColor : undefined}
+            bg={bg}
             start={tk.start}
             paraIndex={paraIndex}
             paragraph={text}

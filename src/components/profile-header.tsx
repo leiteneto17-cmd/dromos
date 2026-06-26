@@ -5,6 +5,7 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 
+import { EmblemStrip } from '@/components/emblem-strip';
 import { useUI } from '@/hooks/use-ui';
 import type { Achievement, DerivedStats } from '@/services/progress';
 
@@ -22,7 +23,6 @@ export function ProfileHeader({
 }) {
   const c = useUI();
   const initial = name.trim().charAt(0).toUpperCase() || '?';
-  const badges = achievements.filter((a) => a.unlocked).slice(0, 3);
 
   return (
     <View style={s.wrap}>
@@ -47,19 +47,8 @@ export function ProfileHeader({
         <View style={[s.fill, { backgroundColor: c.green, width: `${Math.round(derived.levelProgress * 100)}%` }]} />
       </View>
 
-      {/* Emblemas */}
-      <View style={s.badges}>
-        {badges.length === 0 ? (
-          <Text style={[s.noBadges, { color: c.textFaint }]}>Leia para desbloquear emblemas 🏅</Text>
-        ) : (
-          badges.map((b) => (
-            <View key={b.id} style={[s.badge, { backgroundColor: c.cardElevated, borderColor: c.border }]}>
-              <Text style={s.badgeIcon}>{b.icon}</Text>
-              <Text style={[s.badgeText, { color: c.textDim }]}>{b.title}</Text>
-            </View>
-          ))
-        )}
-      </View>
+      {/* Emblemas — só a arte (compacto); o nome aparece ao tocar (EmblemStrip) */}
+      <EmblemStrip achievements={achievements} />
     </View>
   );
 }
@@ -75,9 +64,4 @@ const s = StyleSheet.create({
   level: { fontSize: 14, marginTop: 2 },
   track: { height: 6, borderRadius: 3, marginTop: 14, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 3 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  noBadges: { fontSize: 13 },
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  badgeIcon: { fontSize: 13 },
-  badgeText: { fontSize: 12, fontWeight: '700' },
 });
