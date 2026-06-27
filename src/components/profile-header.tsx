@@ -30,7 +30,13 @@ export function ProfileHeader({
   return (
     <View style={s.wrap}>
       <View style={s.topRow}>
-        <View style={[s.avatar, { backgroundColor: c.cardElevated, borderColor: c.green }]}>
+        <View
+          style={[
+            s.avatar,
+            { backgroundColor: c.cardElevated, borderColor: c.green },
+            founder && s.avatarFounder,
+            founder && { shadowColor: c.green },
+          ]}>
           {avatar ? (
             <Text style={s.avatarEmoji}>{avatar}</Text>
           ) : (
@@ -38,10 +44,21 @@ export function ProfileHeader({
           )}
         </View>
         <View style={s.info}>
-          <Text style={[s.name, { color: c.text }]} numberOfLines={1}>
+          <Text
+            style={[
+              s.name,
+              { color: c.text },
+              founder && { textShadowColor: c.green, textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 } },
+            ]}
+            numberOfLines={1}>
             {name}
           </Text>
           <Text style={[s.level, { color: c.textDim }]}>Nível {derived.level} · Leitor</Text>
+          {founder ? (
+            <Text style={[s.founderLine, { color: c.green }]} numberOfLines={1}>
+              👑 Fundador · entre os 50 primeiros
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -67,4 +84,7 @@ const s = StyleSheet.create({
   level: { fontSize: 14, marginTop: 2 },
   track: { height: 6, borderRadius: 3, marginTop: 14, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 3 },
+  // Anel neon (glow) no avatar do fundador — shadowColor é aplicado inline (cor do tema).
+  avatarFounder: { borderWidth: 2.5, shadowOpacity: 0.9, shadowRadius: 12, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
+  founderLine: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3, marginTop: 5 },
 });

@@ -179,7 +179,7 @@ export function founderAchievement(): Achievement {
     id: 'founder',
     icon: '👑',
     title: 'Fundador',
-    desc: 'Um dos 50 primeiros leitores do +leitura',
+    desc: 'Um dos 50 primeiros leitores do Dromos',
     unlocked: true,
     progress: 1,
   };

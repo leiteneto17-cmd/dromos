@@ -86,7 +86,7 @@ export function OnboardingOverlay() {
           {isWelcome ? (
             <View style={styles.body}>
               <BrandIcon name="books" size={64} strokeWidth={2} />
-              <Text style={styles.kicker}>Bem-vindo ao +leitura</Text>
+              <Text style={styles.kicker}>Bem-vindo ao Dromos (+Leitura)</Text>
               <Text style={styles.title}>Ler mais — e melhor.</Text>
               <Text style={styles.text}>
                 Um leitor que te ajuda a aprender de verdade: leitura guiada, IA no contexto, metas e uma

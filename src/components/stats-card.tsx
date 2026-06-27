@@ -18,7 +18,7 @@ export function StatsCard() {
 
   return (
     <LinearGradient colors={SocialGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
-      <Text style={styles.logo}>+leitura</Text>
+      <Text style={styles.logo}>Dromos</Text>
       <Text style={styles.kicker}>Meu progresso</Text>
 
       <View style={styles.row}>

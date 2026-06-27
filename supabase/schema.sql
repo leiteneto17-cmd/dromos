@@ -378,6 +378,11 @@ alter table public.profiles add column if not exists badges jsonb not null defau
 -- no fim do arquivo, com trava de concorrência). Lido junto com o profile (visível no perfil).
 alter table public.profiles add column if not exists is_founder boolean not null default false;
 
+-- Destaque de fundador LIGADO/DESLIGADO (o fundador escolhe exibir ou não os realces:
+-- anel no avatar, linha "entre os 50 primeiros", nome verde no feed/mural, selo no card).
+-- Default true (mostra). Lido junto com o profile → vale também nas telas sociais de terceiros.
+alter table public.profiles add column if not exists founder_flair boolean not null default true;
+
 -- ---------- SEGUIR leitores (com PEDIDO/APROVAÇÃO p/ perfis privados) ----------
 -- Perfil PÚBLICO: seguir é aceito na hora. PRIVADO: vira PEDIDO (status 'pending') que
 -- o dono aprova. O trigger abaixo define o status (cliente não escolhe — segurança).

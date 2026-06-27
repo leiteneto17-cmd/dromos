@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "+leitura",
+    "name": "Dromos",
     "slug": "leitura-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/IconeMarcaLogo/Dromos-Icone.png",
     "scheme": "leituraapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/IconeMarcaLogo/Dromos-Icone.png"
     },
     "android": {
       "package": "com.leiteneto.leitura",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./assets/IconeMarcaLogo/Dromos-Icone.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },

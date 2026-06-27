@@ -31,6 +31,8 @@ const MEDALS: Record<string, ImageSourcePropType> = {
   'words-10': require('@/assets/medalhas/words-10.png'),
   'words-50': require('@/assets/medalhas/words-50.png'),
   'words-100': require('@/assets/medalhas/words-100.png'),
+  // Brasão especial de FUNDADOR (primeiros 50) — não é conquista de leitura (§founder).
+  founder: require('@/assets/medalhas/founder.png'),
 };
 
 /** Imagem do emblema para um `id` de conquista, ou `undefined` se não houver arte. */

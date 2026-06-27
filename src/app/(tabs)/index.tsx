@@ -119,7 +119,7 @@ export default function HubScreen() {
                 <Text style={styles.avatarText}>{avatar || firstName.charAt(0).toUpperCase() || '🦉'}</Text>
               </View>
               <Text style={styles.appName} numberOfLines={1}>
-                +leitura
+                Dromos
               </Text>
             </View>
             <View style={styles.headerIcons}>

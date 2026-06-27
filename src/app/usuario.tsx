@@ -85,6 +85,8 @@ export default function UserScreen() {
   const avatar = profile?.avatar_url || '🦉';
   // Vê o conteúdo se for eu, o perfil é público, ou eu sou seguidor ACEITO.
   const canSee = isMe || !!profile?.is_public || followState === 'accepted';
+  // Fundador COM realce ligado (anel/linha/emblema). O toggle é do próprio fundador.
+  const showFounder = !!profile?.is_founder && profile?.founder_flair !== false;
 
   return (
     <View style={[styles.fill, { backgroundColor: c.bg }]}>
@@ -101,8 +103,26 @@ export default function UserScreen() {
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* Cabeçalho */}
             <View style={styles.header}>
-              <Text style={styles.avatar}>{avatar}</Text>
-              <Text style={[styles.name, { color: c.text }]}>{name}</Text>
+              {showFounder ? (
+                <View style={[styles.avatarRing, { borderColor: c.green, shadowColor: c.green }]}>
+                  <Text style={styles.avatar}>{avatar}</Text>
+                </View>
+              ) : (
+                <Text style={styles.avatar}>{avatar}</Text>
+              )}
+              <Text
+                style={[
+                  styles.name,
+                  { color: c.text },
+                  showFounder && { textShadowColor: c.green, textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 } },
+                ]}>
+                {name}
+              </Text>
+              {showFounder ? (
+                <Text style={[styles.founderLine, { color: c.green }]} numberOfLines={1}>
+                  👑 Fundador · entre os 50 primeiros
+                </Text>
+              ) : null}
               <View style={styles.countRow}>
                 <Text style={[styles.count, { color: c.text }]}>
                   {counts.followers} <Text style={{ color: c.textFaint }}>seguidores</Text>
@@ -148,15 +168,12 @@ export default function UserScreen() {
             ) : (
               <>
                 {/* Emblemas conquistados (profiles.badges) + brasão de fundador (is_founder) */}
-                {(profile?.badges?.length ?? 0) > 0 || profile?.is_founder ? (
+                {(profile?.badges?.length ?? 0) > 0 || showFounder ? (
                   <>
                     <SectionTitle name="trophy">
-                      {`Emblemas (${(profile?.badges?.length ?? 0) + (profile?.is_founder ? 1 : 0)})`}
+                      {`Emblemas (${(profile?.badges?.length ?? 0) + (showFounder ? 1 : 0)})`}
                     </SectionTitle>
-                    <EmblemStrip
-                      achievements={achievementsFromIds(profile?.badges ?? [])}
-                      founder={profile?.is_founder}
-                    />
+                    <EmblemStrip achievements={achievementsFromIds(profile?.badges ?? [])} founder={showFounder} />
                   </>
                 ) : null}
 
@@ -238,6 +255,20 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginTop: 8 },
   avatar: { fontSize: 64 },
   name: { fontSize: 22, fontWeight: '800', marginTop: 8 },
+  // Anel neon (glow) ao redor do avatar do fundador (shadowColor inline = cor do tema).
+  avatarRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOpacity: 0.9,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  founderLine: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.3, marginTop: 8 },
   countRow: { flexDirection: 'row', gap: 24, marginTop: 10 },
   count: { fontSize: 15, fontWeight: '800' },
   followBtn: { marginTop: 16, borderRadius: 999, paddingHorizontal: 28, paddingVertical: 11 },

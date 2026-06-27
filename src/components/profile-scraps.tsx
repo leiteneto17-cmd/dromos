@@ -182,8 +182,9 @@ export function ProfileScraps({
                 style={styles.who}
                 onPress={() => router.push({ pathname: '/usuario', params: { id: s.author_id, name: s.author_name } })}>
                 <Text style={styles.avatar}>{s.author_avatar || '🦉'}</Text>
-                <Text style={[styles.author, { color: c.text }]} numberOfLines={1}>
+                <Text style={[styles.author, { color: s.author_founder ? c.green : c.text }]} numberOfLines={1}>
                   {s.is_mine ? 'Você' : s.author_name}
+                  {s.author_founder ? ' 👑' : ''}
                 </Text>
               </Pressable>
               <Text style={[styles.date, { color: c.textFaint }]}>{fmtDate(s.created_at)}</Text>
@@ -214,7 +215,7 @@ export function ProfileScraps({
       )}
 
       <Pressable
-        onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Reportar conteúdo — +leitura')}`)}
+        onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Reportar conteúdo — Dromos')}`)}
         hitSlop={6}
         style={styles.contact}>
         <Text style={[styles.contactText, { color: c.textFaint }]}>Algo impróprio? Denuncie acima ou fale com a equipe.</Text>

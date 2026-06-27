@@ -20,6 +20,7 @@ import { deriveStats, fmtHMS } from '@/services/progress';
 import { cleanSnippet } from '@/services/text-utils';
 import { Social, SocialGradient } from '@/theme/social';
 import { useLibrary, type ReadingSession } from '@/store/library';
+import { useProfile } from '@/store/profile';
 
 export type CardVariant = 'escuro' | 'transparente' | 'compacto' | 'capa' | 'foto' | 'citacao';
 
@@ -58,6 +59,14 @@ export function ShareableCard({
 }) {
   const bookList = useLibrary((s) => s.books);
   const currentBookId = useLibrary((s) => s.currentBookId);
+  // Selo de fundador no card (marketing): só se for fundador COM realce ligado.
+  const myProfile = useProfile((st) => st.profile);
+  const showFounder = !!myProfile?.is_founder && myProfile?.founder_flair !== false;
+  const seal = showFounder ? (
+    <View style={s.seal}>
+      <Text style={s.sealText}>👑 Fundador</Text>
+    </View>
+  ) : null;
   const bookmarks = useLibrary((s) => s.bookmarks);
   const highlights = useLibrary((s) => s.highlights);
   const stats = useLibrary((s) => s.stats);
@@ -121,7 +130,7 @@ export function ShareableCard({
         </View>
       ) : null}
 
-      <Text style={s.logo}>✦ +leitura</Text>
+      <Text style={s.logo}>✦ Dromos</Text>
     </>
   ) : null;
 
@@ -162,7 +171,7 @@ export function ShareableCard({
         </View>
       )}
 
-      <Text style={s.logo}>✦ +leitura</Text>
+      <Text style={s.logo}>✦ Dromos</Text>
     </>
   );
 
@@ -184,7 +193,7 @@ export function ShareableCard({
           — {refTitle}
         </Text>
       ) : null}
-      <Text style={s.logo}>✦ +leitura</Text>
+      <Text style={s.logo}>✦ Dromos</Text>
     </>
   );
 
@@ -192,7 +201,12 @@ export function ShareableCard({
 
   if (variant === 'transparente') {
     // Fundo transparente → o PNG capturado fica sem fundo (sticker p/ Story).
-    return <View style={[s.card, s.transparent]}>{content}</View>;
+    return (
+      <View style={[s.card, s.transparent]}>
+        {seal}
+        {content}
+      </View>
+    );
   }
 
   // Variantes com imagem de fundo (capa do livro / foto do usuário) + véu escuro.
@@ -202,6 +216,7 @@ export function ShareableCard({
       <View style={s.card}>
         <Image source={{ uri: bgUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
         <LinearGradient colors={SCRIM} style={StyleSheet.absoluteFill} />
+        {seal}
         {content}
       </View>
     );
@@ -210,6 +225,7 @@ export function ShareableCard({
   // capa/foto sem imagem disponível → cai no gradiente (com aviso amigável no rodapé).
   return (
     <LinearGradient colors={SocialGradient} style={s.card}>
+      {seal}
       {content}
       {variant === 'capa' && !bgUri ? (
         <Text style={s.hint}>Este livro ainda não tem capa.</Text>
@@ -232,6 +248,20 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   transparent: { backgroundColor: 'transparent' },
+  // Selo de fundador (canto superior direito do card compartilhável).
+  seal: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    zIndex: 2,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: Social.green,
+    backgroundColor: 'rgba(125,243,173,0.16)',
+  },
+  sealText: { color: Social.green, fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
   kicker: { color: Social.lavender, fontSize: 15, letterSpacing: 1, fontWeight: '600' },
   bigTitle: {
     color: Social.green,

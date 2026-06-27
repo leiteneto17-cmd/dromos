@@ -234,7 +234,7 @@ export default function GoalsScreen() {
           'Permissão necessária',
           remindersUnsupported
             ? 'Lembretes precisam do app instalado (dev build), não funcionam no Expo Go.'
-            : 'Ative as notificações do +leitura nas configurações do aparelho para receber lembretes.',
+            : 'Ative as notificações do Dromos nas configurações do aparelho para receber lembretes.',
         );
         setReminder({ ...next, enabled: false });
         return;

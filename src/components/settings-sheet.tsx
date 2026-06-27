@@ -45,6 +45,7 @@ export function SettingsSheet({
   const aiActive = aiHasKey || !!user;
 
   const [savingPublic, setSavingPublic] = useState(false);
+  const [savingFlair, setSavingFlair] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const headerName = profile?.name?.trim() || displayName(user);
@@ -53,6 +54,12 @@ export function SettingsSheet({
     setSavingPublic(true);
     await updateProfile({ is_public: next });
     setSavingPublic(false);
+  }
+
+  async function toggleFlair(next: boolean) {
+    setSavingFlair(true);
+    await updateProfile({ founder_flair: next });
+    setSavingFlair(false);
   }
 
   const goIntegracoes = useCallback(() => {
@@ -154,6 +161,27 @@ export function SettingsSheet({
               thumbColor="#fff"
             />
           </Card>
+
+          {/* Destaque de fundador — só para quem é fundador (primeiros 50) */}
+          {profile?.is_founder ? (
+            <Card style={styles.row}>
+              <View style={styles.flex}>
+                <Text style={[styles.itemTitle, { color: c.text }]}>👑 Destaque de fundador</Text>
+                <Text style={[styles.itemSub, { color: c.textFaint }]}>
+                  {profile?.founder_flair !== false
+                    ? 'Brasão, anel no avatar, nome em destaque e selo no card aparecem pra todos.'
+                    : 'Você é fundador, mas está sem os realces. Ligue para exibir.'}
+                </Text>
+              </View>
+              <Switch
+                value={profile?.founder_flair !== false}
+                onValueChange={toggleFlair}
+                disabled={savingFlair}
+                trackColor={{ true: c.green, false: c.border }}
+                thumbColor="#fff"
+              />
+            </Card>
+          ) : null}
 
           {/* IA */}
           <SectionTitle name="sparkles">Inteligência Artificial</SectionTitle>

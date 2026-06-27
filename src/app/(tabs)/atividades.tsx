@@ -108,7 +108,11 @@ export default function ActivitiesScreen() {
                 </Pressable>
                 <View style={styles.flex}>
                   <Text style={[styles.feedWho, { color: c.text }]} numberOfLines={1}>
-                    <Text style={{ fontWeight: '800' }}>{f.author_name}</Text> leu
+                    <Text style={{ fontWeight: '800', color: f.author_founder ? c.green : c.text }}>
+                      {f.author_name}
+                      {f.author_founder ? ' 👑' : ''}
+                    </Text>{' '}
+                    leu
                   </Text>
                   <Text style={[styles.feedBook, { color: c.textDim }]} numberOfLines={1}>
                     {f.book_title}

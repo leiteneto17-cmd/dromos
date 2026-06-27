@@ -18,6 +18,8 @@ export type Profile = {
   is_public: boolean;
   /** Brasão de fundador (um dos 50 primeiros cadastrados) — atribuído no backend. */
   is_founder: boolean;
+  /** Fundador escolheu EXIBIR os realces de fundador (anel, linha, nome verde, selo). */
+  founder_flair: boolean;
 };
 
 type ProfileState = {
@@ -35,7 +37,7 @@ async function loadProfile(userId: string | undefined): Promise<void> {
   useProfile.setState({ loading: true });
   const { data } = await supabase
     .from('profiles')
-    .select('id, name, avatar_url, is_public, is_founder')
+    .select('id, name, avatar_url, is_public, is_founder, founder_flair')
     .eq('id', userId)
     .maybeSingle();
 
@@ -49,10 +51,10 @@ async function loadProfile(userId: string | undefined): Promise<void> {
   const { data: created } = await supabase
     .from('profiles')
     .upsert({ id: userId, name })
-    .select('id, name, avatar_url, is_public, is_founder')
+    .select('id, name, avatar_url, is_public, is_founder, founder_flair')
     .maybeSingle();
   useProfile.setState({
-    profile: (created as Profile) ?? { id: userId, name, avatar_url: null, is_public: false, is_founder: false },
+    profile: (created as Profile) ?? { id: userId, name, avatar_url: null, is_public: false, is_founder: false, founder_flair: true },
     loading: false,
   });
 }
@@ -95,6 +97,7 @@ export async function updateProfile(fields: {
   name?: string;
   avatar_url?: string | null;
   is_public?: boolean;
+  founder_flair?: boolean;
 }): Promise<UpdateResult> {
   const user = useAuth.getState().user;
   if (!supabase || !user) return { ok: false, error: 'Você precisa estar logado.' };

@@ -73,7 +73,7 @@ export async function scheduleDailyReminder(
   await cancelDailyReminder();
   await Notifications!.scheduleNotificationAsync({
     identifier: DAILY_ID,
-    content: { title: '+leitura', body },
+    content: { title: 'Dromos', body },
     trigger: {
       type: Notifications!.SchedulableTriggerInputTypes.DAILY,
       hour,

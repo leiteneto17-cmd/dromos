@@ -17,6 +17,8 @@ export type PublicProfile = {
   badges: string[];
   /** Brasão de fundador (um dos 50 primeiros cadastrados). */
   is_founder: boolean;
+  /** Fundador escolheu exibir os realces (anel/linha/nome verde/selo). */
+  founder_flair: boolean;
 };
 
 export type FeedItem = {
@@ -30,6 +32,8 @@ export type FeedItem = {
   created_at: string;
   kudos: number;
   iKudoed: boolean;
+  /** Autor é fundador COM realce ligado → nome em verde no feed. */
+  author_founder: boolean;
 };
 
 async function uid(): Promise<string | null> {
@@ -53,14 +57,19 @@ export async function searchUsers(query: string): Promise<PublicProfile[]> {
   const safe = q.replace(/[%_]/g, '\\$&');
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, avatar_url, is_public, badges, is_founder')
+    .select('id, name, avatar_url, is_public, badges, is_founder, founder_flair')
     .eq('is_public', true)
     .ilike('name', `%${safe}%`)
     .limit(20);
   if (error || !data) return [];
   return (data as PublicProfile[])
     .filter((p) => p.id !== me && (p.name ?? '').trim().length > 0)
-    .map((p) => ({ ...p, badges: Array.isArray(p.badges) ? p.badges : [], is_founder: !!p.is_founder }));
+    .map((p) => ({
+      ...p,
+      badges: Array.isArray(p.badges) ? p.badges : [],
+      is_founder: !!p.is_founder,
+      founder_flair: p.founder_flair !== false,
+    }));
 }
 
 /** Dados públicos de um perfil (qualquer autenticado pode ler profiles). */
@@ -68,12 +77,17 @@ export async function getUserProfile(userId: string): Promise<PublicProfile | nu
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, avatar_url, is_public, badges, is_founder')
+    .select('id, name, avatar_url, is_public, badges, is_founder, founder_flair')
     .eq('id', userId)
     .maybeSingle();
   if (error || !data) return null;
   const p = data as PublicProfile;
-  return { ...p, badges: Array.isArray(p.badges) ? p.badges : [], is_founder: !!p.is_founder };
+  return {
+    ...p,
+    badges: Array.isArray(p.badges) ? p.badges : [],
+    is_founder: !!p.is_founder,
+    founder_flair: p.founder_flair !== false, // default true (perfis antigos sem a coluna)
+  };
 }
 
 /** Estante de outra pessoa (a RLS só devolve se o perfil for público — ou se for a minha). */
@@ -228,11 +242,14 @@ export async function getFeed(limit = 30): Promise<FeedItem[]> {
 
   // Nome/avatar dos autores
   const authorIds = [...new Set(rows.map((r) => r.user_id))];
-  const profs = new Map<string, { name: string | null; avatar: string | null }>();
+  const profs = new Map<string, { name: string | null; avatar: string | null; founder: boolean }>();
   if (authorIds.length) {
-    const { data: pData } = await supabase.from('profiles').select('id, name, avatar_url').in('id', authorIds);
-    (pData as { id: string; name: string | null; avatar_url: string | null }[] | null)?.forEach((p) =>
-      profs.set(p.id, { name: p.name, avatar: p.avatar_url }),
+    const { data: pData } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url, is_founder, founder_flair')
+      .in('id', authorIds);
+    (pData as { id: string; name: string | null; avatar_url: string | null; is_founder: boolean; founder_flair: boolean }[] | null)?.forEach((p) =>
+      profs.set(p.id, { name: p.name, avatar: p.avatar_url, founder: !!p.is_founder && p.founder_flair !== false }),
     );
   }
 
@@ -259,6 +276,7 @@ export async function getFeed(limit = 30): Promise<FeedItem[]> {
     created_at: r.created_at,
     kudos: kudosCount.get(r.id) ?? 0,
     iKudoed: myKudos.has(r.id),
+    author_founder: profs.get(r.user_id)?.founder ?? false,
   }));
 }
 
@@ -288,6 +306,8 @@ export type Scrap = {
   is_public: boolean;
   created_at: string;
   is_mine: boolean; // sou o AUTOR do recado
+  /** Autor é fundador COM realce ligado → nome em verde no mural. */
+  author_founder: boolean;
 };
 
 /** Recados do mural de `recipientId` (a RLS já decide o que aparece). Junta nome/avatar do autor. */
@@ -303,11 +323,14 @@ export async function getScraps(recipientId: string): Promise<Scrap[]> {
   const rows = data as { id: string; author_id: string; body: string; is_public: boolean; created_at: string }[];
 
   const ids = [...new Set(rows.map((r) => r.author_id))];
-  const profs = new Map<string, { name: string | null; avatar: string | null }>();
+  const profs = new Map<string, { name: string | null; avatar: string | null; founder: boolean }>();
   if (ids.length) {
-    const { data: pData } = await supabase.from('profiles').select('id, name, avatar_url').in('id', ids);
-    (pData as { id: string; name: string | null; avatar_url: string | null }[] | null)?.forEach((p) =>
-      profs.set(p.id, { name: p.name, avatar: p.avatar_url }),
+    const { data: pData } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url, is_founder, founder_flair')
+      .in('id', ids);
+    (pData as { id: string; name: string | null; avatar_url: string | null; is_founder: boolean; founder_flair: boolean }[] | null)?.forEach((p) =>
+      profs.set(p.id, { name: p.name, avatar: p.avatar_url, founder: !!p.is_founder && p.founder_flair !== false }),
     );
   }
   return rows.map((r) => ({
@@ -315,6 +338,7 @@ export async function getScraps(recipientId: string): Promise<Scrap[]> {
     author_id: r.author_id,
     author_name: profs.get(r.author_id)?.name?.trim() || 'Leitor',
     author_avatar: profs.get(r.author_id)?.avatar ?? null,
+    author_founder: profs.get(r.author_id)?.founder ?? false,
     body: r.body,
     is_public: r.is_public,
     created_at: r.created_at,

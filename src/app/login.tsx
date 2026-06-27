@@ -63,7 +63,7 @@ export default function LoginScreen() {
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.body}>
-            <Text style={[styles.brand, { color: c.purple }]}>+leitura</Text>
+            <Text style={[styles.brand, { color: c.purple }]}>Dromos (+Leitura)</Text>
             <Text style={[styles.title, { color: c.text }]}>
               {criar ? 'Criar conta' : 'Entrar'}
             </Text>

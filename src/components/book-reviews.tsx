@@ -298,7 +298,7 @@ export function BookReviews({ bookKey, bookTitle }: { bookKey: string; bookTitle
 
       {/* Contato com a equipe (requisito de UGC das lojas — §4.8) */}
       <Pressable
-        onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Reportar conteúdo — +leitura')}`)}
+        onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Reportar conteúdo — Dromos')}`)}
         hitSlop={6}
         style={styles.contact}>
         <Text style={[styles.contactText, { color: c.textFaint }]}>
