@@ -774,6 +774,19 @@ export default function ReaderScreen() {
     requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: bm.offset, animated: false }));
   }, []);
 
+  // Pular para um capítulo pelo índice de parágrafo inicial (Sumário). Usa scrollToIndex —
+  // funciona com o getItemLayout estimado, sem renderizar o caminho (não trava — §4.6).
+  const jumpToChapter = useCallback((startIndex: number) => {
+    setShowBookmarks(false);
+    requestAnimationFrame(() => {
+      try {
+        listRef.current?.scrollToIndex({ index: startIndex, animated: false, viewPosition: 0 });
+      } catch {
+        // índice ainda não medido — ignora (o getItemLayout cobre os casos normais)
+      }
+    });
+  }, []);
+
   const listHeader = (
     <View>
       <Text style={[styles.bookLabel, { color: t.textSecondary }]}>{bookLabel}</Text>
@@ -902,9 +915,9 @@ export default function ReaderScreen() {
         <Pressable
           onPress={() => setShowBookmarks(true)}
           accessibilityRole="button"
-          accessibilityLabel="Progresso e marcadores"
+          accessibilityLabel={chapters.length > 1 ? 'Sumário, progresso e marcadores' : 'Progresso e marcadores'}
           style={[styles.progressBar, { backgroundColor: t.surface, borderBottomColor: t.border }]}>
-          <Text style={{ fontSize: 15 }}>🔖{bookmarks.length > 0 ? ` ${bookmarks.length}` : ''}</Text>
+          <Text style={{ fontSize: 15 }}>{chapters.length > 1 ? '📑' : '🔖'}{bookmarks.length > 0 ? ` ${bookmarks.length}` : ''}</Text>
           <SessionTimer key={currentBook?.id ?? 'sample'} color={t.accent} />
           <Text style={[styles.progressLabel, { color: t.textSecondary }]} numberOfLines={1}>
             {barChapter || 'Lendo'}
@@ -1082,8 +1095,11 @@ export default function ReaderScreen() {
           t={t}
           bookmarks={bookmarks}
           currentLabel={`${barChapter ? `${barChapter} · ` : ''}${Math.round(readProgress * 100)}%`}
+          chapters={chapters}
+          currentChapter={currentChapter}
           onAdd={addBookmarkHere}
           onJump={jumpToBookmark}
+          onJumpChapter={jumpToChapter}
           onRemove={(id) => currentBook && removeBookmark(currentBook.id, id)}
           onClose={() => setShowBookmarks(false)}
         />

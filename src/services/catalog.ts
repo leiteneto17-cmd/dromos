@@ -173,7 +173,15 @@ export async function searchCatalog(
  * separar Brasil de Portugal). Em vez da popularidade crua do `pt` — que sobe obras de
  * Portugal —, buscamos autores brasileiros conhecidos e intercalamos para dar variedade.
  */
-const AUTORES_BR = ['Machado de Assis', 'José de Alencar', 'Lima Barreto', 'Aluísio Azevedo'];
+const AUTORES_BR = [
+  'Machado de Assis',
+  'José de Alencar',
+  'Lima Barreto',
+  'Aluísio Azevedo',
+  'Bernardo Guimarães',
+  'Manuel Antônio de Almeida',
+  'Olavo Bilac',
+];
 
 export async function featuredBrazilian(): Promise<CatalogBook[]> {
   const listas = await Promise.all(
