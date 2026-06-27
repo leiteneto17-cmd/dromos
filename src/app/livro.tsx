@@ -16,7 +16,6 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BookReviews } from '@/components/book-reviews';
-import { BuyLinks } from '@/components/buy-links';
 import { Card, SectionTitle } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import { bookDetails, similarBooks, type CatalogBook } from '@/services/book-catalog';
@@ -292,9 +291,6 @@ export default function BookScreen() {
               );
             })}
           </View>
-
-          {/* Onde comprar (links de afiliado — abre fora do app, §6) */}
-          <BuyLinks book={{ title, author, isbn }} />
 
           {/* Temperatura na comunidade */}
           {totalReaders > 0 ? (
