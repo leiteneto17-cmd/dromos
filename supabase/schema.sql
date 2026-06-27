@@ -573,3 +573,36 @@ end; $$;
 -- Só um usuário autenticado pode apagar a própria conta (anon não).
 revoke all on function public.delete_current_user() from public, anon;
 grant execute on function public.delete_current_user() to authenticated;
+
+-- =====================================================================
+-- COTA DA IA GERIDA (CLAUDE.md §5) — limite diário por usuário p/ a IA grátis
+-- (dicionário + Coach via Edge Function ai-proxy). Protege a cota/contas das chaves.
+-- A tabela de USO é fechada (RLS sem policy = cliente não lê/escreve); só a função
+-- SECURITY DEFINER mexe nela. A Edge Function chama ai_quota_consume a cada pedido.
+-- =====================================================================
+create table if not exists public.ai_usage (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  day date not null default current_date,
+  count int not null default 0,
+  primary key (user_id, day)
+);
+alter table public.ai_usage enable row level security;
+-- (intencional: NENHUMA policy → cliente não acessa direto; só a função abaixo)
+
+-- Consome 1 da cota do DIA do usuário e diz se AINDA está dentro do limite.
+-- auth.uid() identifica quem chamou (a Edge Function repassa o JWT do usuário).
+create or replace function public.ai_quota_consume(p_limit int)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid := auth.uid();
+  v_count int;
+begin
+  if v_user is null then return false; end if;
+  insert into public.ai_usage (user_id, day, count)
+    values (v_user, current_date, 1)
+    on conflict (user_id, day) do update set count = public.ai_usage.count + 1
+    returning count into v_count;
+  return v_count <= p_limit;
+end; $$;
+grant execute on function public.ai_quota_consume(int) to authenticated;

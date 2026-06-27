@@ -289,6 +289,11 @@ type LibraryState = Persisted & {
   addReadingTime: (seconds: number) => void;
   addSession: (session: ReadingSession) => void;
   markSessionSynced: (id: string, remoteId?: string) => void;
+  /** Restauração da nuvem: funde as atividades do Supabase no estado local sem apagar
+   * nada (sessões por remoteId; estatísticas por dia usando MAX). Idempotente. */
+  mergeCloudActivities: (
+    rows: { remoteId: string; bookTitle: string; format: BookFormat; seconds: number; pages: number; startedAt: number }[],
+  ) => void;
   addGoal: (goal: Goal) => void;
   removeGoal: (id: string) => void;
   completeGoal: (id: string, doneAt: number) => void;
@@ -370,6 +375,42 @@ export const useLibrary = create<LibraryState>((set) => ({
     set((s) => ({
       sessions: s.sessions.map((x) => (x.id === id ? { ...x, synced: true, remoteId } : x)),
     })),
+  mergeCloudActivities: (rows) =>
+    set((s) => {
+      // 1) Sessões: adiciona as da nuvem que ainda não temos (dedupe por remoteId).
+      const haveRemote = new Set(s.sessions.map((x) => x.remoteId).filter(Boolean));
+      const restored: ReadingSession[] = rows
+        .filter((r) => !haveRemote.has(r.remoteId))
+        .map((r) => ({
+          id: `cloud-${r.remoteId}`,
+          bookId: '', // histórico: o arquivo local pode não existir mais
+          bookTitle: r.bookTitle,
+          format: r.format,
+          seconds: r.seconds,
+          pages: r.pages,
+          startedAt: r.startedAt,
+          createdAt: r.startedAt,
+          synced: true,
+          remoteId: r.remoteId,
+        }));
+      const sessions =
+        restored.length === 0
+          ? s.sessions
+          : [...s.sessions, ...restored].sort((a, b) => b.startedAt - a.startedAt).slice(0, 300);
+
+      // 2) Estatísticas: perDay com MAX por dia (não apaga o tempo local; só restaura o
+      //    que faltava). Mesma chave de dia usada em addReadingTime (UTC, toISOString).
+      const cloudPerDay: Record<string, number> = {};
+      for (const r of rows) {
+        const k = new Date(r.startedAt).toISOString().slice(0, 10);
+        cloudPerDay[k] = (cloudPerDay[k] ?? 0) + (r.seconds || 0);
+      }
+      const perDay: Record<string, number> = { ...s.stats.perDay };
+      for (const [k, v] of Object.entries(cloudPerDay)) perDay[k] = Math.max(perDay[k] ?? 0, v);
+      const totalSeconds = Object.values(perDay).reduce((a, v) => a + v, 0);
+
+      return { sessions, stats: { totalSeconds, perDay } };
+    }),
   addGoal: (goal) => set((s) => ({ goals: [goal, ...s.goals] })),
   removeGoal: (id) => set((s) => ({ goals: s.goals.filter((g) => g.id !== id) })),
   completeGoal: (id, doneAt) =>

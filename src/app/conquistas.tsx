@@ -16,7 +16,15 @@ import { PressableScale } from '@/components/pressable-scale';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { medalImage } from '@/theme/medals';
 import { useUI } from '@/hooks/use-ui';
-import { suggestGoal, reminderText } from '@/services/ai/goal-coach';
+import { managedAIAvailable } from '@/services/ai/managed';
+import {
+  planGoals,
+  reminderText,
+  suggestGoal,
+  type CoachInput,
+  type GoalPlan,
+  type GoalSuggestion,
+} from '@/services/ai/goal-coach';
 import {
   computeAchievements,
   dayKeyInDays,
@@ -76,6 +84,13 @@ export default function GoalsScreen() {
   /** Justificativa da IA p/ a meta sugerida (mostrada no modal). */
   const [aiRationale, setAiRationale] = useState('');
 
+  // --- Coach (objetivo → plano de metas) ---
+  const [objective, setObjective] = useState('');
+  const [planning, setPlanning] = useState(false);
+  const [plan, setPlan] = useState<GoalPlan | null>(null);
+  // IA disponível: chave própria (BYOK) OU IA grátis/gerida (logado). Igual ao dicionário.
+  const aiOn = hasKey || managedAIAvailable();
+
   const derived = deriveStats(stats);
   const achievements = computeAchievements({
     booksCount: booksList.length,
@@ -102,36 +117,32 @@ export default function GoalsScreen() {
 
   const goBack = () => (router.canGoBack() ? router.back() : router.navigate('/perfil'));
 
-  // --- Sugestão de meta por IA (BYOK, §1b incremento 2) ---
+  // Resumo numérico (ritmo/consistência/livro atual) passado à IA — compartilhado pela
+  // Sugestão e pelo Coach.
+  function coachInput(): CoachInput {
+    const cb = currentBookId ? booksList.find((b) => b.id === currentBookId) : undefined;
+    const pct = cb ? bookProgress[cb.id] ?? 0 : 0;
+    const pages = cb ? bookPages[cb.id] ?? 0 : 0;
+    return {
+      avgMinPerDay: derived.avgMinPerDay,
+      streak: derived.streak,
+      activeDays: derived.activeDays,
+      totalMinutes: Math.round(derived.totalSeconds / 60),
+      booksCount: booksList.length,
+      currentBook: cb
+        ? { id: cb.id, title: cb.title ?? cb.name, pct, pages, pagesLeft: pages > 0 ? Math.ceil(pages * (1 - pct)) : 0 }
+        : undefined,
+    };
+  }
+
+  // --- Sugestão de meta por IA (uma meta, pré-preenche o modal) ---
   async function onSuggest() {
     if (suggesting) return;
     setSuggesting(true);
     try {
-      const cb = currentBookId ? booksList.find((b) => b.id === currentBookId) : undefined;
-      const pct = cb ? bookProgress[cb.id] ?? 0 : 0;
-      const pages = cb ? bookPages[cb.id] ?? 0 : 0;
-      const res = await suggestGoal({
-        avgMinPerDay: derived.avgMinPerDay,
-        streak: derived.streak,
-        activeDays: derived.activeDays,
-        totalMinutes: Math.round(derived.totalSeconds / 60),
-        booksCount: booksList.length,
-        currentBook: cb
-          ? {
-              id: cb.id,
-              title: cb.title ?? cb.name,
-              pct,
-              pages,
-              pagesLeft: pages > 0 ? Math.ceil(pages * (1 - pct)) : 0,
-            }
-          : undefined,
-      });
+      const res = await suggestGoal(coachInput());
       if (!res.ok) {
-        if (res.needsKey) {
-          Alert.alert('IA não configurada', 'Configure sua chave em Perfil → Integrações para usar sugestões.');
-        } else {
-          Alert.alert('Não consegui sugerir', res.error);
-        }
+        Alert.alert(res.needsKey ? 'IA não configurada' : 'Não consegui sugerir', res.error);
         return;
       }
       // Pré-preenche o modal "Nova meta" com a sugestão (o usuário revisa e cria).
@@ -145,6 +156,60 @@ export default function GoalsScreen() {
     } finally {
       setSuggesting(false);
     }
+  }
+
+  // --- Coach: objetivo (linguagem natural) → plano de 1–3 metas ---
+  async function runCoach() {
+    if (planning) return;
+    if (!objective.trim()) {
+      Alert.alert('Qual seu objetivo?', 'Escreva o que você quer alcançar (ex.: ler 20 min por dia).');
+      return;
+    }
+    setPlanning(true);
+    try {
+      const res = await planGoals(objective, coachInput());
+      if (!res.ok) {
+        Alert.alert(res.needsKey ? 'Coach indisponível' : 'Não consegui montar o plano', res.error);
+        return;
+      }
+      setPlan(res.data);
+    } finally {
+      setPlanning(false);
+    }
+  }
+
+  /** Converte uma meta sugerida pelo Coach num Goal real (mesma construção do create()). */
+  function goalFromSuggestion(s: GoalSuggestion): Goal {
+    const idNum = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const base = {
+      id: idNum,
+      deadline: dayKeyInDays(s.days),
+      createdAt: Date.now(),
+      createdDayKey: localDayKey(),
+      baselineSeconds: stats.totalSeconds,
+    };
+    if (s.kind === 'livro' && s.bookId) {
+      const book = booksList.find((b) => b.id === s.bookId);
+      return { ...base, kind: 'livro', title: s.title || `Terminar ${book?.title ?? book?.name ?? 'o livro'}`, target: 0, bookId: s.bookId };
+    }
+    return { ...base, kind: s.kind, title: s.title, target: s.target };
+  }
+
+  /** Aceita uma meta do plano: cria de verdade e tira da lista de sugestões. */
+  function addSuggested(s: GoalSuggestion, idx: number) {
+    addGoal(goalFromSuggestion(s));
+    setPlan((p) => {
+      if (!p) return p;
+      const goals = p.goals.filter((_, i) => i !== idx);
+      return goals.length ? { ...p, goals } : null; // tudo adicionado → fecha o plano
+    });
+  }
+
+  /** Rótulo curto do que a meta pede (p/ os cards do plano). */
+  function describeSuggestion(s: GoalSuggestion): string {
+    if (s.kind === 'minutos') return `${s.target} min`;
+    if (s.kind === 'dias') return `${s.target} dias de leitura`;
+    return 'Terminar o livro';
   }
 
   // --- Lembrete de leitura (notificação local diária — §1b) ---
@@ -247,18 +312,62 @@ export default function GoalsScreen() {
         </PressableScale>
       </View>
 
-      {/* Sugestão por IA (BYOK) — só aparece com chave configurada (§1b) */}
-      {hasKey ? (
-        <Pressable
-          onPress={onSuggest}
-          disabled={suggesting}
-          style={[styles.suggestBtn, { borderColor: c.purple, opacity: suggesting ? 0.7 : 1 }]}>
-          {suggesting ? (
-            <ActivityIndicator size="small" color={c.purple} />
-          ) : (
-            <Text style={[styles.suggestText, { color: c.purple }]}>✨ Sugerir meta (IA)</Text>
-          )}
-        </Pressable>
+      {/* Coach de Metas (IA): objetivo em linguagem natural → plano de 1–3 metas.
+          Disponível com chave própria (BYOK) ou IA grátis/gerida (logado). */}
+      {aiOn ? (
+        <Card style={styles.coach}>
+          <Text style={[styles.coachTitle, { color: c.text }]}>🧭 Coach de Metas</Text>
+          <Text style={[styles.coachSub, { color: c.textFaint }]}>
+            Diga seu objetivo e a IA monta um plano sob medida pro seu ritmo.
+          </Text>
+          <TextInput
+            value={objective}
+            onChangeText={setObjective}
+            placeholder="ex.: criar o hábito de ler antes de dormir"
+            placeholderTextColor={c.textFaint}
+            multiline
+            style={[styles.coachInput, { backgroundColor: c.cardElevated, borderColor: c.border, color: c.text }]}
+          />
+          <Pressable
+            onPress={runCoach}
+            disabled={planning}
+            style={[styles.coachBtn, { backgroundColor: c.purple, opacity: planning ? 0.7 : 1 }]}>
+            {planning ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.coachBtnText}>✨ Montar meu plano</Text>
+            )}
+          </Pressable>
+
+          {plan ? (
+            <View style={styles.planBox}>
+              {plan.note ? <Text style={[styles.planNote, { color: c.text }]}>{plan.note}</Text> : null}
+              {plan.goals.map((s, i) => (
+                <View key={i} style={[styles.planRow, { borderColor: c.border }]}>
+                  <View style={styles.flex}>
+                    <Text style={[styles.planTitle, { color: c.text }]}>{s.title}</Text>
+                    <Text style={[styles.planMeta, { color: c.green }]}>
+                      {describeSuggestion(s)} · {s.days} dias
+                    </Text>
+                    {s.rationale ? (
+                      <Text style={[styles.planWhy, { color: c.textFaint }]}>{s.rationale}</Text>
+                    ) : null}
+                  </View>
+                  <Pressable onPress={() => addSuggested(s, i)} style={[styles.addBtn, { backgroundColor: c.green }]}>
+                    <Text style={[styles.addBtnText, { color: c.onGreen }]}>+ Adicionar</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Atalho: sugestão rápida de UMA meta a partir do histórico (sem digitar objetivo) */}
+          <Pressable onPress={onSuggest} disabled={suggesting} hitSlop={6} style={styles.suggestLink}>
+            <Text style={[styles.suggestLinkText, { color: c.purple }]}>
+              {suggesting ? 'Pensando…' : 'ou sugira uma meta pelo meu histórico ›'}
+            </Text>
+          </Pressable>
+        </Card>
       ) : null}
 
       {/* Metas ativas */}
@@ -531,8 +640,23 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800' },
   newBtn: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
   newBtnText: { fontSize: 14, fontWeight: '800' },
-  suggestBtn: { marginTop: 12, borderWidth: 1, borderRadius: 999, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', minHeight: 42 },
-  suggestText: { fontSize: 14, fontWeight: '800' },
+  // Coach de Metas (objetivo → plano)
+  coach: { marginTop: 14 },
+  coachTitle: { fontSize: 16, fontWeight: '800' },
+  coachSub: { fontSize: 13, marginTop: 3, lineHeight: 18 },
+  coachInput: { marginTop: 12, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, minHeight: 46 },
+  coachBtn: { marginTop: 10, borderRadius: 999, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44 },
+  coachBtnText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
+  planBox: { marginTop: 14, gap: 10 },
+  planNote: { fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  planRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, padding: 12 },
+  planTitle: { fontSize: 14, fontWeight: '800' },
+  planMeta: { fontSize: 12, fontWeight: '700', marginTop: 3 },
+  planWhy: { fontSize: 12, marginTop: 3, lineHeight: 17 },
+  addBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  addBtnText: { fontSize: 13, fontWeight: '800' },
+  suggestLink: { marginTop: 14, alignItems: 'center' },
+  suggestLinkText: { fontSize: 13, fontWeight: '700' },
   aiTip: { marginTop: 14, borderWidth: 1, borderRadius: 12, padding: 12 },
   aiTipText: { fontSize: 13, lineHeight: 19, fontWeight: '600' },
   emptyTitle: { fontSize: 16, fontWeight: '700' },

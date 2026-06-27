@@ -9,7 +9,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
-import { syncActivities } from '@/services/activity-sync';
+import { restoreActivities, syncActivities } from '@/services/activity-sync';
 import { deriveStats, fmtHMS } from '@/services/progress';
 import { getFeed, toggleKudo, type FeedItem } from '@/services/social';
 import { useAuth } from '@/store/auth';
@@ -45,6 +45,7 @@ export default function ActivitiesScreen() {
   // Ao abrir a aba: sobe sessões pendentes (no-op se deslogado) e carrega o feed.
   useFocusEffect(
     useCallback(() => {
+      void restoreActivities(); // puxa histórico/estatísticas da nuvem (1× por usuário)
       syncActivities();
       if (session) getFeed().then(setFeed);
       else setFeed([]);
@@ -117,8 +118,20 @@ export default function ActivitiesScreen() {
                     {f.pages ? ` · ${f.pages} ${f.pages === 1 ? 'pág' : 'págs'}` : ''}
                   </Text>
                 </View>
-                <Pressable onPress={() => onKudo(f)} hitSlop={8} style={styles.kudoBtn}>
-                  <Text style={[styles.kudoIcon, { opacity: f.iKudoed ? 1 : 0.4 }]}>👏</Text>
+                <Pressable
+                  onPress={() => onKudo(f)}
+                  hitSlop={8}
+                  style={styles.kudoBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    f.iKudoed
+                      ? `Tirar seu Logos (${f.kudos})`
+                      : f.kudos > 0
+                        ? `Dar um Logos — ${f.kudos} Logos`
+                        : 'Dar um Logos'
+                  }>
+                  {/* "Logos" 📜 = a interação social (antigo "kudo" do Strava) */}
+                  <Text style={[styles.kudoIcon, { opacity: f.iKudoed ? 1 : 0.4 }]}>📜</Text>
                   {f.kudos > 0 ? (
                     <Text style={[styles.kudoCount, { color: f.iKudoed ? c.green : c.textFaint }]}>{f.kudos}</Text>
                   ) : null}

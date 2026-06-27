@@ -8,15 +8,17 @@
  */
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { importBookFlow } from '@/app/biblioteca';
 import { BottomTabInset } from '@/constants/theme';
+import { restoreActivities } from '@/services/activity-sync';
 import { backfillCovers } from '@/services/cover-backfill';
+import { getUnreadCount } from '@/services/notifications';
 import { deriveStats } from '@/services/progress';
 import { displayName, useAuth } from '@/store/auth';
 import { useLibrary, type ImportedBook } from '@/store/library';
@@ -74,10 +76,25 @@ export default function HubScreen() {
   const firstName = name.split(' ')[0];
   const avatar = profile?.avatar_url;
 
+  // Bolinha do sino: quantas notificações chegaram desde a última visita. Recarrega ao
+  // focar o hub (volta de /notificacoes zera, pois a tela marca como visto ao abrir).
+  const [unread, setUnread] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      getUnreadCount().then((n) => alive && setUnread(n));
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
+
   // Capas: extrai (uma vez) a capa embutida dos EPUBs importados antes de termos
   // `coverUrl`. Roda em segundo plano — o livro aparece com 📖 e troca pela capa.
   useEffect(() => {
     void backfillCovers();
+    // Restaura histórico/estatísticas da nuvem num install/aparelho novo (1× por usuário).
+    void restoreActivities();
   }, []);
 
   function open(book: ImportedBook) {
@@ -109,8 +126,17 @@ export default function HubScreen() {
               <Pressable onPress={() => router.navigate('/explorar')} hitSlop={8} accessibilityLabel="Explorar">
                 <SearchIcon />
               </Pressable>
-              <Pressable onPress={() => router.navigate('/atividades')} hitSlop={8} accessibilityLabel="Atividades">
+              <Pressable
+                onPress={() => router.navigate('/notificacoes')}
+                hitSlop={8}
+                accessibilityLabel={unread > 0 ? `Notificações, ${unread} não lidas` : 'Notificações'}
+                style={styles.bellWrap}>
                 <BellIcon />
+                {unread > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+                  </View>
+                ) : null}
               </Pressable>
             </View>
           </View>
@@ -284,6 +310,21 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 18, color: HUB.onBg, fontWeight: '700' },
   appName: { color: HUB.onBg, fontSize: 17, fontWeight: '700' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  // Sino + bolinha de não lidas (vermelha p/ saltar sobre o verde do hub).
+  bellWrap: { position: 'relative' },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: '#FF4D4F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
   bigTitle: { color: HUB.onBg, fontSize: 30, fontWeight: '800', marginTop: 14, marginBottom: 14 },
 
   // Hero "Lendo agora" (roxo)

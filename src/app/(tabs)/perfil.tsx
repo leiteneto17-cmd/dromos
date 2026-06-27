@@ -107,7 +107,7 @@ export default function ProfileScreen() {
             <View style={styles.flex}>
               <Text style={[styles.cardTitle, { color: c.text }]}>Entrar / Criar conta</Text>
               <Text style={[styles.cardSub, { color: c.textFaint }]}>
-                Para feed, kudos e sincronizar entre aparelhos.
+                Para feed, Logos 📜 e sincronizar entre aparelhos.
               </Text>
             </View>
             <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>

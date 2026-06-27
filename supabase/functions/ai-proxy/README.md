@@ -16,15 +16,33 @@ trouxe a própria chave (BYOK).
 Pré-requisito: [Supabase CLI](https://supabase.com/docs/guides/cli) e `supabase login`.
 
 ```bash
-# 1) pegue uma chave grátis em https://aistudio.google.com/app/apikey
-# 2) guarde como segredo (NÃO vai pro git, NÃO vai pro app):
-supabase secrets set GEMINI_API_KEY=cole_sua_chave_aqui
+# 1) VÁRIAS chaves Gemini (rotação/resiliência) separadas por vírgula:
+supabase secrets set GEMINI_API_KEYS="chave1,chave2,chave3"
+#    (ainda aceita a antiga GEMINI_API_KEY com 1 chave)
 
-# 3) publique a função:
+# 2) OPCIONAL — OpenAI como rede de segurança (usada só se TODAS as Gemini falharem):
+supabase secrets set OPENAI_API_KEY="sk-..."
+
+# 3) OPCIONAL — limite diário por usuário (padrão 20):
+supabase secrets set AI_DAILY_LIMIT=20
+
+# 4) publique a função:
 supabase functions deploy ai-proxy
 ```
 
-Pronto. O app passa a usar a IA grátis por padrão para quem está logado.
+> ⚠️ A **cota por usuário** precisa da tabela `ai_usage` + função `ai_quota_consume`
+> do `supabase/schema.sql` (rode o schema). Sem elas, a função **fail-open** (não
+> bloqueia) — não quebra, mas também não limita até você rodar o SQL.
+
+Pronto. O app usa a IA grátis por padrão para quem está logado.
+
+## Rotação e cota (resumo)
+
+- **Resiliência:** tenta as chaves Gemini (ordem embaralhada p/ distribuir carga) e,
+  se todas saturarem/falharem (429/5xx/rede), cai para a **OpenAI**. Só erra quando
+  TODAS falham.
+- **Cota:** cada usuário tem `AI_DAILY_LIMIT` chamadas/dia. Estourou → resposta `429`
+  com `{ "error": "A IA foi dormir 😴 ...", "quota": true }` (o app mostra a mensagem).
 
 ## Contrato
 

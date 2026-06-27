@@ -10,6 +10,7 @@
  *
  * Envia só números/resumo (não o livro inteiro) para baratear (§5).
  */
+import { managedAIAvailable, managedChatJSON } from '@/services/ai/managed';
 import { chatJSON } from '@/services/ai/providers';
 import { getApiKey, useAI } from '@/store/ai';
 import type { GoalKind } from '@/store/library';
@@ -51,14 +52,60 @@ const SUGGEST_SYSTEM =
   'curta explicando por que essa meta faz sentido para o ritmo dele). Só use kind="livro" se houver um ' +
   'livro atual no resumo (terminar esse livro no prazo). Seja conservador: baseie o alvo no ritmo médio.';
 
-/** Propõe uma meta com base no histórico. Requer IA configurada (BYOK). */
+/** Propõe UMA meta com base no histórico. Usa a chave do usuário (BYOK) se houver; senão
+ * a IA grátis/gerida (precisa estar logado). Só pede chave quando nenhuma das duas existe. */
 export async function suggestGoal(input: CoachInput): Promise<SuggestResult> {
   const { provider, model, hasKey } = useAI.getState();
-  if (!hasKey) return { ok: false, error: 'Configure sua chave de IA em Integrações.', needsKey: true };
+  const useManaged = !hasKey;
+  if (useManaged && !managedAIAvailable()) {
+    return {
+      ok: false,
+      error: 'Entre na sua conta para usar a IA, ou conecte sua própria chave em Integrações.',
+      needsKey: true,
+    };
+  }
 
-  const key = await getApiKey();
-  if (!key) return { ok: false, error: 'Chave não encontrada. Reconfigure em Integrações.', needsKey: true };
+  try {
+    // maxTokens alto (teto, não custo): modelos Gemini 2.5 "pensam" antes do JSON e, com
+    // orçamento baixo, estouram no raciocínio e devolvem vazio → parse falha. 1024 dá folga.
+    let raw: string;
+    if (hasKey) {
+      const key = await getApiKey();
+      if (!key) return { ok: false, error: 'Chave não encontrada. Reconfigure em Integrações.', needsKey: true };
+      raw = await chatJSON({ provider, key, model, system: SUGGEST_SYSTEM, user: summaryLines(input), maxTokens: 1024 });
+    } else {
+      raw = await managedChatJSON({ system: SUGGEST_SYSTEM, user: summaryLines(input), maxTokens: 1024 });
+    }
+    const parsed = parseJSON(raw);
+    if (!parsed) return { ok: false, error: 'A IA respondeu num formato inesperado. Tente de novo.' };
+    return { ok: true, data: normalizeSuggestion(parsed, input) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Falha ao consultar a IA.', needsKey: useManaged };
+  }
+}
 
+// ---------- COACH: OBJETIVO (linguagem natural) → PLANO de metas ----------
+
+/** Plano sugerido pelo Coach: uma frase de incentivo + 1 a 3 metas concretas. */
+export type GoalPlan = { note: string; goals: GoalSuggestion[] };
+export type PlanResult =
+  | { ok: true; data: GoalPlan }
+  | { ok: false; error: string; needsKey?: boolean };
+
+const PLAN_SYSTEM =
+  'Você é um coach de leitura em português do Brasil. Recebe o OBJETIVO do usuário (em linguagem ' +
+  'natural) e um RESUMO numérico dos hábitos de leitura dele. Transforme o objetivo em um PLANO de ' +
+  '1 a 3 metas CONCRETAS, realistas e calibradas pelo ritmo atual — equilibrando consistência e ' +
+  'COMPREENSÃO, sem incentivar corrida de velocidade (§4.8). Responda APENAS com um objeto JSON ' +
+  'válido, sem texto fora dele, com as chaves exatamente: "note" (1 frase curta em PT-BR explicando/' +
+  'incentivando o plano) e "goals" (array de 1 a 3 objetos). Cada meta tem: "kind" (uma de "minutos", ' +
+  '"dias", "livro"), "target" (inteiro: minutos totais se kind="minutos"; quantidade de dias de ' +
+  'leitura se kind="dias"; 0 se kind="livro"), "days" (prazo em dias, entre 3 e 30), "title" (título ' +
+  'curto da meta) e "rationale" (1 frase curta justificando). Só use kind="livro" se houver um livro ' +
+  'atual no resumo. Seja conservador: baseie os alvos no ritmo médio. Evite metas redundantes entre si.';
+
+/** Monta as linhas do RESUMO numérico (compartilhado entre suggestGoal e planGoals). */
+function summaryLines(input: CoachInput): string {
   const lines = [
     `Média de leitura por dia ativo: ${input.avgMinPerDay} min`,
     `Dias seguidos atuais (streak): ${input.streak}`,
@@ -72,36 +119,67 @@ export async function suggestGoal(input: CoachInput): Promise<SuggestResult> {
         `~${input.currentBook.pages} págs (faltam ~${input.currentBook.pagesLeft} págs)`,
     );
   }
+  return lines.join('\n');
+}
 
-  try {
-    // maxTokens alto (teto, não custo): modelos Gemini 2.5 "pensam" antes do JSON e, com
-    // orçamento baixo, estouram no raciocínio e devolvem vazio → parse falha. 1024 dá folga.
-    const raw = await chatJSON({ provider, key, model, system: SUGGEST_SYSTEM, user: lines.join('\n'), maxTokens: 1024 });
-    const parsed = parseJSON(raw);
-    if (!parsed) return { ok: false, error: 'A IA respondeu num formato inesperado. Tente de novo.' };
+/** Valida/normaliza uma meta crua da IA (clamps + regra do kind="livro"). */
+function normalizeSuggestion(parsed: Record<string, unknown>, input: CoachInput): GoalSuggestion {
+  let kind = String(parsed.kind ?? 'minutos') as GoalKind;
+  if (kind !== 'minutos' && kind !== 'dias' && kind !== 'livro') kind = 'minutos';
+  if (kind === 'livro' && !input.currentBook) kind = 'minutos';
+  const days = clampInt(parsed.days, 3, 30, 7);
+  const target =
+    kind === 'livro' ? 0 : kind === 'minutos' ? clampInt(parsed.target, 5, 100000, 60) : clampInt(parsed.target, 1, 60, 5);
+  return {
+    kind,
+    target,
+    days,
+    bookId: kind === 'livro' ? input.currentBook?.id : undefined,
+    title: String(parsed.title ?? '').trim() || defaultTitle(kind, target, input.currentBook?.title),
+    rationale: String(parsed.rationale ?? '').trim(),
+  };
+}
 
-    let kind = String(parsed.kind ?? 'minutos') as GoalKind;
-    if (kind !== 'minutos' && kind !== 'dias' && kind !== 'livro') kind = 'minutos';
-    // Meta por livro só é possível se há um livro atual; senão, cai p/ minutos.
-    if (kind === 'livro' && !input.currentBook) kind = 'minutos';
+/**
+ * COACH: transforma um OBJETIVO em linguagem natural num plano de 1–3 metas concretas.
+ * Usa a chave do usuário (BYOK) se houver; senão a IA grátis/gerida (precisa estar logado,
+ * é a experiência "Pro" pela nossa chave). Só pede chave quando nenhuma das duas existe.
+ */
+export async function planGoals(objective: string, input: CoachInput): Promise<PlanResult> {
+  const obj = objective.trim();
+  if (!obj) return { ok: false, error: 'Escreva seu objetivo de leitura primeiro.' };
 
-    const days = clampInt(parsed.days, 3, 30, 7);
-    const target =
-      kind === 'livro' ? 0 : kind === 'minutos' ? clampInt(parsed.target, 5, 100000, 60) : clampInt(parsed.target, 1, 60, 5);
-
+  const { provider, model, hasKey } = useAI.getState();
+  const useManaged = !hasKey;
+  if (useManaged && !managedAIAvailable()) {
     return {
-      ok: true,
-      data: {
-        kind,
-        target,
-        days,
-        bookId: kind === 'livro' ? input.currentBook?.id : undefined,
-        title: String(parsed.title ?? '').trim() || defaultTitle(kind, target, input.currentBook?.title),
-        rationale: String(parsed.rationale ?? '').trim(),
-      },
+      ok: false,
+      error: 'Entre na sua conta para usar o Coach, ou conecte sua própria chave em Integrações.',
+      needsKey: true,
     };
+  }
+
+  const user = `OBJETIVO: ${obj}\n\nRESUMO:\n${summaryLines(input)}`;
+  try {
+    let raw: string;
+    if (hasKey) {
+      const key = await getApiKey();
+      if (!key) return { ok: false, error: 'Chave não encontrada. Reconfigure em Integrações.', needsKey: true };
+      raw = await chatJSON({ provider, key, model, system: PLAN_SYSTEM, user, maxTokens: 1024 });
+    } else {
+      raw = await managedChatJSON({ system: PLAN_SYSTEM, user, maxTokens: 1024 });
+    }
+
+    const parsed = parseJSON(raw);
+    const rawGoals = parsed && Array.isArray(parsed.goals) ? (parsed.goals as Record<string, unknown>[]) : null;
+    if (!rawGoals || rawGoals.length === 0) {
+      return { ok: false, error: 'A IA respondeu num formato inesperado. Tente reformular o objetivo.' };
+    }
+    const goals = rawGoals.slice(0, 3).map((g) => normalizeSuggestion(g, input));
+    return { ok: true, data: { note: String(parsed?.note ?? '').trim(), goals } };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'Falha ao consultar a IA.' };
+    const msg = e instanceof Error ? e.message : 'Falha ao consultar o Coach.';
+    return { ok: false, error: msg, needsKey: useManaged };
   }
 }
 

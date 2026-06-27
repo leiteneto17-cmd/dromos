@@ -9,9 +9,11 @@
  * uma leitura). Visibilidade nasce 'private' por padrão no banco (§4.8).
  */
 import { supabase } from '@/services/supabase';
-import { useLibrary } from '@/store/library';
+import { useLibrary, type BookFormat } from '@/store/library';
 
 let inFlight = false;
+/** uid já restaurado nesta execução do app (evita re-baixar a cada foco). */
+let restoredFor: string | null = null;
 
 export type SyncResult = { pushed: number } | null;
 
@@ -56,4 +58,46 @@ export async function syncActivities(): Promise<SyncResult> {
   } finally {
     inFlight = false;
   }
+}
+
+/**
+ * Restauração da nuvem (cloud → app): puxa as atividades já sincronizadas do Supabase e
+ * funde no estado local, reconstruindo o HISTÓRICO de sessões e as ESTATÍSTICAS num
+ * aparelho/instalação novo (resolve "atualizei o app e perdi tudo"). É offline-first
+ * amigável: o merge não apaga nada local (sessões por remoteId; perDay por MAX — ver
+ * store.mergeCloudActivities). Roda 1× por usuário/execução. No-op se deslogado.
+ *
+ * Obs: livros importados são arquivos LOCAIS → não restauram aqui (precisa do backup de
+ * arquivos no Storage, recurso Pro). A ESTANTE (book_shelves) já volta da nuvem por si.
+ */
+export async function restoreActivities(): Promise<void> {
+  if (!supabase) return;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return;
+  const userId = session.user.id;
+  if (restoredFor === userId) return;
+
+  const { data, error } = await supabase
+    .from('reading_activities')
+    .select('id, book_title, book_format, seconds, pages, started_at')
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false })
+    .limit(300);
+  if (error || !data) return;
+
+  const rows = (
+    data as { id: string; book_title: string; book_format: string | null; seconds: number; pages: number | null; started_at: string }[]
+  ).map((r) => ({
+    remoteId: r.id,
+    bookTitle: r.book_title,
+    format: (r.book_format as BookFormat) || 'epub',
+    seconds: r.seconds || 0,
+    pages: r.pages || 0,
+    startedAt: new Date(r.started_at).getTime(),
+  }));
+
+  useLibrary.getState().mergeCloudActivities(rows);
+  restoredFor = userId; // marca só após sucesso (se falhar, tenta de novo depois)
 }

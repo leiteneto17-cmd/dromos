@@ -3,7 +3,7 @@
  *
  * Login é OPCIONAL no +leitura (CLAUDE.md §6): ler os próprios livros offline é
  * grátis e não exige conta. A identidade só é necessária para a camada SOCIAL
- * (feed, kudos, comentários — Fase 5b) e para sincronizar na nuvem.
+ * (feed, Logos/kudos, comentários — Fase 5b) e para sincronizar na nuvem.
  *
  * A sessão persiste no AsyncStorage (config em src/services/supabase.ts), então
  * o usuário continua logado entre aberturas do app.
