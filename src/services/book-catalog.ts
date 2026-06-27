@@ -118,15 +118,46 @@ function mapOpenLibrary(d: OLDoc): CatalogBook | null {
   };
 }
 
+const OL_FIELDS = 'title,author_name,cover_i,isbn,first_publish_year,number_of_pages_median,subject,language,key';
+
 async function searchOpenLibrary(query: string, lang?: LangFilter, signal?: AbortSignal): Promise<CatalogBook[]> {
   const ol3 = lang === 'pt' ? 'por' : lang === 'en' ? 'eng' : '';
   const langParam = ol3 ? `&language=${ol3}` : '';
-  const fields = 'title,author_name,cover_i,isbn,first_publish_year,number_of_pages_median,subject,language,key';
-  const url = `${OL_SEARCH}?q=${encodeURIComponent(query)}${langParam}&limit=20&fields=${fields}`;
+  const url = `${OL_SEARCH}?q=${encodeURIComponent(query)}${langParam}&limit=20&fields=${OL_FIELDS}`;
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`openlibrary ${res.status}`);
   const json = (await res.json()) as { docs?: OLDoc[] };
   return (json.docs ?? []).map(mapOpenLibrary).filter((b): b is CatalogBook => b !== null);
+}
+
+/** Busca por AUTOR no Open Library (campo `author`, não busca genérica) — usada no
+ * fallback de "do mesmo autor" p/ não trazer livros aleatórios quando o Google estoura. */
+async function searchOpenLibraryByAuthor(author: string, lang?: LangFilter, signal?: AbortSignal): Promise<CatalogBook[]> {
+  const ol3 = lang === 'pt' ? 'por' : lang === 'en' ? 'eng' : '';
+  const langParam = ol3 ? `&language=${ol3}` : '';
+  const url = `${OL_SEARCH}?author=${encodeURIComponent(author)}${langParam}&limit=20&fields=${OL_FIELDS}`;
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`openlibrary ${res.status}`);
+  const json = (await res.json()) as { docs?: OLDoc[] };
+  return (json.docs ?? []).map(mapOpenLibrary).filter((b): b is CatalogBook => b !== null);
+}
+
+/** Tokens significativos do nome do autor (sem acento, ≥3 letras) p/ casar autores. */
+function authorTokens(s?: string): string[] {
+  if (!s) return [];
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((t) => t.length >= 3);
+}
+
+/** true se os nomes de autor compartilham ao menos um token significativo (ex.: "Machado"). */
+function sameAuthor(a?: string, b?: string): boolean {
+  const ta = authorTokens(a);
+  const tb = new Set(authorTokens(b));
+  return ta.some((t) => tb.has(t));
 }
 
 /** Google → se falhar/vazio, Open Library. Mantém a regionalização nos dois. */
@@ -246,8 +277,9 @@ export async function similarBooks(
     list = [];
   }
   if (list.length === 0) {
+    // Fallback por CAMPO autor (não busca genérica) → não traz livros aleatórios.
     try {
-      list = await searchOpenLibrary(author, lang, signal);
+      list = await searchOpenLibraryByAuthor(author, lang, signal);
     } catch {
       return [];
     }
@@ -256,6 +288,9 @@ export async function similarBooks(
   const out: CatalogBook[] = [];
   for (const b of list) {
     if (!b.coverUrl) continue;
+    // Filtro defensivo: só mantém quem é REALMENTE do mesmo autor (corrige resultados
+    // soltos quando o Google cai no fallback ou a busca por autor é imprecisa).
+    if (!sameAuthor(author, b.author)) continue;
     const k = b.title.toLowerCase();
     if (k === exclude || seen.has(k)) continue;
     seen.add(k);
