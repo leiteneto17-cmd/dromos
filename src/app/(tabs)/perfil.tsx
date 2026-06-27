@@ -92,6 +92,7 @@ export default function ProfileScreen() {
         avatar={profile?.avatar_url}
         derived={derived}
         achievements={achievements}
+        founder={profile?.is_founder}
       />
 
       {!configured ? (

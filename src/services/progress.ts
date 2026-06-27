@@ -171,6 +171,20 @@ export function achievementsFromIds(unlockedIds: string[]): Achievement[] {
   }));
 }
 
+/** Emblema especial de FUNDADOR (os 50 primeiros cadastrados). NÃO vem de
+ * computeAchievements (não é conquista de leitura) — é atribuído no backend
+ * (`profiles.is_founder`) e exibido à parte. Arte opcional em `medalImage('founder')`. */
+export function founderAchievement(): Achievement {
+  return {
+    id: 'founder',
+    icon: '👑',
+    title: 'Fundador',
+    desc: 'Um dos 50 primeiros leitores do +leitura',
+    unlocked: true,
+    progress: 1,
+  };
+}
+
 // ---------- METAS (Fase 6) ----------
 
 export type GoalProgress = {

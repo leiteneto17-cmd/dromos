@@ -15,12 +15,20 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/pressable-scale';
 import { useUI } from '@/hooks/use-ui';
-import type { Achievement } from '@/services/progress';
+import { founderAchievement, type Achievement } from '@/services/progress';
 import { medalImage } from '@/theme/medals';
 
-export function EmblemStrip({ achievements }: { achievements: Achievement[] }) {
+export function EmblemStrip({
+  achievements,
+  founder = false,
+}: {
+  achievements: Achievement[];
+  /** Mostra o brasão de FUNDADOR à frente (primeiros 50 cadastrados, profiles.is_founder). */
+  founder?: boolean;
+}) {
   const c = useUI();
-  const unlocked = achievements.filter((a) => a.unlocked);
+  const earned = achievements.filter((a) => a.unlocked && a.id !== 'founder');
+  const unlocked = founder ? [founderAchievement(), ...earned] : earned;
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = unlocked.find((a) => a.id === activeId);
 

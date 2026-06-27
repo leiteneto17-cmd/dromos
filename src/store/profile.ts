@@ -16,6 +16,8 @@ export type Profile = {
   name: string | null;
   avatar_url: string | null;
   is_public: boolean;
+  /** Brasão de fundador (um dos 50 primeiros cadastrados) — atribuído no backend. */
+  is_founder: boolean;
 };
 
 type ProfileState = {
@@ -33,7 +35,7 @@ async function loadProfile(userId: string | undefined): Promise<void> {
   useProfile.setState({ loading: true });
   const { data } = await supabase
     .from('profiles')
-    .select('id, name, avatar_url, is_public')
+    .select('id, name, avatar_url, is_public, is_founder')
     .eq('id', userId)
     .maybeSingle();
 
@@ -47,10 +49,10 @@ async function loadProfile(userId: string | undefined): Promise<void> {
   const { data: created } = await supabase
     .from('profiles')
     .upsert({ id: userId, name })
-    .select('id, name, avatar_url, is_public')
+    .select('id, name, avatar_url, is_public, is_founder')
     .maybeSingle();
   useProfile.setState({
-    profile: (created as Profile) ?? { id: userId, name, avatar_url: null, is_public: false },
+    profile: (created as Profile) ?? { id: userId, name, avatar_url: null, is_public: false, is_founder: false },
     loading: false,
   });
 }

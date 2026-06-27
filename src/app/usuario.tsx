@@ -147,11 +147,16 @@ export default function UserScreen() {
               </Card>
             ) : (
               <>
-                {/* Emblemas conquistados (vêm de profiles.badges no backend) */}
-                {(profile?.badges?.length ?? 0) > 0 ? (
+                {/* Emblemas conquistados (profiles.badges) + brasão de fundador (is_founder) */}
+                {(profile?.badges?.length ?? 0) > 0 || profile?.is_founder ? (
                   <>
-                    <SectionTitle name="trophy">{`Emblemas (${profile!.badges.length})`}</SectionTitle>
-                    <EmblemStrip achievements={achievementsFromIds(profile!.badges)} />
+                    <SectionTitle name="trophy">
+                      {`Emblemas (${(profile?.badges?.length ?? 0) + (profile?.is_founder ? 1 : 0)})`}
+                    </SectionTitle>
+                    <EmblemStrip
+                      achievements={achievementsFromIds(profile?.badges ?? [])}
+                      founder={profile?.is_founder}
+                    />
                   </>
                 ) : null}
 

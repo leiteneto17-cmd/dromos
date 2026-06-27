@@ -14,12 +14,15 @@ export function ProfileHeader({
   avatar,
   derived,
   achievements,
+  founder = false,
 }: {
   name: string;
   /** Emoji do avatar (ex.: "🦉"). Sem ele, mostra a inicial do nome. */
   avatar?: string | null;
   derived: DerivedStats;
   achievements: Achievement[];
+  /** Brasão de fundador (primeiros 50) — exibido à frente dos emblemas. */
+  founder?: boolean;
 }) {
   const c = useUI();
   const initial = name.trim().charAt(0).toUpperCase() || '?';
@@ -48,7 +51,7 @@ export function ProfileHeader({
       </View>
 
       {/* Emblemas — só a arte (compacto); o nome aparece ao tocar (EmblemStrip) */}
-      <EmblemStrip achievements={achievements} />
+      <EmblemStrip achievements={achievements} founder={founder} />
     </View>
   );
 }

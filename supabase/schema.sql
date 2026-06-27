@@ -374,6 +374,10 @@ alter table public.profiles add column if not exists is_public boolean not null 
 -- (mesma policy de leitura), então segue a visibilidade do perfil.
 alter table public.profiles add column if not exists badges jsonb not null default '[]'::jsonb;
 
+-- Brasão de FUNDADOR (os 50 PRIMEIROS cadastrados). Atribuído no servidor (handle_new_user,
+-- no fim do arquivo, com trava de concorrência). Lido junto com o profile (visível no perfil).
+alter table public.profiles add column if not exists is_founder boolean not null default false;
+
 -- ---------- SEGUIR leitores (com PEDIDO/APROVAÇÃO p/ perfis privados) ----------
 -- Perfil PÚBLICO: seguir é aceito na hora. PRIVADO: vira PEDIDO (status 'pending') que
 -- o dono aprova. O trigger abaixo define o status (cliente não escolhe — segurança).
@@ -606,3 +610,41 @@ begin
   return v_count <= p_limit;
 end; $$;
 grant execute on function public.ai_quota_consume(int) to authenticated;
+
+-- =====================================================================
+-- BRASÃO DE FUNDADOR — os 50 PRIMEIROS cadastrados ganham (lançamento).
+-- (a coluna is_founder é criada lá em cima, na seção da camada social.)
+-- =====================================================================
+
+-- Backfill: os 50 perfis mais antigos viram fundadores (idempotente — só liga, nunca desliga).
+with first50 as (
+  select id from public.profiles order by created_at asc limit 50
+)
+update public.profiles p
+  set is_founder = true
+  from first50
+  where p.id = first50.id and p.is_founder = false;
+
+-- handle_new_user (REDEFINIÇÃO): cria o profile no signup E concede o brasão se ainda houver
+-- vaga (<50 fundadores). pg_advisory_xact_lock serializa o cálculo → nunca passa de 50 mesmo
+-- com cadastros simultâneos. Substitui a versão anterior (que só inseria o profile).
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_founders int;
+begin
+  insert into public.profiles (id, name)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1))
+  )
+  on conflict (id) do nothing;
+
+  -- Trava global (mesmo número arbitrário) p/ contar+atribuir sem corrida.
+  perform pg_advisory_xact_lock(742042);
+  select count(*) into v_founders from public.profiles where is_founder;
+  if v_founders < 50 then
+    update public.profiles set is_founder = true where id = new.id;
+  end if;
+  return new;
+end; $$;

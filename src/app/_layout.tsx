@@ -4,6 +4,7 @@ import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { CelebrationOverlay } from '@/components/celebration-overlay';
+import { OnboardingOverlay } from '@/components/onboarding-overlay';
 import { useUI } from '@/hooks/use-ui';
 import { setupNotificationHandler } from '@/services/reminders';
 import { useAuth } from '@/store/auth';
@@ -72,6 +73,7 @@ export default function RootLayout() {
         </Stack.Protected>
       </Stack>
       <CelebrationOverlay />
+      <OnboardingOverlay />
       {initializing ? <BootGate /> : null}
     </ThemeProvider>
   );

@@ -215,11 +215,14 @@ export default function HubScreen() {
 
           {books.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>Sua estante está vazia. Importe um .epub ou .pdf para começar.</Text>
+              <Text style={styles.emptyText}>Sua estante está vazia. Importe um .epub ou .pdf — ou explore o acervo grátis.</Text>
               <Pressable
                 onPress={() => importBookFlow(addBook, () => router.navigate('/reader'))}
                 style={styles.cta}>
                 <Text style={styles.ctaText}>+ Importar livro</Text>
+              </Pressable>
+              <Pressable onPress={() => router.navigate('/explorar')} style={styles.ctaSecondary}>
+                <Text style={styles.ctaSecondaryText}>🔎 Explorar o acervo</Text>
               </Pressable>
             </View>
           ) : (
@@ -380,6 +383,8 @@ const styles = StyleSheet.create({
   emptyText: { color: HUB.cardMuted, fontSize: 14, lineHeight: 21 },
   cta: { marginTop: 16, borderRadius: 999, paddingVertical: 12, alignItems: 'center', backgroundColor: HUB.greenInk },
   ctaText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+  ctaSecondary: { marginTop: 10, borderRadius: 999, paddingVertical: 11, alignItems: 'center', borderWidth: 1.5, borderColor: HUB.greenInk },
+  ctaSecondaryText: { fontSize: 15, fontWeight: '800', color: HUB.greenInk },
   shelf: { gap: 14, paddingVertical: 4, paddingRight: 8 },
   tileWrap: { width: 110 },
   tile: { width: 110, height: 156, borderRadius: 14, padding: 10, justifyContent: 'space-between', overflow: 'hidden', ...cardShadow },
