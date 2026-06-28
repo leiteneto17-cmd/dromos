@@ -431,6 +431,18 @@ export default function ReaderScreen() {
   const currentChapter = chapters.length ? chapterAt(chapters, topIndex) : 0;
   const readProgress = paragraphs.length > 1 ? topIndex / (paragraphs.length - 1) : 0;
 
+  // Sumário enriquecido p/ a folha: quando o capítulo não tem título (corte por <h>),
+  // usa um trecho real do começo dele (melhor que "Capítulo N" genérico) + % de posição.
+  const toc = useMemo(
+    () =>
+      chapters.map((ch, i) => ({
+        start: ch.start,
+        label: ch.title?.trim() || cleanSnippet(paragraphs[ch.start] ?? '', 60) || `Trecho ${i + 1}`,
+        pct: paragraphs.length > 1 ? ch.start / (paragraphs.length - 1) : 0,
+      })),
+    [chapters, paragraphs],
+  );
+
   // Audiobook assistido. Lê o livro a partir do parágrafo no topo da tela.
   const read = useReadAloud(paragraphs);
   const readRef = useRef(read.state);
@@ -1096,7 +1108,7 @@ export default function ReaderScreen() {
           t={t}
           bookmarks={bookmarks}
           currentLabel={`${barChapter ? `${barChapter} · ` : ''}${Math.round(readProgress * 100)}%`}
-          chapters={chapters}
+          chapters={toc}
           currentChapter={currentChapter}
           onAdd={addBookmarkHere}
           onJump={jumpToBookmark}

@@ -3,6 +3,7 @@
  * Mostra a posição atual, permite adicionar um marcador aqui e pular para marcadores
  * salvos. O salto usa OFFSET de rolagem (não scrollToIndex) — não trava em livro grande.
  */
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { GlassSheet } from '@/components/glass-sheet';
@@ -14,8 +15,8 @@ type Props = {
   bookmarks: Bookmark[];
   /** Rótulo da posição atual, ex.: "Capítulo III · 23%". */
   currentLabel: string;
-  /** Sumário (capítulos) do livro — título + índice de parágrafo inicial. */
-  chapters?: { title?: string; start: number }[];
+  /** Sumário (capítulos): rótulo (título ou trecho), parágrafo inicial e % de posição. */
+  chapters?: { label: string; start: number; pct: number }[];
   /** Índice do capítulo atual (p/ destacar no sumário). */
   currentChapter?: number;
   onAdd: () => void;
@@ -39,6 +40,17 @@ export function BookmarksSheet({
   onClose,
 }: Props) {
   const hasToc = !!chapters && chapters.length > 1;
+
+  // Abre o sumário já rolado até o capítulo atual (altura de linha estimada).
+  const TOC_ROW = 60;
+  const tocRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (!hasToc || typeof currentChapter !== 'number') return;
+    const y = Math.max(0, (currentChapter - 1) * TOC_ROW);
+    const id = setTimeout(() => tocRef.current?.scrollTo({ y, animated: false }), 60);
+    return () => clearTimeout(id);
+  }, [hasToc, currentChapter]);
+
   return (
     <GlassSheet onClose={onClose} surface={t.surface} accent={t.accent} bgForTint={t.background}>
       <Text style={[styles.title, { color: t.text }]}>{hasToc ? 'Navegação' : 'Marcadores'}</Text>
@@ -46,19 +58,26 @@ export function BookmarksSheet({
 
       {hasToc ? (
         <>
-          <Text style={[styles.section, { color: t.text }]}>📑 Sumário</Text>
-          <ScrollView style={{ maxHeight: 220 }} contentContainerStyle={styles.list}>
+          <Text style={[styles.section, { color: t.text }]}>📑 Sumário · {chapters!.length}</Text>
+          <ScrollView ref={tocRef} style={{ maxHeight: 300 }} contentContainerStyle={styles.list}>
             {chapters!.map((ch, i) => {
               const here = i === currentChapter;
               return (
                 <Pressable
                   key={`${i}-${ch.start}`}
                   onPress={() => onJumpChapter?.(ch.start)}
-                  style={[styles.chapterRow, { borderColor: here ? t.accent : t.border }]}>
+                  style={[
+                    styles.chapterRow,
+                    { borderColor: here ? t.accent : t.border },
+                    here && { backgroundColor: t.accent + '1A' },
+                  ]}>
+                  <Text style={[styles.chapterNum, { color: here ? t.accent : t.textSecondary }]}>{i + 1}</Text>
                   <Text style={[styles.chapterTitle, { color: here ? t.accent : t.text }]} numberOfLines={2}>
-                    {ch.title?.trim() || `Capítulo ${i + 1}`}
+                    {ch.label}
                   </Text>
-                  {here ? <Text style={[styles.chapterNow, { color: t.accent }]}>agora</Text> : null}
+                  <Text style={[styles.chapterPct, { color: here ? t.accent : t.textSecondary }]}>
+                    {here ? '• agora' : `${Math.round(ch.pct * 100)}%`}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -104,9 +123,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700' },
   current: { fontSize: 13, marginTop: 4, marginBottom: 14 },
   section: { fontSize: 14, fontWeight: '800', marginBottom: 8 },
-  chapterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  chapterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  chapterNum: { fontSize: 13, fontWeight: '800', minWidth: 22, textAlign: 'center' },
   chapterTitle: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '600' },
-  chapterNow: { fontSize: 11, fontWeight: '800' },
+  chapterPct: { fontSize: 11, fontWeight: '800', minWidth: 44, textAlign: 'right' },
   addBtn: { paddingVertical: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', marginBottom: 14 },
   empty: { fontSize: 14, lineHeight: 20, paddingVertical: 8 },
   list: { gap: 10, paddingBottom: 4 },
