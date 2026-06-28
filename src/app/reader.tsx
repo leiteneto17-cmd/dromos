@@ -1062,6 +1062,7 @@ export default function ReaderScreen() {
       {selection ? (
         <SelectionBar
           preview={selPreview}
+          text={paragraphs[selection.index]?.slice(selStart, selEnd) ?? ''}
           t={t}
           onCancel={cancelSelection}
           onHighlight={confirmHighlight}
