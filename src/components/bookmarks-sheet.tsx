@@ -15,8 +15,8 @@ type Props = {
   bookmarks: Bookmark[];
   /** Rótulo da posição atual, ex.: "Capítulo III · 23%". */
   currentLabel: string;
-  /** Sumário (capítulos): rótulo (título ou trecho), parágrafo inicial e % de posição. */
-  chapters?: { label: string; start: number; pct: number }[];
+  /** Sumário denso: cada marca tem rótulo, parágrafo inicial, % e se é capítulo real. */
+  chapters?: { label: string; start: number; pct: number; isChapter: boolean }[];
   /** Índice do capítulo atual (p/ destacar no sumário). */
   currentChapter?: number;
   onAdd: () => void;
@@ -41,8 +41,8 @@ export function BookmarksSheet({
 }: Props) {
   const hasToc = !!chapters && chapters.length > 1;
 
-  // Abre o sumário já rolado até o capítulo atual (altura de linha estimada).
-  const TOC_ROW = 60;
+  // Abre o sumário já rolado até a marca atual (altura de linha estimada).
+  const TOC_ROW = 44;
   const tocRef = useRef<ScrollView>(null);
   useEffect(() => {
     if (!hasToc || typeof currentChapter !== 'number') return;
@@ -58,26 +58,30 @@ export function BookmarksSheet({
 
       {hasToc ? (
         <>
-          <Text style={[styles.section, { color: t.text }]}>📑 Sumário · {chapters!.length}</Text>
-          <ScrollView ref={tocRef} style={{ maxHeight: 300 }} contentContainerStyle={styles.list}>
+          <Text style={[styles.section, { color: t.text }]}>📑 Sumário</Text>
+          <ScrollView ref={tocRef} style={{ maxHeight: 300 }} contentContainerStyle={styles.tocList}>
             {chapters!.map((ch, i) => {
               const here = i === currentChapter;
               return (
                 <Pressable
                   key={`${i}-${ch.start}`}
                   onPress={() => onJumpChapter?.(ch.start)}
-                  style={[
-                    styles.chapterRow,
-                    { borderColor: here ? t.accent : t.border },
-                    here && { backgroundColor: t.accent + '1A' },
-                  ]}>
-                  <Text style={[styles.chapterNum, { color: here ? t.accent : t.textSecondary }]}>{i + 1}</Text>
-                  <Text style={[styles.chapterTitle, { color: here ? t.accent : t.text }]} numberOfLines={2}>
-                    {ch.label}
+                  style={[styles.tocRow, here && { backgroundColor: t.accent + '1A' }]}>
+                  <Text style={[styles.tocPct, { color: here ? t.accent : t.textSecondary }]}>
+                    {Math.round(ch.pct * 100)}%
                   </Text>
-                  <Text style={[styles.chapterPct, { color: here ? t.accent : t.textSecondary }]}>
-                    {here ? '• agora' : `${Math.round(ch.pct * 100)}%`}
+                  <Text
+                    style={[
+                      styles.tocLabel,
+                      {
+                        color: here ? t.accent : ch.isChapter ? t.text : t.textSecondary,
+                        fontWeight: ch.isChapter ? '700' : '400',
+                      },
+                    ]}
+                    numberOfLines={1}>
+                    {ch.isChapter ? ch.label : `· ${ch.label}`}
                   </Text>
+                  {here ? <Text style={[styles.tocNow, { color: t.accent }]}>•</Text> : null}
                 </Pressable>
               );
             })}
@@ -123,10 +127,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700' },
   current: { fontSize: 13, marginTop: 4, marginBottom: 14 },
   section: { fontSize: 14, fontWeight: '800', marginBottom: 8 },
-  chapterRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  chapterNum: { fontSize: 13, fontWeight: '800', minWidth: 22, textAlign: 'center' },
-  chapterTitle: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '600' },
-  chapterPct: { fontSize: 11, fontWeight: '800', minWidth: 44, textAlign: 'right' },
+  tocList: { paddingBottom: 4 },
+  tocRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
+  tocPct: { fontSize: 12, fontWeight: '800', minWidth: 40 },
+  tocLabel: { flex: 1, fontSize: 14, lineHeight: 18 },
+  tocNow: { fontSize: 16, fontWeight: '900' },
   addBtn: { paddingVertical: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', marginBottom: 14 },
   empty: { fontSize: 14, lineHeight: 20, paddingVertical: 8 },
   list: { gap: 10, paddingBottom: 4 },

@@ -431,17 +431,36 @@ export default function ReaderScreen() {
   const currentChapter = chapters.length ? chapterAt(chapters, topIndex) : 0;
   const readProgress = paragraphs.length > 1 ? topIndex / (paragraphs.length - 1) : 0;
 
-  // Sumário enriquecido p/ a folha: quando o capítulo não tem título (corte por <h>),
-  // usa um trecho real do começo dele (melhor que "Capítulo N" genérico) + % de posição.
-  const toc = useMemo(
-    () =>
-      chapters.map((ch, i) => ({
-        start: ch.start,
-        label: ch.title?.trim() || cleanSnippet(paragraphs[ch.start] ?? '', 60) || `Trecho ${i + 1}`,
-        pct: paragraphs.length > 1 ? ch.start / (paragraphs.length - 1) : 0,
-      })),
-    [chapters, paragraphs],
-  );
+  // Sumário DENSO: alguns livros têm pouquíssimos capítulos (corte por <h>), e o índice
+  // ficava com buracos enormes (25% → 68%). Mantemos os capítulos REAIS e PREENCHEMOS os
+  // vãos grandes com marcadores intermediários (trecho + %), pra a pessoa se localizar fino.
+  const toc = useMemo(() => {
+    const N = paragraphs.length;
+    if (N === 0) return [] as { start: number; label: string; pct: number; isChapter: boolean }[];
+    const gap = Math.max(50, Math.ceil(N * 0.05)); // no máx ~5% (ou 50 parágrafos) entre marcas
+    const chs = chapters.length ? chapters : [{ start: 0, title: undefined as string | undefined }];
+    const out: { start: number; label: string; pct: number; isChapter: boolean }[] = [];
+    const push = (start: number, label: string, isChapter: boolean) =>
+      out.push({ start, label, pct: N > 1 ? start / (N - 1) : 0, isChapter });
+
+    for (let c = 0; c < chs.length; c++) {
+      const ch = chs[c];
+      const nextStart = c + 1 < chs.length ? chs[c + 1].start : N;
+      push(ch.start, ch.title?.trim() || cleanSnippet(paragraphs[ch.start] ?? '', 60) || `Trecho ${c + 1}`, true);
+      // preenche o vão até o próximo capítulo com marcadores a cada `gap` parágrafos
+      for (let p = ch.start + gap; p < nextStart - Math.floor(gap / 2); p += gap) {
+        push(p, cleanSnippet(paragraphs[p] ?? '', 50) || '…', false);
+      }
+    }
+    return out;
+  }, [chapters, paragraphs]);
+
+  // Marcador atual do sumário denso (última marca cujo início já passou).
+  let currentTocIndex = 0;
+  for (let i = 0; i < toc.length; i++) {
+    if (toc[i].start <= topIndex) currentTocIndex = i;
+    else break;
+  }
 
   // Audiobook assistido. Lê o livro a partir do parágrafo no topo da tela.
   const read = useReadAloud(paragraphs);
@@ -1109,7 +1128,7 @@ export default function ReaderScreen() {
           bookmarks={bookmarks}
           currentLabel={`${barChapter ? `${barChapter} · ` : ''}${Math.round(readProgress * 100)}%`}
           chapters={toc}
-          currentChapter={currentChapter}
+          currentChapter={currentTocIndex}
           onAdd={addBookmarkHere}
           onJump={jumpToBookmark}
           onJumpChapter={jumpToChapter}
