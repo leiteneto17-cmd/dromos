@@ -15,10 +15,15 @@ import { translateManyToPT } from '@/services/ai/translate';
 
 /** Parágrafos à frente do topo que pré-traduzimos (esconde a latência). */
 const WINDOW = 10;
-/** Tamanho-alvo de cada LOTE de tradução (em caracteres) — economiza cota (§5). */
-const BATCH_CHARS = 2500;
+/**
+ * Tamanho-alvo de cada LOTE de tradução (em caracteres) — economiza cota (§5).
+ * Mantido conservador (~1400) porque o proxy `ai-proxy` corta a saída em 1024 tokens:
+ * lote maior truncaria o JSON e a tradução falharia. Com BYOK não há esse teto, mas
+ * deixamos seguro para os dois caminhos. (Se subir o teto do proxy, dá pra aumentar.)
+ */
+const BATCH_CHARS = 1400;
 /** Teto de parágrafos por lote (segurança p/ não estourar a saída do modelo). */
-const BATCH_MAX = 20;
+const BATCH_MAX = 12;
 
 function cacheFile(bookId: string) {
   return new File(Paths.document, `translated-${bookId}.json`);
