@@ -155,7 +155,9 @@ Deno.serve(async (req: Request) => {
   if (!userText.trim()) return json({ error: 'Faltou o texto da consulta.' }, 400);
 
   const model = ALLOWED_MODELS.has(String(payload.model)) ? String(payload.model) : DEFAULT_MODEL;
-  const maxTokens = Math.min(Math.max(Number(payload.maxTokens) || 700, 16), 1024);
+  // Teto de saída: 2048 (era 1024). Folga p/ a tradução em LOTE do leitor (vários
+  // parágrafos numa resposta) e p/ não truncar parágrafos longos. Requer redeploy.
+  const maxTokens = Math.min(Math.max(Number(payload.maxTokens) || 700, 16), 2048);
 
   // Cota diária por usuário (antes de gastar API). Estourou → "a IA foi dormir".
   const limit = Math.max(1, Number(Deno.env.get('AI_DAILY_LIMIT')) || 20);
