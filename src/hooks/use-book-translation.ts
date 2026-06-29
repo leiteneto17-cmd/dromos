@@ -11,10 +11,14 @@
 import { File, Paths } from 'expo-file-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { translateToPT } from '@/services/ai/translate';
+import { translateManyToPT } from '@/services/ai/translate';
 
 /** Parágrafos à frente do topo que pré-traduzimos (esconde a latência). */
 const WINDOW = 10;
+/** Tamanho-alvo de cada LOTE de tradução (em caracteres) — economiza cota (§5). */
+const BATCH_CHARS = 2500;
+/** Teto de parágrafos por lote (segurança p/ não estourar a saída do modelo). */
+const BATCH_MAX = 20;
 
 function cacheFile(bookId: string) {
   return new File(Paths.document, `translated-${bookId}.json`);
@@ -104,24 +108,36 @@ export function useBookTranslation(
     runningRef.current = true;
     try {
       while (queueRef.current.length) {
-        const i = queueRef.current.shift();
-        if (i == null || mapRef.current[i] != null) continue;
-        const src = paragraphs[i];
-        if (!src || !src.trim()) continue;
-        const res = await translateToPT(src);
-        const next = { ...mapRef.current, [i]: res.ok ? res.text : mapRef.current[i] };
+        // Monta um LOTE de índices pendentes (até ~2500 chars ou 20 parágrafos) → 1 chamada
+        // de IA por lote em vez de 1 por parágrafo (economiza cota, §5).
+        const batchIdx: number[] = [];
+        let chars = 0;
+        while (queueRef.current.length && chars < BATCH_CHARS && batchIdx.length < BATCH_MAX) {
+          const i = queueRef.current.shift();
+          if (i == null || mapRef.current[i] != null) continue;
+          const src = paragraphs[i];
+          if (!src || !src.trim()) continue;
+          batchIdx.push(i);
+          chars += src.length;
+        }
+        if (batchIdx.length === 0) continue;
+
+        const res = await translateManyToPT(batchIdx.map((i) => paragraphs[i]));
+        if (bookRef.current == null) return; // trocou de livro no meio
         if (res.ok) {
+          const next = { ...mapRef.current };
+          batchIdx.forEach((i, k) => {
+            if (res.texts[k]) next[i] = res.texts[k];
+          });
           mapRef.current = next;
           setMap(next);
           persist();
           setError(null);
         } else {
           setError(res.error);
-          if (res.needsKey) {
-            setNeedsKey(true);
-            queueRef.current = []; // sem IA → para de tentar (o leitor desliga o toggle)
-            break;
-          }
+          if (res.needsKey) setNeedsKey(true);
+          queueRef.current = []; // sem IA / formato ruim → para de tentar (não martela a cota)
+          break;
         }
       }
     } finally {
