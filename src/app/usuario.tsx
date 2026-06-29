@@ -7,7 +7,7 @@
  * impede a leitura da estante/atividades; aqui mostramos um aviso amigável).
  */
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -124,12 +124,30 @@ export default function UserScreen() {
                 </Text>
               ) : null}
               <View style={styles.countRow}>
-                <Text style={[styles.count, { color: c.text }]}>
-                  {counts.followers} <Text style={{ color: c.textFaint }}>seguidores</Text>
-                </Text>
-                <Text style={[styles.count, { color: c.text }]}>
-                  {counts.following} <Text style={{ color: c.textFaint }}>seguindo</Text>
-                </Text>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/seguidores',
+                      params: { id: userId, name, tab: 'followers' },
+                    } as Href)
+                  }>
+                  <Text style={[styles.count, { color: c.text }]}>
+                    {counts.followers} <Text style={{ color: c.textFaint }}>seguidores</Text>
+                  </Text>
+                </Pressable>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/seguidores',
+                      params: { id: userId, name, tab: 'following' },
+                    } as Href)
+                  }>
+                  <Text style={[styles.count, { color: c.text }]}>
+                    {counts.following} <Text style={{ color: c.textFaint }}>seguindo</Text>
+                  </Text>
+                </Pressable>
               </View>
               {!isMe ? (
                 <Pressable

@@ -136,6 +136,51 @@ export async function getFollowCounts(userId: string): Promise<{ followers: numb
   return { followers: Number(row.followers), following: Number(row.following) };
 }
 
+export type FollowListItem = {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  is_founder: boolean;
+  founder_flair: boolean;
+};
+
+/**
+ * Lista de SEGUIDORES (mode='followers') ou de QUEM o usuário segue (mode='following').
+ * Só vínculos ACEITOS (combina com os contadores). A RLS de `follows` permite leitura a
+ * qualquer autenticado, então vale tanto p/ o meu perfil quanto p/ o de outros.
+ */
+export async function getFollowList(
+  userId: string,
+  mode: 'followers' | 'following',
+): Promise<FollowListItem[]> {
+  if (!supabase) return [];
+  const matchCol = mode === 'followers' ? 'followee_id' : 'follower_id';
+  const pickCol = mode === 'followers' ? 'follower_id' : 'followee_id';
+  const { data, error } = await supabase
+    .from('follows')
+    .select(pickCol)
+    .eq(matchCol, userId)
+    .eq('status', 'accepted');
+  if (error || !data) return [];
+  const ids = (data as Record<string, string>[]).map((r) => r[pickCol]).filter(Boolean);
+  if (ids.length === 0) return [];
+  const { data: profs } = await supabase
+    .from('profiles')
+    .select('id, name, avatar_url, is_founder, founder_flair')
+    .in('id', ids);
+  const rows =
+    (profs as
+      | { id: string; name: string | null; avatar_url: string | null; is_founder: boolean; founder_flair: boolean }[]
+      | null) ?? [];
+  return rows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    avatar_url: p.avatar_url,
+    is_founder: !!p.is_founder,
+    founder_flair: p.founder_flair !== false,
+  }));
+}
+
 export type FollowState = 'none' | 'pending' | 'accepted';
 
 export type FollowRequest = { follower_id: string; name: string | null; avatar_url: string | null };

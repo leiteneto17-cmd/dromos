@@ -65,6 +65,7 @@ export default function RootLayout() {
           <Stack.Screen name="conquistas" />
           <Stack.Screen name="livro" />
           <Stack.Screen name="usuario" />
+          <Stack.Screen name="seguidores" />
           <Stack.Screen name="notificacoes" />
           <Stack.Screen name="integracoes" />
         </Stack.Protected>
