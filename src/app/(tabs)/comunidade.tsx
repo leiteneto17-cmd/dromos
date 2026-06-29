@@ -13,6 +13,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import { featuredBooks, searchBooks, type CatalogBook, type LangFilter } from '@/services/book-catalog';
@@ -408,6 +409,9 @@ export default function CommunityScreen() {
           🔒 O que você lê é íntimo. Só quem torna o perfil público aparece para os outros (Perfil → Privacidade).
         </Text>
       </Card>
+
+      {/* Banner do tier grátis (fora do leitor, §2.5). No-op p/ plano pago / Expo Go. */}
+      <AdBanner style={styles.ad} />
     </ScreenBG>
   );
 }
@@ -452,4 +456,5 @@ const styles = StyleSheet.create({
   gridTitle: { fontSize: 12, fontWeight: '600', marginTop: 6 },
   privacy: { marginTop: 18 },
   privacyText: { fontSize: 13, lineHeight: 20 },
+  ad: { marginTop: 16 },
 });

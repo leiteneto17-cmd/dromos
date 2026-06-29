@@ -8,6 +8,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { restoreActivities, syncActivities } from '@/services/activity-sync';
 import { deriveStats, fmtHMS } from '@/services/progress';
@@ -15,6 +16,12 @@ import { getFeed, toggleKudo, type FeedItem } from '@/services/social';
 import { useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
 import { HUB, hubUI } from '@/theme/hub';
+
+/** Quantos itens do feed "Seguindo" mostrar antes do "Ver mais" (não vira lista infinita). */
+const FEED_PREVIEW = 5;
+/** Sessões recentes: poucas por padrão, e um teto ao expandir (evita rolagem gigante). */
+const SESSIONS_PREVIEW = 3;
+const SESSIONS_MAX = 15;
 
 /** Data amigável da sessão: "hoje 14:30", "ontem 09:10" ou "12/06/2026". Usa data
  * LOCAL (não UTC) para casar com a hora local exibida — senão erra "hoje/ontem" perto
@@ -40,6 +47,7 @@ export default function ActivitiesScreen() {
   const d = deriveStats(stats);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [feedOpen, setFeedOpen] = useState(false); // recolhido por padrão (economiza espaço)
+  const [feedExpanded, setFeedExpanded] = useState(false); // feed: mostra poucas e expande
   const [allSessions, setAllSessions] = useState(false); // sessões recentes: mostra poucas e expande
 
   // Ao abrir a aba: sobe sessões pendentes (no-op se deslogado) e carrega o feed.
@@ -100,7 +108,8 @@ export default function ActivitiesScreen() {
               que as leituras apareçam aqui.
             </Text>
           ) : (
-            feed.map((f) => (
+            <>
+            {(feedExpanded ? feed : feed.slice(0, FEED_PREVIEW)).map((f) => (
               <Card hub key={f.id} style={styles.feedRow}>
                 <Pressable
                   onPress={() => router.push({ pathname: '/usuario', params: { id: f.user_id, name: f.author_name } })}>
@@ -141,7 +150,15 @@ export default function ActivitiesScreen() {
                   ) : null}
                 </Pressable>
               </Card>
-            ))
+            ))}
+            {feed.length > FEED_PREVIEW ? (
+              <Pressable onPress={() => setFeedExpanded((v) => !v)} style={styles.moreBtn}>
+                <Text style={[styles.moreText, { color: HUB.onBg }]}>
+                  {feedExpanded ? 'Ver menos ▴' : `Ver mais (${feed.length}) ▾`}
+                </Text>
+              </Pressable>
+            ) : null}
+            </>
           )}
         </>
       ) : null}
@@ -206,7 +223,7 @@ export default function ActivitiesScreen() {
               ↻ {pendingCount} {pendingCount === 1 ? 'sessão pendente' : 'sessões pendentes'}…
             </Text>
           ) : null}
-          {sessions.slice(0, allSessions ? 30 : 3).map((s) => (
+          {sessions.slice(0, allSessions ? SESSIONS_MAX : SESSIONS_PREVIEW).map((s) => (
             <Pressable
               key={s.id}
               onPress={() =>
@@ -236,10 +253,10 @@ export default function ActivitiesScreen() {
               </Card>
             </Pressable>
           ))}
-          {sessions.length > 3 ? (
+          {sessions.length > SESSIONS_PREVIEW ? (
             <Pressable onPress={() => setAllSessions((v) => !v)} style={styles.moreBtn}>
               <Text style={[styles.moreText, { color: HUB.onBg }]}>
-                {allSessions ? 'Ver menos ▴' : `Ver todas (${sessions.length}) ▾`}
+                {allSessions ? 'Ver menos ▴' : 'Ver mais ▾'}
               </Text>
             </Pressable>
           ) : null}
@@ -251,6 +268,9 @@ export default function ActivitiesScreen() {
           Comece a ler na aba Leitura — o tempo é registrado automaticamente e aparece aqui.
         </Text>
       ) : null}
+
+      {/* Banner do tier grátis (fora do leitor, §2.5). No-op p/ plano pago / Expo Go. */}
+      <AdBanner style={styles.ad} />
     </ScreenBG>
   );
 }
@@ -326,6 +346,7 @@ const styles = StyleSheet.create({
   sessionShare: { fontSize: 16, marginLeft: 2 },
   moreBtn: { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
   moreText: { fontSize: 14, fontWeight: '700' },
+  ad: { marginTop: 16 },
   feedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 10 },
   feedHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   feedHeaderIcon: { fontSize: 18 },

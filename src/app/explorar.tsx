@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 
+import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import {
@@ -347,6 +348,7 @@ export default function ExplorarScreen() {
               </Pressable>
             );
           }}
+          ListFooterComponent={<AdBanner style={styles.ad} />}
         />
       )}
     </ScreenBG>
@@ -376,6 +378,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   errorText: { fontSize: 15, lineHeight: 22, textAlign: 'center', paddingHorizontal: 20 },
   list: { gap: 12, paddingTop: 8, paddingBottom: 24 },
+  ad: { marginTop: 12 },
   sectionLabel: { fontSize: 16, fontWeight: '800', letterSpacing: 0.3, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   cover: { width: 46, height: 64, borderRadius: 6 },
