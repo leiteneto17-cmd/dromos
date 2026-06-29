@@ -15,9 +15,9 @@
  * montados, e nada é reprocessado ao navegar (CLAUDE.md §4.6).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { BionicParagraph } from '@/components/bionic-text';
 import { BookmarksSheet } from '@/components/bookmarks-sheet';
@@ -26,6 +26,7 @@ import { SelectionBar } from '@/components/selection-bar';
 import { WordPanel } from '@/components/word-panel';
 import { WordPopover } from '@/components/word-popover';
 import { BottomTabInset, Fonts } from '@/constants/theme';
+import { useBookTranslation } from '@/hooks/use-book-translation';
 import { useReadAloud } from '@/hooks/use-read-aloud';
 import {
   loadPreparedCache,
@@ -161,6 +162,10 @@ export default function ReaderScreen() {
   // "Acompanhar": a tela rola sozinha seguindo o parágrafo falado (estilo teleprompter).
   // Desliga automaticamente quando o usuário rola manualmente — não brigar com o dedo.
   const [follow, setFollow] = useState<boolean>(true);
+  // 🌐 Ler em português: traduz o texto exibido conforme se lê (tradução automática).
+  const [translatePT, setTranslatePT] = useState(false);
+  // Sinal vindo do Explorar (livro não-PT) p/ ligar a tradução automaticamente ao abrir.
+  const { pt: ptParam } = useLocalSearchParams<{ pt?: string }>();
 
   // PDF
   const [progress, setProgress] = useState<ExtractProgress | null>(null);
@@ -431,6 +436,49 @@ export default function ReaderScreen() {
   const currentChapter = chapters.length ? chapterAt(chapters, topIndex) : 0;
   const readProgress = paragraphs.length > 1 ? topIndex / (paragraphs.length - 1) : 0;
 
+  // 🌐 Ler em português — tradução sob demanda do livro (prefetch + cache em disco).
+  const { map: ptMap, ensure: ensurePT, error: ptError, needsKey: ptNeedsKey } =
+    useBookTranslation(currentBook?.id, paragraphs);
+
+  // Pré-traduz a janela a partir do topo da tela enquanto o modo PT está ligado.
+  useEffect(() => {
+    if (translatePT) ensurePT(topIndex);
+  }, [translatePT, topIndex, ensurePT]);
+
+  // Sem login/chave de IA → desliga o modo e avisa (não fica "tentando" à toa).
+  useEffect(() => {
+    if (translatePT && ptNeedsKey) {
+      setTranslatePT(false);
+      Alert.alert(
+        'Tradução indisponível',
+        ptError ?? 'Entre na sua conta ou conecte sua chave de IA em Integrações para ler em português.',
+      );
+    }
+  }, [translatePT, ptNeedsKey, ptError]);
+
+  const toggleTranslate = useCallback(() => {
+    setTranslatePT((v) => {
+      const next = !v;
+      if (next) {
+        // sai de seleção/menu (offsets são do texto original) e começa a traduzir o topo
+        setSelection(null);
+        setSelectedWord(null);
+        ensurePT(topIndexRef.current);
+      }
+      return next;
+    });
+  }, [ensurePT]);
+
+  // Veio do Explorar com `pt=1` (livro não-PT, clicou "Leia em português no app") → liga a
+  // tradução sozinho. Aplica 1× por livro (se o usuário desligar depois, não religa).
+  const autoPtBookRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (ptParam === '1' && currentBook && autoPtBookRef.current !== currentBook.id) {
+      autoPtBookRef.current = currentBook.id;
+      setTranslatePT(true);
+    }
+  }, [ptParam, currentBook]);
+
   // Sumário DENSO: alguns livros têm pouquíssimos capítulos (corte por <h>), e o índice
   // ficava com buracos enormes (25% → 68%). Mantemos os capítulos REAIS e PREENCHEMOS os
   // vãos grandes com marcadores intermediários (trecho + %), pra a pessoa se localizar fino.
@@ -632,13 +680,18 @@ export default function ReaderScreen() {
         )
       : undefined;
 
-  // Entra no modo seleção a partir da palavra do popover.
+  // Entra no modo seleção a partir da palavra do popover. No modo 🌐 PT a citação fica
+  // desativada (os offsets/grifos são ancorados no texto ORIGINAL, não na tradução).
   const startSelection = useCallback(() => {
     if (!selectedWord) return;
+    if (translatePT) {
+      setSelectedWord(null);
+      return;
+    }
     const { index, charOffset, rawLen } = selectedWord;
     setSelection({ index, aStart: charOffset, aEnd: charOffset + rawLen, fStart: charOffset, fEnd: charOffset + rawLen });
     setSelectedWord(null);
-  }, [selectedWord]);
+  }, [selectedWord, translatePT]);
 
   const cancelSelection = useCallback(() => setSelection(null), []);
 
@@ -692,6 +745,8 @@ export default function ReaderScreen() {
       const r = readRef.current;
       const activePara = highlightReading && r.active && index === r.paraIndex;
       const heading = chapterTitleAt.get(index); // título de capítulo inline (estilo livro)
+      // Modo 🌐 PT: mostra a tradução quando já pronta; senão o original (some ao chegar).
+      const text = translatePT ? ptMap[index] ?? item : item;
       return (
         <View>
           {heading ? (
@@ -700,7 +755,7 @@ export default function ReaderScreen() {
             </Text>
           ) : null}
           <BionicParagraph
-            text={item}
+            text={text}
             bionic={bionic}
             ratio={prefs.bionicRatio}
             color={t.text}
@@ -713,9 +768,9 @@ export default function ReaderScreen() {
             onWordPress={handleWord}
             markedSet={markedSet}
             highlightColor={t.highlight}
-            selRange={selection && selection.index === index ? { start: selStart, end: selEnd } : undefined}
+            selRange={!translatePT && selection && selection.index === index ? { start: selStart, end: selEnd } : undefined}
             selColor={t.accent + '55'}
-            savedRanges={savedRangesByPara.get(index)}
+            savedRanges={translatePT ? undefined : savedRangesByPara.get(index)}
             savedColor={t.accent + '2E'}
             activePara={activePara}
             activeColor={t.accent + '22'}
@@ -723,7 +778,7 @@ export default function ReaderScreen() {
         </View>
       );
     },
-    [bionic, prefs.bionicRatio, prefs.letterSpacing, t, fontSize, lineHeight, paragraphSpacing, handleWord, markedSet, chapterTitleAt, highlightReading, selection, selStart, selEnd, savedRangesByPara],
+    [bionic, prefs.bionicRatio, prefs.letterSpacing, t, fontSize, lineHeight, paragraphSpacing, handleWord, markedSet, chapterTitleAt, highlightReading, selection, selStart, selEnd, savedRangesByPara, translatePT, ptMap],
   );
 
   // Rastreia o parágrafo no topo (progresso/capítulo) — estável p/ a FlatList.
@@ -794,11 +849,11 @@ export default function ReaderScreen() {
       offset: Math.round(offsetRef.current),
       index: idx,
       // Trecho maior e cortado na fronteira de palavra → vira uma citação legível (card §2.6).
-      snippet: cleanSnippet(paragraphs[idx] ?? '', 180),
+      snippet: cleanSnippet((translatePT ? ptMap[idx] ?? paragraphs[idx] : paragraphs[idx]) ?? '', 180),
       progress: paragraphs.length > 1 ? idx / (paragraphs.length - 1) : 0,
       createdAt: Date.now(),
     });
-  }, [currentBook, addBookmark, paragraphs]);
+  }, [currentBook, addBookmark, paragraphs, translatePT, ptMap]);
 
   const jumpToBookmark = useCallback((bm: import('@/store/library').Bookmark) => {
     setShowBookmarks(false);
@@ -823,6 +878,11 @@ export default function ReaderScreen() {
       <Text style={[styles.bookLabel, { color: t.textSecondary }]}>{bookLabel}</Text>
       {subtitle ? (
         <Text style={[styles.chapter, { color: t.text, fontFamily: Fonts?.serif }]}>{subtitle}</Text>
+      ) : null}
+      {translatePT ? (
+        <Text style={[styles.ptNote, { color: t.accent }]}>
+          🌐 Lendo em português · tradução automática
+        </Text>
       ) : null}
       {status}
     </View>
@@ -912,6 +972,24 @@ export default function ReaderScreen() {
           </Pressable>
 
           <Pressable
+            onPress={toggleTranslate}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: translatePT }}
+            accessibilityLabel="Ler em português (tradução automática)"
+            style={[
+              styles.btn,
+              {
+                borderColor: translatePT ? t.accent : t.border,
+                backgroundColor: translatePT ? t.accent : 'transparent',
+              },
+            ]}>
+            <Text
+              style={{ color: translatePT ? t.surface : t.textSecondary, fontSize: 13, fontWeight: '700' }}>
+              🌐 PT
+            </Text>
+          </Pressable>
+
+          <Pressable
             onPress={() => {
               if (read.state.active) read.stop();
               else {
@@ -970,7 +1048,7 @@ export default function ReaderScreen() {
         renderItem={renderItem}
         extraData={`${highlightReading && read.state.active ? read.state.paraIndex : -1}|${
           selection ? `${selection.index}:${selStart}:${selEnd}` : ''
-        }|${highlights.length}`}
+        }|${highlights.length}|${translatePT ? 'pt' : 'o'}|${Object.keys(ptMap).length}`}
         ListHeaderComponent={listHeader}
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: BottomTabInset + 48 }]}
@@ -1181,6 +1259,7 @@ const styles = StyleSheet.create({
   bookLabel: { fontSize: 13, letterSpacing: 0.5, marginBottom: 4 },
   chapter: { fontSize: 23, fontWeight: '600', marginBottom: 20 },
   inlineChapter: { fontSize: 22, fontWeight: '700', marginTop: 18, marginBottom: 14 },
+  ptNote: { fontSize: 12, fontWeight: '700', marginBottom: 16 },
   banner: { borderLeftWidth: 3, paddingLeft: 12, paddingVertical: 8, marginBottom: 18 },
   noticeSmall: { fontSize: 13, lineHeight: 19 },
   center: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },

@@ -12,6 +12,7 @@ import { BookCover } from '@/components/book-cover';
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import { deleteCoverFile, deletePreparedCache, openEpub, saveEpubCover } from '@/services/epub-parser';
+import { deleteTranslationCache } from '@/hooks/use-book-translation';
 import { readPdfTitle } from '@/services/pdf-metadata';
 import { useLibrary, type BookFormat, type ImportedBook } from '@/store/library';
 
@@ -169,6 +170,7 @@ export default function LibraryScreen() {
           }
           deletePreparedCache(book.id);
           deleteCoverFile(book.id);
+          deleteTranslationCache(book.id);
           removeBook(book.id);
         },
       },

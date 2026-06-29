@@ -1,0 +1,144 @@
+/**
+ * Tradução do livro "conforme se lê" (toggle 🌐 Ler em português no leitor).
+ *
+ * Em vez de traduzir o livro inteiro no download (lento + caro + §5), traduz só os
+ * parágrafos que o leitor vai ver, COM PREFETCH de uma janela à frente e CACHE EM DISCO
+ * (`translated-<bookId>.json`) — relê instantâneo e sem gastar IA de novo.
+ *
+ * Usa o `translateToPT` que já existe (BYOK → senão IA grátis/gerida). A fila roda 1 por
+ * vez (não estoura rate limit) e nunca trava a UI (é tudo `fetch` assíncrono).
+ */
+import { File, Paths } from 'expo-file-system';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { translateToPT } from '@/services/ai/translate';
+
+/** Parágrafos à frente do topo que pré-traduzimos (esconde a latência). */
+const WINDOW = 10;
+
+function cacheFile(bookId: string) {
+  return new File(Paths.document, `translated-${bookId}.json`);
+}
+
+/** Remove o cache de tradução do livro (ao excluí-lo da biblioteca). */
+export function deleteTranslationCache(bookId: string): void {
+  try {
+    const f = cacheFile(bookId);
+    if (f.exists) f.delete();
+  } catch {
+    // ignora
+  }
+}
+
+export type BookTranslation = {
+  /** índice do parágrafo → tradução PT (só os já traduzidos). */
+  map: Record<number, string>;
+  /** Garante a tradução de uma janela a partir de `startIndex` (idempotente). */
+  ensure: (startIndex: number) => void;
+  /** Última mensagem de erro (rede/IA), se houver. */
+  error: string | null;
+  /** true quando falta login/chave de IA — o leitor desliga o toggle e avisa. */
+  needsKey: boolean;
+};
+
+export function useBookTranslation(
+  bookId: string | undefined,
+  paragraphs: string[],
+): BookTranslation {
+  const [map, setMap] = useState<Record<number, string>>({});
+  const mapRef = useRef(map);
+  mapRef.current = map;
+  const [error, setError] = useState<string | null>(null);
+  const [needsKey, setNeedsKey] = useState(false);
+
+  const bookRef = useRef(bookId);
+  const queueRef = useRef<number[]>([]);
+  const runningRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Troca de livro: zera estado e carrega o cache do disco (se houver).
+  useEffect(() => {
+    bookRef.current = bookId;
+    queueRef.current = [];
+    setMap({});
+    setError(null);
+    setNeedsKey(false);
+    if (!bookId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const f = cacheFile(bookId);
+        if (f.exists) {
+          const data = JSON.parse(await f.text()) as Record<number, string>;
+          if (alive && data) {
+            mapRef.current = data;
+            setMap(data);
+          }
+        }
+      } catch {
+        // cache ausente/corrompido → ignora
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [bookId]);
+
+  const persist = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const id = bookRef.current;
+      if (!id) return;
+      try {
+        const f = cacheFile(id);
+        if (!f.exists) f.create();
+        f.write(JSON.stringify(mapRef.current));
+      } catch {
+        // ignora falha de escrita
+      }
+    }, 1500);
+  }, []);
+
+  const pump = useCallback(async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    try {
+      while (queueRef.current.length) {
+        const i = queueRef.current.shift();
+        if (i == null || mapRef.current[i] != null) continue;
+        const src = paragraphs[i];
+        if (!src || !src.trim()) continue;
+        const res = await translateToPT(src);
+        const next = { ...mapRef.current, [i]: res.ok ? res.text : mapRef.current[i] };
+        if (res.ok) {
+          mapRef.current = next;
+          setMap(next);
+          persist();
+          setError(null);
+        } else {
+          setError(res.error);
+          if (res.needsKey) {
+            setNeedsKey(true);
+            queueRef.current = []; // sem IA → para de tentar (o leitor desliga o toggle)
+            break;
+          }
+        }
+      }
+    } finally {
+      runningRef.current = false;
+    }
+  }, [paragraphs, persist]);
+
+  const ensure = useCallback(
+    (startIndex: number) => {
+      const end = Math.min(paragraphs.length, Math.max(0, startIndex) + WINDOW);
+      for (let i = Math.max(0, startIndex); i < end; i++) {
+        if (mapRef.current[i] == null && !queueRef.current.includes(i)) queueRef.current.push(i);
+      }
+      void pump();
+    },
+    [paragraphs.length, pump],
+  );
+
+  return { map, ensure, error, needsKey };
+}

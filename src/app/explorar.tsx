@@ -32,6 +32,7 @@ import {
   type CatalogLang,
   type CatalogSource,
 } from '@/services/catalog';
+import { filterCurated, loadCurated } from '@/services/curated-catalog';
 import { useLibrary, type ImportedBook } from '@/store/library';
 
 const LANGS: { id: CatalogLang; label: string }[] = [
@@ -56,10 +57,44 @@ export default function ExplorarScreen() {
     setLoading(true);
     setError(null);
     try {
+      // Acervo PRÓPRIO curado primeiro (clássicos que o Gutenberg não tem, ex.: Sun Tzu).
+      // Carrega uma vez e filtra localmente por idioma/termo — sempre vem no topo.
+      const curated = filterCurated(await loadCurated(), q, l);
+
       // Vitrine padrão em PT (sem busca) = clássicos brasileiros curados; o resto usa o
       // catálogo normal. O Gutenberg não separa pt-BR de pt-PT, então curamos por autor.
       const isBrShelf = !q.trim() && src === 'gutenberg' && l === 'pt';
-      const results = isBrShelf ? await featuredBrazilian() : (await searchCatalog(src, q, l)).results;
+      let base: CatalogBook[];
+      if (isBrShelf) {
+        base = await featuredBrazilian();
+      } else if (q.trim()) {
+        // Busca: combina Gutenberg + Google Books (grátis baixável). Se uma fonte falhar
+        // (ex.: Google em 429), a outra ainda responde — não derruba a busca.
+        const [g, gb] = await Promise.all([
+          searchCatalog(src, q, l).then((r) => r.results).catch(() => [] as CatalogBook[]),
+          searchCatalog('google', q, l).then((r) => r.results).catch(() => [] as CatalogBook[]),
+        ]);
+        // INTERCALA as duas fontes (1 de cada) para o Google aparecer no topo também,
+        // em vez de enterrado embaixo de todos os resultados do Gutenberg.
+        base = [];
+        for (let i = 0; i < Math.max(g.length, gb.length); i++) {
+          if (g[i]) base.push(g[i]);
+          if (gb[i]) base.push(gb[i]);
+        }
+      } else {
+        base = (await searchCatalog(src, q, l)).results;
+      }
+
+      // Mescla acervo próprio + fonte online, sem repetir o mesmo título.
+      const seen = new Set<string>();
+      const results: CatalogBook[] = [];
+      for (const b of [...curated, ...base]) {
+        const key = b.title.trim().toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push(b);
+      }
+
       setResults(results);
       if (results.length === 0)
         setError('Nenhum livro encontrado. Tente outro termo, idioma ou fonte.');
@@ -78,13 +113,19 @@ export default function ExplorarScreen() {
   }, [source, lang]);
 
   async function baixar(book: CatalogBook) {
+    // Livro não está em português (ex.: clássico em inglês)? Abre já com a tradução
+    // automática LIGADA — o leitor lê o sinal `pt=1` (combina com o aviso "Leia em
+    // português no app" do card).
+    const ptAuto = !!(book.language && book.language !== 'pt');
+    const readerTarget = ptAuto ? { pathname: '/reader' as const, params: { pt: '1' } } : '/reader';
+
     // Já está na biblioteca? Abre em vez de baixar de novo.
     const dup = useLibrary
       .getState()
       .books.find((b) => b.format === 'epub' && b.name === book.title);
     if (dup) {
       useLibrary.getState().openBook(dup.id);
-      router.navigate('/reader');
+      router.navigate(readerTarget);
       return;
     }
 
@@ -130,7 +171,7 @@ export default function ExplorarScreen() {
       };
       addBook(imported); // store já marca como livro atual
       setDownloadingId(null);
-      router.navigate('/reader');
+      router.navigate(readerTarget);
     } catch (e) {
       setDownloadingId(null);
       const msg = e instanceof Error ? e.message : '';
@@ -280,6 +321,20 @@ export default function ExplorarScreen() {
                       {item.author}
                       {item.language ? ` · ${item.language.toUpperCase()}` : ''}
                     </Text>
+                    {item.source === 'curated' ? (
+                      <Text style={[styles.srcTag, { color: c.green }]}>★ Acervo +leitura</Text>
+                    ) : (
+                      <Text style={[styles.srcTag, { color: c.textFaint }]}>
+                        {item.source === 'google'
+                          ? '🔎 Google Books'
+                          : item.source === 'archive'
+                            ? 'Internet Archive'
+                            : '📚 Project Gutenberg'}
+                      </Text>
+                    )}
+                    {item.language && item.language !== 'pt' ? (
+                      <Text style={[styles.ptHint, { color: c.purple }]}>🌐 Leia em português no app</Text>
+                    ) : null}
                   </View>
                   {busy ? (
                     <ActivityIndicator color={c.green} style={styles.dl} />
@@ -329,6 +384,8 @@ const styles = StyleSheet.create({
   rowBody: { flex: 1, gap: 3 },
   bookName: { fontSize: 15, fontWeight: '600' },
   bookSub: { fontSize: 13 },
+  srcTag: { fontSize: 11, fontWeight: '800', marginTop: 2 },
+  ptHint: { fontSize: 11, fontWeight: '700', marginTop: 2 },
   dl: { paddingHorizontal: 8 },
   dlBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   dlText: { fontSize: 13, fontWeight: '700' },
