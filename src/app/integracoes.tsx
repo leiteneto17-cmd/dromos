@@ -20,6 +20,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useUI } from '@/hooks/use-ui';
+import { useRewardedAd } from '@/hooks/use-rewarded';
+import { adsUnsupported } from '@/services/ads';
 import { PROVIDERS, validateKey, type AIProvider } from '@/services/ai/providers';
 import { getUsage, listVoices, synthesize, type ElevenVoice, type TtsUsage } from '@/services/ai/tts';
 import { listDeviceVoices, previewDeviceVoice, type DeviceVoice } from '@/services/ai/tts-device';
@@ -34,11 +36,23 @@ import {
   useAI,
 } from '@/store/ai';
 import { useAuth } from '@/store/auth';
+import { usePlan, type Plan } from '@/store/plan';
 
 const PROVIDER_IDS: AIProvider[] = ['gemini', 'openai', 'anthropic'];
 
+const PLAN_OPTS: { id: Plan; label: string }[] = [
+  { id: 'free', label: 'Grátis (com ads)' },
+  { id: 'basico', label: 'Básico (sem ads)' },
+  { id: 'pro', label: 'Pro (sem ads)' },
+];
+
 export default function IntegracoesScreen() {
   const c = useUI();
+  const plan = usePlan((s) => s.plan);
+  const setPlan = usePlan((s) => s.setPlan);
+  const adFreeUntil = usePlan((s) => s.adFreeUntil);
+  const grantAdFree = usePlan((s) => s.grantAdFree);
+  const rewarded = useRewardedAd();
   const savedProvider = useAI((s) => s.provider);
   const savedModel = useAI((s) => s.model);
   const hasKey = useAI((s) => s.hasKey);
@@ -542,6 +556,56 @@ export default function IntegracoesScreen() {
             🔒 A chave nunca é enviada aos nossos servidores nem sincronizada. Fica apenas neste
             aparelho.
           </Text>
+
+          {/* ---- Plano (TESTE) ---- até o RevenueCat entrar (Fase 4), troca o plano à mão
+              para conferir o gating (ex.: anúncios só no grátis). */}
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+          <Text style={[styles.sectionTitle, { color: c.text }]}>🧪 Plano (teste)</Text>
+          <Text style={[styles.subtitle, { color: c.textFaint }]}>
+            Provisório até o pagamento real (RevenueCat). Use para conferir o que muda por plano —
+            os anúncios aparecem só no <Text style={{ fontWeight: '700' }}>Grátis</Text>.
+          </Text>
+          <View style={styles.suggestions}>
+            {PLAN_OPTS.map((p) => {
+              const active = plan === p.id;
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => setPlan(p.id)}
+                  style={[
+                    styles.sugChip,
+                    { borderColor: active ? c.green : c.border },
+                    active && { borderWidth: 2 },
+                  ]}>
+                  <Text style={[styles.sugText, { color: active ? c.green : c.textDim }]}>{p.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Rewarded "degustar": grátis assiste 1 vídeo → 30 min sem anúncios. */}
+          {plan === 'free' && !adsUnsupported ? (
+            <>
+              <Text style={[styles.label, { color: c.textDim }]}>Recompensa por vídeo</Text>
+              {adFreeUntil > Date.now() ? (
+                <Text style={[styles.ok, { color: c.green, marginTop: 0 }]}>
+                  ✅ Sem anúncios até {new Date(adFreeUntil).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
+                </Text>
+              ) : null}
+              <Pressable
+                onPress={() => rewarded.show(() => grantAdFree(30))}
+                disabled={!rewarded.ready || rewarded.loading}
+                style={[styles.testBtn, { borderColor: c.green, opacity: rewarded.ready ? 1 : 0.5 }]}>
+                {rewarded.loading && !rewarded.ready ? (
+                  <ActivityIndicator color={c.green} />
+                ) : (
+                  <Text style={{ color: c.green, fontWeight: '800', fontSize: 15 }}>
+                    {rewarded.ready ? '▶ Assistir vídeo → 30 min sem anúncios' : 'Carregando vídeo…'}
+                  </Text>
+                )}
+              </Pressable>
+            </>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </View>

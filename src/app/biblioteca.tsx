@@ -8,6 +8,7 @@ import { File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AdBanner } from '@/components/ad-banner';
 import { BookCover } from '@/components/book-cover';
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
@@ -254,6 +255,9 @@ export default function LibraryScreen() {
           )}
         />
       )}
+
+      {/* Banner do tier grátis — fora do leitor (§2.5). No-op p/ plano pago / Expo Go. */}
+      <AdBanner style={styles.ad} />
     </ScreenBG>
   );
 }
@@ -278,4 +282,5 @@ const styles = StyleSheet.create({
   bookSub: { fontSize: 13 },
   trashBtn: { paddingHorizontal: 4, paddingVertical: 4 },
   trash: { fontSize: 20 },
+  ad: { marginTop: 8 },
 });

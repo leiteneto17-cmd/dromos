@@ -52,7 +52,16 @@
         {
           "color": "#5EF0A0"
         }
-      ]
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "userTrackingUsageDescription": "Usamos isto para mostrar anúncios mais relevantes no plano grátis. Você pode recusar e continuar usando o app normalmente."
+        }
+      ],
+      "./plugins/withKotlinMetadataSkip"
     ],
     "experiments": {
       "typedRoutes": true,

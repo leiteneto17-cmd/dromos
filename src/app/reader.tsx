@@ -35,6 +35,7 @@ import {
   type PreparedEpub,
 } from '@/services/epub-parser';
 import { getUsage } from '@/services/ai/tts';
+import { accrueReadingSeconds, maybeShowReadingInterstitial } from '@/services/ads/interstitial';
 import { PdfExtractor, type ExtractProgress } from '@/services/pdf-extractor';
 import { evaluateGoals } from '@/services/goals';
 import { computeAchievements, deriveStats } from '@/services/progress';
@@ -306,6 +307,7 @@ export default function ReaderScreen() {
       const id = setInterval(() => {
         addReadingTime(TICK);
         sessionSeconds += TICK;
+        accrueReadingSeconds(TICK); // soma rumo ao próximo intersticial (tier grátis)
         evaluateGoals(); // conclui/celebra metas no momento EXATO em que o alvo é batido
       }, TICK * 1000);
       return () => {
@@ -358,6 +360,10 @@ export default function ReaderScreen() {
             newAchievements,
           });
         }
+
+        // PONTO NATURAL (§2.5): saiu do leitor → se acumulou ~10 min de leitura e é tier grátis,
+        // mostra um intersticial de vídeo. Nunca por cima do texto; só aqui, fora da leitura.
+        maybeShowReadingInterstitial();
       };
     }, [currentBook, addReadingTime, addSession]),
   );

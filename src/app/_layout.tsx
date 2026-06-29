@@ -6,11 +6,15 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { CelebrationOverlay } from '@/components/celebration-overlay';
 import { OnboardingOverlay } from '@/components/onboarding-overlay';
 import { useUI } from '@/hooks/use-ui';
+import { initAds } from '@/services/ads';
 import { setupNotificationHandler } from '@/services/reminders';
 import { useAuth } from '@/store/auth';
 
 // Mostra os lembretes de leitura mesmo com o app aberto (no-op no Expo Go).
 setupNotificationHandler();
+
+// Inicializa o AdMob + consentimento (tier grátis). No-op no Expo Go; tolera qualquer falha.
+void initAds();
 
 /**
  * Pilha raiz com LOGIN OBRIGATÓRIO (decisão do usuário 2026-06-21 — reverte o
