@@ -17,13 +17,13 @@ import { translateManyToPT } from '@/services/ai/translate';
 const WINDOW = 10;
 /**
  * Tamanho-alvo de cada LOTE de tradução (em caracteres) — economiza cota (§5).
- * Mantido conservador (~1400) porque o proxy `ai-proxy` corta a saída em 1024 tokens:
- * lote maior truncaria o JSON e a tradução falharia. Com BYOK não há esse teto, mas
- * deixamos seguro para os dois caminhos. (Se subir o teto do proxy, dá pra aumentar.)
+ * ~3000 aproveita o teto de saída de 2048 tokens do `ai-proxy` (após o deploy) e o BYOK.
+ * Se a resposta vier grande demais pro teto deployado, o `pump` DIVIDE o lote e tenta
+ * menor sozinho — então isto é seguro mesmo se o proxy ainda estiver no teto antigo.
  */
-const BATCH_CHARS = 1400;
+const BATCH_CHARS = 3000;
 /** Teto de parágrafos por lote (segurança p/ não estourar a saída do modelo). */
-const BATCH_MAX = 12;
+const BATCH_MAX = 24;
 
 function cacheFile(bookId: string) {
   return new File(Paths.document, `translated-${bookId}.json`);
@@ -111,9 +111,44 @@ export function useBookTranslation(
   const pump = useCallback(async () => {
     if (runningRef.current) return;
     runningRef.current = true;
+
+    // Traduz UM lote. Se falhar por FORMATO/truncação (resposta grande demais pro teto do
+    // proxy), DIVIDE em dois e tenta de novo — auto-ajuste ao teto deployado. Retorna false
+    // só quando deve PARAR tudo (sem IA / cota estourada).
+    const applyBatch = async (idx: number[]): Promise<boolean> => {
+      if (idx.length === 0) return true;
+      const res = await translateManyToPT(idx.map((i) => paragraphs[i]));
+      if (bookRef.current == null) return false; // trocou de livro no meio
+      if (res.ok) {
+        const next = { ...mapRef.current };
+        idx.forEach((i, k) => {
+          if (res.texts[k]) next[i] = res.texts[k];
+        });
+        mapRef.current = next;
+        setMap(next);
+        persist();
+        setError(null);
+        return true;
+      }
+      if (res.needsKey) {
+        setNeedsKey(true);
+        setError(res.error);
+        return false; // sem IA / cota → para tudo (não martela)
+      }
+      // Falha de formato/truncação → divide o lote e tenta menor.
+      if (idx.length > 1) {
+        const mid = Math.ceil(idx.length / 2);
+        if (!(await applyBatch(idx.slice(0, mid)))) return false;
+        return applyBatch(idx.slice(mid));
+      }
+      // 1 parágrafo só e ainda falhou → desiste DESTE (mostra o original) e segue.
+      setError(res.error);
+      return true;
+    };
+
     try {
       while (queueRef.current.length) {
-        // Monta um LOTE de índices pendentes (até ~2500 chars ou 20 parágrafos) → 1 chamada
+        // Monta um LOTE de índices pendentes (até ~3000 chars / 24 parágrafos) → 1 chamada
         // de IA por lote em vez de 1 por parágrafo (economiza cota, §5).
         const batchIdx: number[] = [];
         let chars = 0;
@@ -126,22 +161,8 @@ export function useBookTranslation(
           chars += src.length;
         }
         if (batchIdx.length === 0) continue;
-
-        const res = await translateManyToPT(batchIdx.map((i) => paragraphs[i]));
-        if (bookRef.current == null) return; // trocou de livro no meio
-        if (res.ok) {
-          const next = { ...mapRef.current };
-          batchIdx.forEach((i, k) => {
-            if (res.texts[k]) next[i] = res.texts[k];
-          });
-          mapRef.current = next;
-          setMap(next);
-          persist();
-          setError(null);
-        } else {
-          setError(res.error);
-          if (res.needsKey) setNeedsKey(true);
-          queueRef.current = []; // sem IA / formato ruim → para de tentar (não martela a cota)
+        if (!(await applyBatch(batchIdx))) {
+          queueRef.current = [];
           break;
         }
       }
