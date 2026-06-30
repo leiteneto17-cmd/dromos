@@ -1,28 +1,33 @@
 /**
- * Plano do usuário (Zustand) — base do GATING de monetização (CLAUDE.md §6 / [[monetizacao-planos]]).
+ * Plano do usuário (Zustand) — fonte única do GATING de monetização (CLAUDE.md §6 / [[monetizacao-planos]]).
  *
- * Hoje NÃO há enforcement real: o paywall/RevenueCat é Fase 4. Este store existe para que
- * os recursos que dependem de plano (a começar pelos ANÚNCIOS do tier grátis) já consultem
- * uma fonte única de verdade. Quando o RevenueCat entrar, ele só passa a chamar `setPlan`
- * com o que a loja confirmou — o resto do app não muda.
+ * MODELO (decisão 2026-06-30 — substitui os 3 planos): só DOIS planos.
+ *   - 'free'    → grátis COM anúncios. SÓ o leitor: importar/ler EPUB/PDF, Bionic, temas,
+ *                 marcações, atividades/estatísticas. SEM áudio/vozes, SEM Metas, SEM Coach,
+ *                 SEM dicionário por IA, SEM social avançado.
+ *   - 'premium' → R$ 4,90/mês, TUDO liberado e SEM anúncios.
  *
- * Mapeamento (decisão 2026-06-26):
- *   - 'free'   → grátis COM anúncios;
- *   - 'basico' → R$ 4,90/mês, SEM anúncios (+ áudio assistido, metas, a11y);
- *   - 'pro'    → R$ 9,90/mês, SEM anúncios, tudo liberado.
+ * Sem enforcement de COBRANÇA ainda: a compra real é via IAP nativo (App Store / Google Play)
+ * unificado por RevenueCat (Fase 4). O RevenueCat só vai chamar `setPlan('premium')` quando a
+ * loja confirmar a assinatura. Até lá, o seletor de teste em Integrações flipa o plano.
  *
- * Também guarda a JANELA "sem anúncios" temporária (`adFreeUntil`) — recompensa do anúncio
- * rewarded (Bloco 3): o usuário grátis assiste um vídeo e ganha X minutos sem anúncios.
+ * Também guarda a JANELA "sem anúncios" temporária (`adFreeUntil`) — recompensa do rewarded:
+ * o usuário grátis assiste um vídeo e ganha X minutos sem anúncios.
  *
- * Persistido em AsyncStorage (leve, chave-valor). Default = 'free'.
+ * Persistido em AsyncStorage. Default = 'free'.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
-export type Plan = 'free' | 'basico' | 'pro';
+export type Plan = 'free' | 'premium';
 
 const STORAGE_KEY = 'leitura-plan';
 const AD_FREE_KEY = 'leitura-ad-free-until';
+
+/** Normaliza valores salvos (inclui os planos antigos 'basico'/'pro' → 'premium'). */
+function normalizePlan(v: string | null | undefined): Plan {
+  return v === 'premium' || v === 'basico' || v === 'pro' ? 'premium' : 'free';
+}
 
 type PlanState = {
   plan: Plan;
@@ -44,7 +49,6 @@ export const usePlan = create<PlanState>((set, get) => ({
     AsyncStorage.setItem(STORAGE_KEY, plan).catch(() => {});
   },
   grantAdFree: (minutes) => {
-    // Estende a partir do MAIOR entre agora e a janela atual (não encurta se já houver uma).
     const base = Math.max(Date.now(), get().adFreeUntil);
     const until = base + minutes * 60_000;
     set({ adFreeUntil: until });
@@ -60,23 +64,27 @@ export const usePlan = create<PlanState>((set, get) => ({
 AsyncStorage.multiGet([STORAGE_KEY, AD_FREE_KEY])
   .then((pairs) => {
     const map = Object.fromEntries(pairs);
-    const saved = map[STORAGE_KEY];
     const until = parseInt(map[AD_FREE_KEY] ?? '0', 10);
     usePlan.setState({
-      plan: saved === 'basico' || saved === 'pro' || saved === 'free' ? saved : 'free',
+      plan: normalizePlan(map[STORAGE_KEY]),
       adFreeUntil: Number.isFinite(until) ? until : 0,
     });
   })
   .catch(() => {});
 
-/** true quando o PLANO em si vê anúncios (só o grátis). Pago = sem ads, sempre. */
+/** true quando o PLANO em si vê anúncios (só o grátis). Premium = sem ads, sempre. */
 export function planHasAds(plan: Plan): boolean {
   return plan === 'free';
 }
 
-/** Hook de conveniência: o usuário atual deve ver anúncios AGORA (plano + janela sem-ads)? */
+/** Hook: o usuário atual deve ver anúncios AGORA (plano grátis E fora da janela sem-ads)? */
 export function useHasAds(): boolean {
   const plan = usePlan((s) => s.plan);
   const adFreeUntil = usePlan((s) => s.adFreeUntil);
   return planHasAds(plan) && Date.now() >= adFreeUntil;
+}
+
+/** Hook: o usuário é Premium? (gate de áudio/vozes, Metas, Coach, IA, social avançado). */
+export function useIsPremium(): boolean {
+  return usePlan((s) => s.plan === 'premium');
 }

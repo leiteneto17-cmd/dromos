@@ -6,7 +6,8 @@
  * As sessões nascem locais com `synced=false`. Aqui empurramos as pendentes e marcamos
  * `synced=true` (guardando o id remoto). É idempotente por sessão: o que falhar continua
  * pendente e tenta de novo na próxima chamada (ao abrir Atividades, ao logar, ao fim de
- * uma leitura). Visibilidade nasce 'private' por padrão no banco (§4.8).
+ * uma leitura). Visibilidade nasce 'friends' (visível a seguidores aceitos — a privacidade
+ * de fato vem da aprovação de quem te segue, §4.8); o RLS esconde as 'private' até deles.
  */
 import { supabase } from '@/services/supabase';
 import { useLibrary, type BookFormat } from '@/store/library';
@@ -45,6 +46,7 @@ export async function syncActivities(): Promise<SyncResult> {
           seconds: s.seconds,
           pages: s.pages,
           started_at: new Date(s.startedAt).toISOString(),
+          visibility: 'friends', // explícito (não depende do default do banco)
         })
         .select('id')
         .single();

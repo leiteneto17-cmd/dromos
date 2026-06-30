@@ -63,7 +63,7 @@ create table if not exists public.reading_activities (
   pages integer,                          -- páginas (ou equivalentes) lidas
   started_at timestamptz,
   created_at timestamptz not null default now(),
-  visibility text not null default 'private'  -- 'private' | 'friends' | 'public'
+  visibility text not null default 'friends'  -- 'private' (só o dono) | 'friends' (seguidores aceitos) | 'public'
 );
 
 alter table public.reading_activities enable row level security;
@@ -459,12 +459,19 @@ create policy "ver estante (público ou seguidor aceito)" on public.book_shelves
                where f.follower_id = auth.uid() and f.followee_id = user_id and f.status = 'accepted')
   );
 
--- Ver as ATIVIDADES de quem eu sigo (aceito) — público ou privado. Alimenta o feed.
+-- #5: a coluna `visibility` agora é RESPEITADA. Default passou p/ 'friends' (compartilhar
+-- com seguidores aceitos = o comportamento de fato do feed). Uma atividade 'private' fica
+-- visível SÓ p/ o dono (pela policy "dono vê suas atividades"), escondida até dos seguidores.
+-- Em DBs já existentes, garante o novo default (idempotente; NÃO mexe nos valores das linhas).
+alter table public.reading_activities alter column visibility set default 'friends';
+
+-- Ver as ATIVIDADES de quem eu sigo (aceito), exceto as marcadas 'private'. Alimenta o feed.
 drop policy if exists "ver atividade de quem sigo (público)" on public.reading_activities;
 drop policy if exists "ver atividade de quem sigo (aceito)" on public.reading_activities;
 create policy "ver atividade de quem sigo (aceito)" on public.reading_activities for select to authenticated
   using (
-    exists (select 1 from public.follows f
+    visibility in ('friends', 'public')
+    and exists (select 1 from public.follows f
             where f.follower_id = auth.uid() and f.followee_id = user_id and f.status = 'accepted')
   );
 

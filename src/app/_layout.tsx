@@ -67,6 +67,7 @@ export default function RootLayout() {
           <Stack.Screen name="explorar" />
           <Stack.Screen name="compartilhar" />
           <Stack.Screen name="conquistas" />
+          <Stack.Screen name="premium" />
           <Stack.Screen name="livro" />
           <Stack.Screen name="usuario" />
           <Stack.Screen name="seguidores" />

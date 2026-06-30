@@ -45,6 +45,7 @@ import { markBookReading } from '@/services/community';
 import { syncBadges } from '@/store/profile';
 import { getTtsKey, useAI } from '@/store/ai';
 import { useLibrary } from '@/store/library';
+import { useIsPremium } from '@/store/plan';
 import { useSession } from '@/store/session';
 import {
   FontSizeRange,
@@ -520,6 +521,17 @@ export default function ReaderScreen() {
   const read = useReadAloud(paragraphs);
   const readRef = useRef(read.state);
   readRef.current = read.state;
+
+  const isPremium = useIsPremium();
+  // Áudio/voz é recurso Premium (§6). No grátis, "Ouvir" leva à assinatura em vez de tocar.
+  function startListening(index: number, offset?: number) {
+    if (!isPremium) {
+      router.push('/premium');
+      return;
+    }
+    setFollow(true);
+    read.start(index, offset);
+  }
 
   // Restaura a posição de leitura SEM travar. Antes tentávamos rolar até o parágrafo
   // depois de montar a lista — numa lista virtualizada isso renderiza todos os parágrafos
@@ -998,10 +1010,7 @@ export default function ReaderScreen() {
           <Pressable
             onPress={() => {
               if (read.state.active) read.stop();
-              else {
-                setFollow(true); // nova sessão começa acompanhando
-                read.start(topIndexRef.current);
-              }
+              else startListening(topIndexRef.current); // grátis → leva ao Premium
             }}
             accessibilityRole="button"
             accessibilityLabel="Ouvir em voz alta"
@@ -1163,8 +1172,7 @@ export default function ReaderScreen() {
             setWordMode('full');
           }}
           onListen={() => {
-            setFollow(true);
-            read.start(selectedWord.index, selectedWord.charOffset);
+            startListening(selectedWord.index, selectedWord.charOffset);
             closeWord();
           }}
           onSelect={startSelection}
@@ -1195,10 +1203,7 @@ export default function ReaderScreen() {
           autoAction={wordAuto}
           t={t}
           onClose={closeWord}
-          onListenFromHere={() => {
-            setFollow(true);
-            read.start(selectedWord.index, selectedWord.charOffset);
-          }}
+          onListenFromHere={() => startListening(selectedWord.index, selectedWord.charOffset)}
         />
       ) : null}
 

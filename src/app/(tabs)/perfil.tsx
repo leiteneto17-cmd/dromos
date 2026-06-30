@@ -22,6 +22,7 @@ import { computeAchievements, deriveStats } from '@/services/progress';
 import { approveRequest, getFollowRequests, rejectRequest, type FollowRequest } from '@/services/social';
 import { displayName, useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
+import { useIsPremium } from '@/store/plan';
 import { syncBadges, useProfile } from '@/store/profile';
 
 export default function ProfileScreen() {
@@ -42,6 +43,7 @@ export default function ProfileScreen() {
   // Estatísticas retráteis — começam recolhidas para o perfil ocupar menos espaço.
   const [showStats, setShowStats] = useState(false);
   const [requests, setRequests] = useState<FollowRequest[]>([]);
+  const isPremium = useIsPremium();
 
   useFocusEffect(
     useCallback(() => {
@@ -116,6 +118,22 @@ export default function ProfileScreen() {
         </Pressable>
       ) : (
         <>
+          <PressableScale onPress={() => router.navigate('/premium')}>
+            <Card glow={!isPremium} style={styles.row}>
+              <View style={styles.flex}>
+                <Text style={[styles.cardTitle, { color: isPremium ? c.green : c.text }]}>
+                  {isPremium ? '✓ Premium ativo' : '✨ Seja Premium'}
+                </Text>
+                <Text style={[styles.cardSub, { color: c.textFaint }]}>
+                  {isPremium
+                    ? 'Tudo liberado, sem anúncios. Obrigado!'
+                    : 'Áudio, Metas, Coach de IA e mais — sem anúncios · R$ 4,90/mês'}
+                </Text>
+              </View>
+              <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
+            </Card>
+          </PressableScale>
+
           <PressableScale onPress={() => router.navigate({ pathname: '/usuario', params: { id: user.id, name: headerName } })}>
             <Card style={styles.row}>
               <View style={styles.flex}>

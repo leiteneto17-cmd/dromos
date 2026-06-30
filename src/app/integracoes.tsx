@@ -42,8 +42,7 @@ const PROVIDER_IDS: AIProvider[] = ['gemini', 'openai', 'anthropic'];
 
 const PLAN_OPTS: { id: Plan; label: string }[] = [
   { id: 'free', label: 'Grátis (com ads)' },
-  { id: 'basico', label: 'Básico (sem ads)' },
-  { id: 'pro', label: 'Pro (sem ads)' },
+  { id: 'premium', label: 'Premium (tudo)' },
 ];
 
 export default function IntegracoesScreen() {

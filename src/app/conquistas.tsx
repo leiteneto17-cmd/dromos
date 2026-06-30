@@ -42,6 +42,8 @@ import {
 import { evaluateGoals } from '@/services/goals';
 import { useAI } from '@/store/ai';
 import { useLibrary, type Goal, type GoalKind, type ReminderConfig } from '@/store/library';
+import { useIsPremium } from '@/store/plan';
+import { PremiumLock } from '@/components/premium-lock';
 
 const WINDOWS = [7, 14, 30];
 
@@ -61,6 +63,7 @@ const REMINDER_TIMES: { h: number; m: number; label: string }[] = [
 
 export default function GoalsScreen() {
   const c = useUI();
+  const isPremium = useIsPremium();
   const booksList = useLibrary((s) => s.books);
   const vocab = useLibrary((s) => s.vocab.length);
   const stats = useLibrary((s) => s.stats);
@@ -292,6 +295,18 @@ export default function GoalsScreen() {
     setDays(7);
     setAiRationale('');
     setShowNew(false);
+  }
+
+  // Metas + Coach de IA são Premium (§6). Grátis vê a trava com convite à assinatura.
+  if (!isPremium) {
+    return (
+      <ScreenBG>
+        <PremiumLock
+          feature="Metas e Coach de IA"
+          note="Crie metas de leitura, acompanhe seu ritmo e deixe a IA montar um plano sob medida — tudo no Premium."
+        />
+      </ScreenBG>
+    );
   }
 
   return (
