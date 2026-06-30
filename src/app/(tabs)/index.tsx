@@ -14,6 +14,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { AdBanner } from '@/components/ad-banner';
 import { importBookFlow } from '@/app/biblioteca';
 import { BottomTabInset } from '@/constants/theme';
 import { restoreActivities } from '@/services/activity-sync';
@@ -205,6 +206,10 @@ export default function HubScreen() {
             <WeekBars data={derived.last7} />
           </View>
 
+          {/* Banner do tier grátis — no meio do feed (visível, fora do leitor §2.5).
+              No-op p/ plano pago / Expo Go. */}
+          <AdBanner style={styles.ad} />
+
           {/* Biblioteca atual */}
           <View style={styles.sectionHeadRow}>
             <Text style={styles.sectionTitle}>📚 Biblioteca atual</Text>
@@ -374,6 +379,8 @@ const styles = StyleSheet.create({
   barTrack: { width: '100%', height: 76, justifyContent: 'flex-end', borderRadius: 7, overflow: 'hidden', backgroundColor: '#EFF1F0' },
   bar: { width: '100%', borderRadius: 7 },
   barLabel: { color: HUB.cardMuted, fontSize: 11, marginTop: 6 },
+
+  ad: { marginTop: 14 },
 
   // Biblioteca (sobre o fundo verde)
   sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 12 },

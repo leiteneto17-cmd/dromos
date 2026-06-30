@@ -348,9 +348,11 @@ export default function ExplorarScreen() {
               </Pressable>
             );
           }}
-          ListFooterComponent={<AdBanner style={styles.ad} />}
         />
       )}
+
+      {/* Banner do tier grátis — fixo no rodapé (sempre visível, fora do leitor §2.5). */}
+      <AdBanner style={styles.ad} />
     </ScreenBG>
   );
 }

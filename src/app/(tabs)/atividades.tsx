@@ -186,6 +186,9 @@ export default function ActivitiesScreen() {
         <WeekBars data={d.last7} />
       </Card>
 
+      {/* Banner do tier grátis — logo após o resumo (visível, fora do leitor §2.5). */}
+      <AdBanner style={styles.ad} />
+
       {/* Totais */}
       <SectionTitle hub icon="📊">Totais</SectionTitle>
       <View style={styles.statGrid}>
@@ -268,9 +271,6 @@ export default function ActivitiesScreen() {
           Comece a ler na aba Leitura — o tempo é registrado automaticamente e aparece aqui.
         </Text>
       ) : null}
-
-      {/* Banner do tier grátis (fora do leitor, §2.5). No-op p/ plano pago / Expo Go. */}
-      <AdBanner style={styles.ad} />
     </ScreenBG>
   );
 }

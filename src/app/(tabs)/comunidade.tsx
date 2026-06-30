@@ -244,6 +244,9 @@ export default function CommunityScreen() {
             </View>
           ) : null}
 
+          {/* Banner do tier grátis — abaixo da busca (visível, fora do leitor §2.5). */}
+          <AdBanner style={styles.ad} />
+
           {query.trim().length >= 2 ? (
             /* ---- Modo de busca (resultados ao vivo: livros ou pessoas) ---- */
             <>
@@ -409,9 +412,6 @@ export default function CommunityScreen() {
           🔒 O que você lê é íntimo. Só quem torna o perfil público aparece para os outros (Perfil → Privacidade).
         </Text>
       </Card>
-
-      {/* Banner do tier grátis (fora do leitor, §2.5). No-op p/ plano pago / Expo Go. */}
-      <AdBanner style={styles.ad} />
     </ScreenBG>
   );
 }
