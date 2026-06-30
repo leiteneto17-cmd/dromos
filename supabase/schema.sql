@@ -415,7 +415,11 @@ create trigger follows_set_status before insert on public.follows
   for each row execute function public.set_follow_status();
 
 drop policy if exists "follows legíveis" on public.follows;
-create policy "follows legíveis" on public.follows for select to authenticated using (true);
+-- SELECT: vínculos ACEITOS são legíveis (contadores, listas seguidores/seguindo, checagem
+-- do feed). PEDIDOS pendentes (seguir perfil privado) ficam visíveis SÓ p/ as duas partes —
+-- não vazar "fulano pediu p/ seguir sicrano" a terceiros (privacidade, §4.8).
+create policy "follows legíveis" on public.follows for select to authenticated
+  using (status = 'accepted' or auth.uid() = follower_id or auth.uid() = followee_id);
 
 drop policy if exists "dono segue" on public.follows;
 create policy "dono segue" on public.follows for insert to authenticated

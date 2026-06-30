@@ -33,8 +33,10 @@ yarn-error.*
 # IDE (config específica da máquina)
 .idea/
 
-# local env files
-.env*.local
+# env files — NUNCA versionar (podem conter EXPO_PUBLIC_* e segredos)
+.env
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
