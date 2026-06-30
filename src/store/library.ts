@@ -180,6 +180,8 @@ type Persisted = {
   sessions: ReadingSession[];
   goals: Goal[];
   uiTheme: UITheme;
+  /** Compartilhar atividades de leitura no feed (visibility 'friends' vs 'private'). Default true. */
+  shareActivities: boolean;
   reminder: ReminderConfig;
   readerPrefs: ReaderPrefs;
 };
@@ -210,6 +212,7 @@ function emptyPersisted(): Persisted {
     sessions: [],
     goals: [],
     uiTheme: 'system',
+    shareActivities: true,
     reminder: { ...DEFAULT_REMINDER },
     readerPrefs: { ...DEFAULT_READER_PREFS },
   };
@@ -235,6 +238,7 @@ function parsePersisted(f: File): Persisted {
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
       goals: Array.isArray(parsed.goals) ? parsed.goals : [],
       uiTheme: parsed.uiTheme ?? 'system',
+      shareActivities: parsed.shareActivities !== false, // default true (compartilha)
       reminder: {
         enabled: Boolean(parsed.reminder?.enabled),
         hour: typeof parsed.reminder?.hour === 'number' ? parsed.reminder.hour : DEFAULT_REMINDER.hour,
@@ -298,6 +302,7 @@ type LibraryState = Persisted & {
   removeGoal: (id: string) => void;
   completeGoal: (id: string, doneAt: number) => void;
   setUiTheme: (theme: UITheme) => void;
+  setShareActivities: (share: boolean) => void;
   setReminder: (reminder: ReminderConfig) => void;
   setReaderPrefs: (prefs: Partial<ReaderPrefs>) => void;
 };
@@ -320,6 +325,7 @@ export const useLibrary = create<LibraryState>((set) => ({
   sessions: initial.sessions,
   goals: initial.goals,
   uiTheme: initial.uiTheme,
+  shareActivities: initial.shareActivities,
   reminder: initial.reminder,
   readerPrefs: initial.readerPrefs,
   addBook: (book) =>
@@ -426,6 +432,7 @@ export const useLibrary = create<LibraryState>((set) => ({
       };
     }),
   setUiTheme: (uiTheme) => set({ uiTheme }),
+  setShareActivities: (shareActivities) => set({ shareActivities }),
   setReminder: (reminder) => set({ reminder }),
   setReaderPrefs: (prefs) => set((s) => ({ readerPrefs: { ...s.readerPrefs, ...prefs } })),
 }));
@@ -435,12 +442,12 @@ let switchingUser = false;
 function persist() {
   if (switchingUser) return; // não regravar durante a troca de conta
   try {
-    const { books, currentBookId, positions, progress, bookPages, bookmarks, highlights, vocab, stats, sessions, goals, uiTheme, reminder, readerPrefs } =
+    const { books, currentBookId, positions, progress, bookPages, bookmarks, highlights, vocab, stats, sessions, goals, uiTheme, shareActivities, reminder, readerPrefs } =
       useLibrary.getState();
     const f = fileFor(currentUserId);
     if (!f.exists) f.create();
     f.write(
-      JSON.stringify({ books, currentBookId, positions, progress, bookPages, bookmarks, highlights, vocab, stats, sessions, goals, uiTheme, reminder, readerPrefs }),
+      JSON.stringify({ books, currentBookId, positions, progress, bookPages, bookmarks, highlights, vocab, stats, sessions, goals, uiTheme, shareActivities, reminder, readerPrefs }),
     );
   } catch {
     // ignora falha de escrita

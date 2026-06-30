@@ -46,7 +46,8 @@ export async function syncActivities(): Promise<SyncResult> {
           seconds: s.seconds,
           pages: s.pages,
           started_at: new Date(s.startedAt).toISOString(),
-          visibility: 'friends', // explícito (não depende do default do banco)
+          // Respeita a escolha do usuário (Configurações → "Compartilhar minhas leituras").
+          visibility: useLibrary.getState().shareActivities ? 'friends' : 'private',
         })
         .select('id')
         .single();
@@ -59,6 +60,29 @@ export async function syncActivities(): Promise<SyncResult> {
     return null;
   } finally {
     inFlight = false;
+  }
+}
+
+/**
+ * Liga/desliga o COMPARTILHAMENTO das atividades de leitura (escolha do usuário, §4.8).
+ * Salva a preferência localmente (vale para as próximas sessões) E atualiza as atividades
+ * JÁ enviadas: 'friends' (aparecem no feed de quem te segue) ou 'private' (só você vê).
+ * O RLS já permite o dono atualizar as próprias linhas. No-op no backend se deslogado.
+ */
+export async function setActivitySharing(share: boolean): Promise<void> {
+  useLibrary.getState().setShareActivities(share); // imediato/local (offline-first)
+  if (!supabase) return;
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+    await supabase
+      .from('reading_activities')
+      .update({ visibility: share ? 'friends' : 'private' })
+      .eq('user_id', session.user.id);
+  } catch {
+    // melhor-esforço: a preferência local já valeu; tenta de novo numa próxima alternância
   }
 }
 

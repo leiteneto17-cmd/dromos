@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, SectionTitle } from '@/components/social-ui';
 import { Fonts } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
+import { setActivitySharing } from '@/services/activity-sync';
 import { PROVIDERS } from '@/services/ai/providers';
 import { useAI } from '@/store/ai';
 import { deleteAccount, displayName, signOut, useAuth } from '@/store/auth';
@@ -44,8 +45,10 @@ export function SettingsSheet({
   const aiHasKey = useAI((s) => s.hasKey);
   const aiActive = aiHasKey || !!user;
 
+  const shareActivities = useLibrary((s) => s.shareActivities);
   const [savingPublic, setSavingPublic] = useState(false);
   const [savingFlair, setSavingFlair] = useState(false);
+  const [savingShare, setSavingShare] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const headerName = profile?.name?.trim() || displayName(user);
@@ -54,6 +57,12 @@ export function SettingsSheet({
     setSavingPublic(true);
     await updateProfile({ is_public: next });
     setSavingPublic(false);
+  }
+
+  async function toggleShare(next: boolean) {
+    setSavingShare(true);
+    await setActivitySharing(next);
+    setSavingShare(false);
   }
 
   async function toggleFlair(next: boolean) {
@@ -157,6 +166,26 @@ export function SettingsSheet({
               value={!!profile?.is_public}
               onValueChange={togglePublic}
               disabled={savingPublic}
+              trackColor={{ true: c.green, false: c.border }}
+              thumbColor="#fff"
+            />
+          </Card>
+
+          {/* Compartilhar leituras — a pessoa ESCOLHE se as sessões vão para o feed (§4.8).
+              Off = visibility 'private' (só você vê), inclusive nas atividades já enviadas. */}
+          <Card style={styles.row}>
+            <View style={styles.flex}>
+              <Text style={[styles.itemTitle, { color: c.text }]}>Compartilhar minhas leituras</Text>
+              <Text style={[styles.itemSub, { color: c.textFaint }]}>
+                {shareActivities
+                  ? 'Suas sessões aparecem no feed de quem te segue.'
+                  : 'Suas sessões ficam só para você — ninguém vê no feed.'}
+              </Text>
+            </View>
+            <Switch
+              value={shareActivities}
+              onValueChange={toggleShare}
+              disabled={savingShare}
               trackColor={{ true: c.green, false: c.border }}
               thumbColor="#fff"
             />
