@@ -20,11 +20,25 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- SELECT: evita ENUMERAÇÃO de todos os usuários via anon key (§4.8). Um perfil é
+-- legível se é PÚBLICO, se é o meu, ou se há follow ACEITO entre nós (qualquer direção
+-- — cobre o feed/listas de quem eu sigo). Perfis privados de estranhos ficam ocultos.
+-- (Referencia follows, cuja policy NÃO referencia profiles → sem recursão de RLS.)
 drop policy if exists "perfis legíveis por autenticados" on public.profiles;
-create policy "perfis legíveis por autenticados"
+drop policy if exists "perfis visíveis (público, eu, ou follow aceito)" on public.profiles;
+create policy "perfis visíveis (público, eu, ou follow aceito)"
   on public.profiles for select
   to authenticated
-  using (true);
+  using (
+    is_public
+    or auth.uid() = id
+    or exists (
+      select 1 from public.follows f
+      where f.status = 'accepted'
+        and ((f.follower_id = auth.uid() and f.followee_id = id)
+          or (f.followee_id = auth.uid() and f.follower_id = id))
+    )
+  );
 
 drop policy if exists "dono insere o próprio perfil" on public.profiles;
 create policy "dono insere o próprio perfil"
