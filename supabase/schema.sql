@@ -678,3 +678,67 @@ begin
   end if;
   return new;
 end; $$;
+
+-- =====================================================================
+-- ACERVO CURADO (CLAUDE.md §4.3 / [[acervo-fontes]]) — catálogo PRÓPRIO de livros
+-- (foco: TRADUÇÕES EM PT de clássicos que o Gutenberg só tem em inglês). Antes era um
+-- catalog.json no Storage; agora a fonte de verdade é ESTA tabela (mais fácil de gerir/filtrar).
+--
+-- O ARQUIVO do livro (EPUB/PDF) fica no Storage (bucket público `acervo`); aqui guardamos só
+-- os METADADOS + a URL pública. Só livros LEGAIS (domínio público ou tradução própria) — §4.3.
+-- =====================================================================
+create table if not exists public.curated_books (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  author text,
+  language text not null default 'pt',            -- idioma DO ARQUIVO: 'pt' | 'en' | ...
+  is_translated boolean not null default false,   -- true = tradução PT curada por nós
+  source_language text,                           -- idioma original (ex.: 'en') quando traduzido
+  format text not null default 'epub' check (format in ('epub', 'pdf')),
+  file_url text not null unique,                  -- URL pública do arquivo (bucket `acervo`); único (idempotência do seed)
+  cover_url text,
+  description text,
+  sort_order int not null default 0,              -- ordena a vitrine (maior = antes)
+  active boolean not null default true,           -- desligar sem apagar
+  created_at timestamptz not null default now()
+);
+
+alter table public.curated_books enable row level security;
+
+-- Catálogo é conteúdo PÚBLICO do app — qualquer logado LÊ (só os ATIVOS). A GESTÃO
+-- (inserir/editar/remover) é feita por você no painel/service_role: sem policy de escrita
+-- p/ `authenticated`, o cliente não altera o acervo.
+drop policy if exists "acervo legível" on public.curated_books;
+create policy "acervo legível" on public.curated_books
+  for select to authenticated using (active);
+
+create index if not exists curated_books_lang_idx on public.curated_books (language, sort_order desc);
+
+-- ---------- SEED inicial (opcional) — clássicos PT reais (EPUB direto do Gutenberg), só p/ a
+-- vitrine já não nascer vazia e ser testável. `on conflict` evita duplicar ao reexecutar. ----------
+insert into public.curated_books (title, author, language, format, file_url, cover_url, sort_order)
+values
+  ('Dom Casmurro', 'Machado de Assis', 'pt', 'epub',
+   'https://www.gutenberg.org/ebooks/55752.epub3.images',
+   'https://www.gutenberg.org/cache/epub/55752/pg55752.cover.medium.jpg', 100),
+  ('O Cortiço', 'Aluísio Azevedo', 'pt', 'epub',
+   'https://www.gutenberg.org/ebooks/69187.epub3.images',
+   'https://www.gutenberg.org/cache/epub/69187/pg69187.cover.medium.jpg', 90)
+on conflict (file_url) do nothing;
+
+-- ---------- MODELO p/ AS SUAS TRADUÇÕES (rodar DEPOIS de subir o arquivo no bucket `acervo`):
+-- 1) Storage → bucket `acervo` (público) → upload do PDF/EPUB.
+-- 2) Copie a "URL pública" do arquivo e cole em file_url abaixo. Descomente e rode.
+--
+-- insert into public.curated_books
+--   (title, author, language, is_translated, source_language, format, file_url, cover_url, sort_order)
+-- values
+--   ('A Arte da Guerra', 'Sun Tzu', 'pt', true, 'en', 'pdf',
+--    'https://SEU-PROJETO.supabase.co/storage/v1/object/public/acervo/arte-da-guerra-pt.pdf',
+--    null, 80),
+--   ('Alice no País das Maravilhas', 'Lewis Carroll', 'pt', true, 'en', 'pdf',
+--    'https://SEU-PROJETO.supabase.co/storage/v1/object/public/acervo/alice-pt.pdf', null, 70),
+--   ('Peter Pan e Wendy', 'J. M. Barrie', 'pt', true, 'en', 'pdf',
+--    'https://SEU-PROJETO.supabase.co/storage/v1/object/public/acervo/peter-pan-pt.pdf', null, 60),
+--   ('Romeu e Julieta', 'William Shakespeare', 'pt', true, 'en', 'pdf',
+--    'https://SEU-PROJETO.supabase.co/storage/v1/object/public/acervo/romeu-julieta-pt.pdf', null, 50);

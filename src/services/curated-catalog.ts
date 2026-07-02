@@ -21,7 +21,7 @@
  * Suba o EPUB no Storage (bucket público `acervo`) e cole a URL pública em `epubUrl`.
  */
 import type { CatalogBook, CatalogLang } from '@/services/catalog';
-import { SUPABASE_URL } from '@/services/supabase';
+import { SUPABASE_URL, supabase } from '@/services/supabase';
 
 export type CuratedEntry = {
   title: string;
@@ -30,6 +30,8 @@ export type CuratedEntry = {
   language: string;
   epubUrl: string;
   coverUrl?: string | null;
+  /** Formato do arquivo (default 'epub'). O acervo próprio pode ter PDF. */
+  format?: 'epub' | 'pdf';
 };
 
 /** Manifesto no Storage (bucket público `acervo`). Vazio se o Supabase não está configurado. */
@@ -95,17 +97,54 @@ function toCatalogBook(e: CuratedEntry, i: number): CatalogBook {
     language: e.language,
     coverUrl: e.coverUrl ?? null,
     epubUrl: e.epubUrl,
+    format: e.format === 'pdf' ? 'pdf' : 'epub',
   };
+}
+
+/** Lê o acervo da TABELA `curated_books` (fonte de verdade). null se sem Supabase/vazio/erro. */
+async function loadFromDB(): Promise<CuratedEntry[] | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('curated_books')
+      .select('title, author, language, format, file_url, cover_url')
+      .eq('active', true)
+      .order('sort_order', { ascending: false });
+    if (error || !data || data.length === 0) return null;
+    return (data as {
+      title: string;
+      author: string | null;
+      language: string | null;
+      format: string | null;
+      file_url: string;
+      cover_url: string | null;
+    }[]).map((r) => ({
+      title: r.title,
+      author: r.author ?? '',
+      language: r.language ?? 'pt',
+      epubUrl: r.file_url,
+      coverUrl: r.cover_url,
+      format: r.format === 'pdf' ? 'pdf' : 'epub',
+    }));
+  } catch {
+    return null; // offline / tabela ainda não criada → cai no JSON/semente
+  }
 }
 
 /** Cache de sessão (reinicia o app para reler o manifesto). */
 let cache: CatalogBook[] | null = null;
 
-/** Carrega o acervo curado (manifesto remoto → senão a semente). Memoiza na sessão. */
+/**
+ * Carrega o acervo curado. Ordem de prioridade:
+ *   1. TABELA `curated_books` no Supabase (fonte de verdade — gerida por SQL/painel);
+ *   2. manifesto `catalog.json` no Storage (legado);
+ *   3. LISTA-SEMENTE embutida (offline / nada configurado).
+ * Memoiza na sessão (reinicie o app para reler).
+ */
 export async function loadCurated(): Promise<CatalogBook[]> {
   if (cache) return cache;
-  let entries: CuratedEntry[] = SEED;
-  if (MANIFEST_URL) {
+  let entries: CuratedEntry[] | null = await loadFromDB();
+  if (!entries && MANIFEST_URL) {
     try {
       const r = await fetch(MANIFEST_URL);
       if (r.ok) {
@@ -116,7 +155,7 @@ export async function loadCurated(): Promise<CatalogBook[]> {
       // offline / manifesto ainda não existe → usa a semente embutida
     }
   }
-  cache = entries.filter((e) => e?.title && e?.epubUrl).map(toCatalogBook);
+  cache = (entries ?? SEED).filter((e) => e?.title && e?.epubUrl).map(toCatalogBook);
   return cache;
 }
 

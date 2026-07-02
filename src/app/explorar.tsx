@@ -119,11 +119,12 @@ export default function ExplorarScreen() {
     // português no app" do card).
     const ptAuto = !!(book.language && book.language !== 'pt');
     const readerTarget = ptAuto ? { pathname: '/reader' as const, params: { pt: '1' } } : '/reader';
+    const fmt = book.format ?? 'epub'; // acervo curado pode ser PDF; catálogos externos são EPUB
 
     // Já está na biblioteca? Abre em vez de baixar de novo.
     const dup = useLibrary
       .getState()
-      .books.find((b) => b.format === 'epub' && b.name === book.title);
+      .books.find((b) => b.format === fmt && b.name === book.title);
     if (dup) {
       useLibrary.getState().openBook(dup.id);
       router.navigate(readerTarget);
@@ -133,14 +134,14 @@ export default function ExplorarScreen() {
     setDownloadingId(book.id);
     try {
       const url = await resolveEpubUrl(book);
-      if (!url) throw new Error('EPUB indisponível para este título.');
+      if (!url) throw new Error('Arquivo indisponível para este título.');
       // O servidor do Project Gutenberg às vezes responde devagar (timeout de leitura).
       // Tentamos até 2 vezes antes de desistir.
       let f: File | null = null;
       let lastErr: unknown;
       for (let attempt = 0; attempt < 2 && !f; attempt++) {
         try {
-          const dest = new File(Paths.document, `book-${Date.now()}-${attempt}.epub`);
+          const dest = new File(Paths.document, `book-${Date.now()}-${attempt}.${fmt}`);
           f = await File.downloadFileAsync(url, dest);
         } catch (e) {
           lastErr = e;
@@ -163,10 +164,10 @@ export default function ExplorarScreen() {
       const imported: ImportedBook = {
         id,
         name: book.title,
-        fileName: `${book.title}.epub`,
+        fileName: `${book.title}.${fmt}`,
         uri: f.uri,
         size: f.size ?? undefined,
-        format: 'epub',
+        format: fmt,
         addedAt: Date.now(),
         coverUrl,
       };

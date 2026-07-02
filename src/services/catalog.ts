@@ -22,6 +22,8 @@ export type CatalogBook = {
   /** Conhecido no Gutenberg; no Archive resolvemos na hora de baixar (resolveEpubUrl). */
   epubUrl: string | null;
   iaIdentifier?: string;
+  /** Formato do arquivo p/ o download (default 'epub'). O acervo curado pode ter PDF. */
+  format?: 'epub' | 'pdf';
 };
 
 export type CatalogPage = { results: CatalogBook[]; hasNext: boolean };
