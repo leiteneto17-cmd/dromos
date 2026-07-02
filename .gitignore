@@ -46,3 +46,6 @@ example
 # generated native folders
 /ios
 /android
+
+# datasets locais (PDFs de treino/tradução) — não versionar binários grandes
+docs/datasets-livros-traducao/
