@@ -19,8 +19,9 @@ import { importBookFlow } from '@/app/(tabs)/biblioteca';
 import { BottomTabInset } from '@/constants/theme';
 import { restoreActivities } from '@/services/activity-sync';
 import { backfillCovers } from '@/services/cover-backfill';
+import { computeDesafios } from '@/services/desafios';
 import { getUnreadCount } from '@/services/notifications';
-import { deriveStats } from '@/services/progress';
+import { deriveGoal, deriveStats } from '@/services/progress';
 import { displayName, useAuth } from '@/store/auth';
 import { useLibrary, type ImportedBook } from '@/store/library';
 import { useProfile } from '@/store/profile';
@@ -67,11 +68,31 @@ export default function HubScreen() {
   const user = useAuth((s) => s.user);
   const profile = useProfile((s) => s.profile);
 
+  const goals = useLibrary((s) => s.goals);
+  const bookPages = useLibrary((s) => s.bookPages);
+
   const derived = deriveStats(stats);
   const current = books.find((b) => b.id === currentBookId) ?? books[0] ?? null;
   const pct = current ? Math.round((progress[current.id] ?? 0) * 100) : 0;
   const weekMinutes = derived.last7.reduce((a, day) => a + day.minutes, 0);
   const lastSession = sessions[0] ?? null;
+
+  // --- Home do Hábito (alma do app = Strava social + bons hábitos, 2026-07-02) ---
+  // Tudo derivado do que já existe: streak/last7 (deriveStats), metas e desafios locais.
+  const readToday = (derived.last7[6]?.minutes ?? 0) > 0;
+  const activeGoal = goals.find((g) => !g.doneAt) ?? null;
+  const goalProg = activeGoal
+    ? deriveGoal(
+        activeGoal,
+        stats,
+        activeGoal.bookId
+          ? { progress: progress[activeGoal.bookId] ?? 0, pages: bookPages[activeGoal.bookId] ?? 0 }
+          : undefined,
+      )
+    : null;
+  const desafios = computeDesafios(stats, sessions);
+  // Destaque: o desafio em aberto mais perto de completar (senão o primeiro concluído).
+  const topDesafio = desafios.filter((d) => !d.done).sort((a, b) => b.pct - a.pct)[0] ?? desafios[0];
 
   const name = profile?.name?.trim() || displayName(user);
   const firstName = name.split(' ')[0];
@@ -144,6 +165,56 @@ export default function HubScreen() {
 
           <Text style={styles.bigTitle}>Olá, {firstName}</Text>
 
+          {/* HÁBITO — streak-herói + semana em bolinhas + meta do dia (estilo Duolingo/Strava).
+              Toque no card → estatísticas; na linha da meta → Metas. */}
+          <Pressable onPress={() => router.navigate('/estatisticas')}>
+            <View style={styles.feedCard}>
+              <View style={styles.habitTop}>
+                <Text style={styles.habitFlame}>🔥</Text>
+                <View style={styles.habitTitles}>
+                  <Text style={styles.habitStreak}>
+                    {derived.streak} {derived.streak === 1 ? 'dia seguido' : 'dias seguidos'}
+                  </Text>
+                  <Text style={styles.habitHint}>
+                    {readToday
+                      ? 'Chama acesa hoje! Continue assim.'
+                      : derived.streak > 0
+                        ? 'Leia hoje para manter a chama.'
+                        : 'Leia alguns minutos e acenda a chama.'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.habitWeek}>
+                {derived.last7.map((d, i) => (
+                  <View key={d.key} style={styles.habitDayCol}>
+                    <View
+                      style={[
+                        styles.habitDot,
+                        d.minutes > 0 && styles.habitDotOn,
+                        i === 6 && styles.habitDotToday,
+                      ]}>
+                      {d.minutes > 0 ? <Text style={styles.habitDotCheck}>✓</Text> : null}
+                    </View>
+                    <Text style={styles.habitDayLabel}>{d.label}</Text>
+                  </View>
+                ))}
+              </View>
+              <Pressable
+                onPress={() => router.navigate('/conquistas')}
+                hitSlop={6}
+                style={styles.habitGoalRow}>
+                <Text style={styles.habitGoalText} numberOfLines={1}>
+                  {activeGoal && goalProg
+                    ? goalProg.done
+                      ? `🎯 ${activeGoal.title} — concluída! 🎉`
+                      : `🎯 ${activeGoal.title} · ~${goalProg.perDay} ${goalProg.unit}/dia · ${goalProg.daysLeft}d`
+                    : '🎯 Definir uma meta de leitura'}
+                </Text>
+                <Text style={styles.habitGoalArrow}>›</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+
           {/* Lendo agora — card hero roxo (progresso real) */}
           <Pressable onPress={continueReading}>
             <View style={styles.hero}>
@@ -207,6 +278,29 @@ export default function HubScreen() {
               <WeekBars data={derived.last7} />
             </View>
           </Pressable>
+
+          {/* Desafios (estilo Strava Challenges) — destaca o mais perto de completar. */}
+          {topDesafio ? (
+            <Pressable onPress={() => router.navigate('/desafios')}>
+              <View style={styles.feedCard}>
+                <View style={styles.weekHead}>
+                  <Text style={styles.feedKicker}>🏆 Desafios</Text>
+                  <Text style={styles.feedShare}>Ver todos ›</Text>
+                </View>
+                <Text style={styles.desafioTitle}>
+                  {topDesafio.icon} {topDesafio.title}
+                </Text>
+                <View style={styles.desafioTrack}>
+                  <View style={[styles.desafioFill, { width: `${Math.round(topDesafio.pct * 100)}%` }]} />
+                </View>
+                <Text style={styles.desafioMeta}>
+                  {topDesafio.done
+                    ? 'Concluído! 🎉'
+                    : `${topDesafio.current.toLocaleString('pt-BR')} / ${topDesafio.target.toLocaleString('pt-BR')} ${topDesafio.unit}`}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
 
           {/* Banner do tier grátis — no meio do feed (visível, fora do leitor §2.5).
               No-op p/ plano pago / Expo Go. */}
@@ -372,6 +466,46 @@ const styles = StyleSheet.create({
   feedAvatarText: { fontSize: 15, color: HUB.greenInk, fontWeight: '700' },
   feedMeta: { color: HUB.cardMuted, fontSize: 12 },
   feedShare: { color: HUB.greenInk, fontSize: 13, fontWeight: '700' },
+
+  // Hábito (streak-herói + bolinhas da semana + meta do dia)
+  habitTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  habitFlame: { fontSize: 34 },
+  habitTitles: { flex: 1, minWidth: 0 },
+  habitStreak: { color: HUB.cardText, fontSize: 20, fontWeight: '800' },
+  habitHint: { color: HUB.cardMuted, fontSize: 13, marginTop: 2 },
+  habitWeek: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14, gap: 6 },
+  habitDayCol: { flex: 1, alignItems: 'center', gap: 4 },
+  habitDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: '#E4E7E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  habitDotOn: { backgroundColor: HUB.greenInk, borderColor: HUB.greenInk },
+  habitDotToday: { borderColor: HUB.purple },
+  habitDotCheck: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  habitDayLabel: { color: HUB.cardMuted, fontSize: 10.5 },
+  habitGoalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#EFF1F0',
+    gap: 8,
+  },
+  habitGoalText: { flex: 1, color: HUB.cardText, fontSize: 13.5, fontWeight: '700' },
+  habitGoalArrow: { color: HUB.purple, fontSize: 18, fontWeight: '800' },
+
+  // Desafios (faixa na Home)
+  desafioTitle: { color: HUB.cardText, fontSize: 16, fontWeight: '800', marginBottom: 10 },
+  desafioTrack: { height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: '#EFF1F0' },
+  desafioFill: { height: '100%', borderRadius: 4, backgroundColor: HUB.greenInk },
+  desafioMeta: { color: HUB.cardMuted, fontSize: 12.5, fontWeight: '700', marginTop: 8 },
 
   // Semana
   weekHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 },
