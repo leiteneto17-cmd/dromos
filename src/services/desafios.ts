@@ -36,8 +36,9 @@ function utcDayKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Os 7 dias (chaves UTC) da SEMANA atual, de segunda a domingo. */
-function semanaAtualKeys(): string[] {
+/** Os 7 dias (chaves UTC) da SEMANA atual, de segunda a domingo.
+ * Exportada: o Recap semanal (services/recap.ts) usa a MESMA janela. */
+export function semanaAtualKeys(): string[] {
   const now = new Date();
   const dow = now.getDay(); // 0=dom … 6=sáb
   const diasDesdeSegunda = (dow + 6) % 7; // seg=0 … dom=6

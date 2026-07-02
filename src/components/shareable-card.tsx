@@ -17,6 +17,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { BookTrail } from '@/components/book-trail';
 import { deriveStats, fmtHMS } from '@/services/progress';
+import type { WeekRecap } from '@/services/recap';
 import { cleanSnippet } from '@/services/text-utils';
 import { Social, SocialGradient } from '@/theme/social';
 import { useLibrary, type ReadingSession } from '@/store/library';
@@ -49,11 +50,14 @@ function fmtDuration(total: number): string {
 export function ShareableCard({
   variant,
   session,
+  recap,
   photoUri,
 }: {
   variant: CardVariant;
   /** Se vier, o card mostra ESTA sessão (estilo Strava); senão, o resumo geral. */
   session?: ReadingSession;
+  /** Se vier, o card mostra o RECAP da semana ("Wrapped" — services/recap.ts). */
+  recap?: WeekRecap;
   /** Foto escolhida pelo usuário (variante 'foto'). */
   photoUri?: string;
 }) {
@@ -175,6 +179,54 @@ export function ShareableCard({
     </>
   );
 
+  // ---- Card do RECAP da semana (o "Wrapped" semanal) ----
+  const recapContent = recap ? (
+    <>
+      <Text style={s.kicker}>Minha semana de leitura 📅</Text>
+      <Text style={s.weekLabel}>{recap.label}</Text>
+      <Text style={s.bigTitle}>{recap.minutes} min</Text>
+
+      <View style={s.metaRow}>
+        <Text style={s.meta}>
+          <Text style={s.metaNum}>{recap.daysActive}</Text>/7 dias
+        </Text>
+        {recap.pages > 0 ? (
+          <Text style={s.meta}>
+            <Text style={s.metaNum}>{recap.pages}</Text> {recap.pages === 1 ? 'pág' : 'págs'}
+          </Text>
+        ) : null}
+      </View>
+
+      {recap.bestDay ? (
+        <>
+          <Text style={s.section}>Melhor dia</Text>
+          <Text style={s.value}>
+            {recap.bestDay.label} <Text style={s.unit}>· {recap.bestDay.minutes} min</Text>
+          </Text>
+        </>
+      ) : (
+        <Text style={s.quoteEmpty}>A semana está só começando —{'\n'}leia hoje e volte aqui. 😉</Text>
+      )}
+
+      {recap.books.length > 0 ? (
+        <>
+          <Text style={s.section}>{recap.books.length === 1 ? 'Livro da semana' : 'Livros da semana'}</Text>
+          <Text style={[s.label, s.centered]} numberOfLines={2}>
+            {recap.books.slice(0, 3).join(' · ')}
+          </Text>
+        </>
+      ) : null}
+
+      <View style={s.streakBox}>
+        <Text style={s.streak}>
+          🔥 {recap.streak} {recap.streak === 1 ? 'dia seguido' : 'dias seguidos'}
+        </Text>
+      </View>
+
+      <Text style={s.logo}>✦ Dromos</Text>
+    </>
+  ) : null;
+
   // ---- Card de CITAÇÃO (trecho marcado + título do livro) ----
   const quoteContent = (
     <>
@@ -197,7 +249,8 @@ export function ShareableCard({
     </>
   );
 
-  const content = variant === 'citacao' ? quoteContent : sessionContent ?? generalContent;
+  const content =
+    variant === 'citacao' ? quoteContent : recapContent ?? sessionContent ?? generalContent;
 
   if (variant === 'transparente') {
     // Fundo transparente → o PNG capturado fica sem fundo (sticker p/ Story).
@@ -280,6 +333,8 @@ const s = StyleSheet.create({
     textShadowRadius: 14,
     marginTop: 2,
   },
+  weekLabel: { color: Social.muted, fontSize: 14, fontWeight: '700', marginTop: 2 },
+  centered: { textAlign: 'center' },
   metaRow: { flexDirection: 'row', gap: 22, marginTop: 4 },
   meta: { color: Social.white, fontSize: 18 },
   metaNum: { color: Social.green, fontWeight: '800' },

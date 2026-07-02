@@ -33,6 +33,7 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 
 import { CARD_VARIANTS, ShareableCard, type CardVariant } from '@/components/shareable-card';
 import { useUI } from '@/hooks/use-ui';
+import { computeWeekRecap } from '@/services/recap';
 import { useLibrary } from '@/store/library';
 
 const SCREEN = Dimensions.get('window').width;
@@ -61,7 +62,8 @@ function Checkerboard() {
 export default function ShareScreen() {
   const c = useUI();
   // Se veio `?model=`, abre o carrossel já naquele modelo (ex.: 'citacao' vindo do leitor).
-  const params = useLocalSearchParams<{ sessionId?: string; model?: string }>();
+  // `?recap=1` mostra o RECAP da semana em vez da sessão/resumo geral.
+  const params = useLocalSearchParams<{ sessionId?: string; model?: string; recap?: string }>();
   const initialIndex = Math.max(0, CARD_VARIANTS.findIndex((v) => v.id === params.model));
   const [index, setIndex] = useState(initialIndex);
   const [busy, setBusy] = useState(false);
@@ -72,6 +74,10 @@ export default function ShareScreen() {
   const session = useLibrary((s) => s.sessions.find((x) => x.id === params.sessionId));
   const books = useLibrary((s) => s.books);
   const currentBookId = useLibrary((s) => s.currentBookId);
+  const stats = useLibrary((s) => s.stats);
+  const sessions = useLibrary((s) => s.sessions);
+  // Recap da semana (?recap=1): derivado na hora dos dados locais (services/recap.ts).
+  const recap = params.recap ? computeWeekRecap(stats, sessions) : undefined;
 
   const variant: CardVariant = CARD_VARIANTS[index].id;
 
@@ -247,7 +253,7 @@ export default function ShareScreen() {
             <Text style={[styles.back, { color: c.textDim }]}>‹ Voltar</Text>
           </Pressable>
           <Text style={[styles.title, { color: c.text }]}>
-            {session ? 'Compartilhar atividade' : 'Compartilhar'}
+            {recap ? 'Recap da semana' : session ? 'Compartilhar atividade' : 'Compartilhar'}
           </Text>
           <View style={{ width: 60 }} />
         </View>
@@ -272,7 +278,7 @@ export default function ShareScreen() {
                     shotRefs.current[i] = r;
                   }}
                   style={styles.shot}>
-                  <ShareableCard variant={item.id} session={session} photoUri={photoUri} />
+                  <ShareableCard variant={item.id} session={session} recap={recap} photoUri={photoUri} />
                 </ViewShot>
               </View>
             </View>

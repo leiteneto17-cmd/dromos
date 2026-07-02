@@ -276,6 +276,13 @@ export default function HubScreen() {
                 <Text style={styles.weekTotal}>{weekMinutes} min</Text>
               </View>
               <WeekBars data={derived.last7} />
+              {/* Recap semanal ("Wrapped") → carrossel do card compartilhável */}
+              <Pressable
+                onPress={() => router.navigate({ pathname: '/compartilhar', params: { recap: '1' } })}
+                hitSlop={6}
+                style={styles.recapRow}>
+                <Text style={styles.feedShare}>📤 Compartilhar minha semana ›</Text>
+              </Pressable>
             </View>
           </Pressable>
 
@@ -500,6 +507,8 @@ const styles = StyleSheet.create({
   },
   habitGoalText: { flex: 1, color: HUB.cardText, fontSize: 13.5, fontWeight: '700' },
   habitGoalArrow: { color: HUB.purple, fontSize: 18, fontWeight: '800' },
+
+  recapRow: { alignItems: 'flex-end', marginTop: 12 },
 
   // Desafios (faixa na Home)
   desafioTitle: { color: HUB.cardText, fontSize: 16, fontWeight: '800', marginBottom: 10 },
