@@ -63,7 +63,7 @@ export default function RootLayout() {
         <Stack.Protected guard={allowed}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="reader" />
-          <Stack.Screen name="biblioteca" />
+          <Stack.Screen name="estatisticas" />
           <Stack.Screen name="explorar" />
           <Stack.Screen name="compartilhar" />
           <Stack.Screen name="conquistas" />

@@ -1,6 +1,7 @@
 /**
- * Biblioteca completa — importar e gerenciar os livros (.epub / .pdf).
- * Rota empilhada, alcançada pelo HUB ("Ver biblioteca" / "+ Importar").
+ * Aba Biblioteca — importar e gerenciar os livros (.epub / .pdf).
+ * Promovida a ABA em 2026-07-01 (ocupou o slot da ex-aba Atividades — a nav agora
+ * reflete o core do app: ler livros). A rota continua /biblioteca (grupo não muda a URL).
  * Toque num livro → abre o leitor (/reader). Pressão longa → remover.
  * Usa a pele social (roxo+verde), igual ao restante da camada de navegação.
  */
@@ -181,9 +182,6 @@ export default function LibraryScreen() {
   return (
     <ScreenBG scroll={false}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.back}>
-          <Text style={[styles.backText, { color: c.textDim }]}>‹ Voltar</Text>
-        </Pressable>
         <View style={styles.headerActions}>
           <Pressable
             onPress={() => router.navigate('/explorar')}
@@ -263,10 +261,8 @@ export default function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 8 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  back: { paddingVertical: 4, paddingRight: 8 },
-  backText: { fontSize: 16, fontWeight: '600' },
   importBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
   importText: { fontWeight: '700', fontSize: 14 },
   title: { fontSize: 28, fontWeight: '800', marginBottom: 4 },

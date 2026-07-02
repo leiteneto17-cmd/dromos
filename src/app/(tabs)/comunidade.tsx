@@ -1,5 +1,6 @@
 /**
- * Aba Comunidade — DESCOBERTA de livros, estilo Skoob. Busca num catálogo público
+ * Aba Comunidade — o lar SOCIAL do app: feed "Seguindo" (leituras de quem você segue,
+ * com Logos 📜) + DESCOBERTA de livros, estilo Skoob. Busca num catálogo público
  * (Google Books + Open Library, regionalizado por idioma) com resultados AO VIVO,
  * grade "Em alta" e "Populares na comunidade". Tocar num livro abre a página dele
  * (/livro), onde se cataloga na estante, avalia e vê quem está lendo.
@@ -7,11 +8,18 @@
  * NOTA (2026-06-21): a "Minha estante" foi MOVIDA para a aba Leitura (hub) —
  * componente `components/my-shelf.tsx`. Aqui só ficou a descoberta + indicador "✓"
  * de quais resultados já estão na sua estante.
+ * NOTA (2026-07-01): o feed "Seguindo" veio da ex-aba Atividades (removida) — o feed
+ * dos seguidos é o conteúdo social mais valioso e agora abre por padrão (era recolhido).
+ * As estatísticas/sessões daquela aba viraram a tela /estatisticas.
+ * NOTA (2026-07-01b): anti-rolagem — "Em alta" e "Populares" viraram CARROSSÉIS horizontais
+ * (padrão prateleira, Netflix/Skoob) e os chips Livros/Pessoas + idioma só aparecem com a
+ * busca ativa (padrão iOS: controles de busca são contextuais). Hierarquia: feed primeiro
+ * (vertical), descoberta depois (horizontal, explorar é opcional).
  */
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
@@ -25,16 +33,48 @@ import {
   type PopularBook,
   type ShelfItem,
 } from '@/services/community';
-import { searchUsers, type PublicProfile } from '@/services/social';
+import { getFeed, searchUsers, toggleKudo, type FeedItem, type PublicProfile } from '@/services/social';
 import { useAuth } from '@/store/auth';
+
+/** Quantos itens do feed "Seguindo" mostrar antes do "Ver mais" (não vira lista infinita). */
+const FEED_PREVIEW = 5;
+
+/** Sugestões de busca (chips) — aparecem com a busca aberta e vazia, como os
+ * QUICK_SEARCHES do Explorar, mas adaptadas ao catálogo (Google Books/Open Library):
+ * autores clássicos + séries populares funcionam bem em PT. */
+const SEARCH_SUGGESTIONS = [
+  'Machado de Assis',
+  'Clarice Lispector',
+  'Jane Austen',
+  'Dostoiévski',
+  'Agatha Christie',
+  'George Orwell',
+  'Harry Potter',
+  'Sherlock Holmes',
+];
+
+/** Data amigável da atividade: "hoje 14:30", "ontem 09:10" ou "12/06/2026". Usa data
+ * LOCAL (não UTC) para casar com a hora local exibida — senão erra "hoje/ontem" perto
+ * da meia-noite. */
+function fmtFeedDate(ts: number): string {
+  const d = new Date(ts);
+  const localKey = (x: Date) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const hhmm = d.toTimeString().slice(0, 5);
+  if (localKey(d) === localKey(today)) return `hoje ${hhmm}`;
+  if (localKey(d) === localKey(yesterday)) return `ontem ${hhmm}`;
+  return d.toLocaleDateString('pt-BR');
+}
 
 type SearchMode = 'books' | 'people';
 
-type CoverSize = 'sm' | 'grid';
+type CoverSize = 'sm' | 'shelf';
 
 function Cover({ uri, size = 'sm' }: { uri?: string | null; size?: CoverSize }) {
   const c = useUI();
-  const dim = size === 'grid' ? styles.gridCover : styles.coverSm;
+  const dim = size === 'shelf' ? styles.shelfCover : styles.coverSm;
   if (uri) return <Image source={{ uri }} style={[styles.cover, dim]} contentFit="cover" transition={150} />;
   return (
     <View style={[styles.cover, dim, { backgroundColor: c.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
@@ -55,21 +95,28 @@ export default function CommunityScreen() {
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [lang, setLang] = useState<LangFilter>('pt');
+  // Busca "aberta" = mostra os chips Livros/Pessoas + idioma (contextuais). Abre ao focar
+  // o campo e só fecha no "Fechar"/"‹ Voltar" (blur não fecha — senão tocar num chip fecharia).
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const [featured, setFeatured] = useState<CatalogBook[]>([]);
   const [shelf, setShelf] = useState<ShelfItem[]>([]); // só p/ o indicador "✓ / status"
   const [popular, setPopular] = useState<PopularBook[]>([]);
+  const [feed, setFeed] = useState<FeedItem[]>([]); // "Seguindo" — leituras de quem sigo
+  const [feedExpanded, setFeedExpanded] = useState(false); // mostra poucas e expande
 
   const load = useCallback(async () => {
     featuredBooks(lang).then(setFeatured);
     if (!user) {
       setShelf([]);
       setPopular([]);
+      setFeed([]);
       return;
     }
-    const [sh, pop] = await Promise.all([getMyShelf(), getPopularBooks()]);
+    const [sh, pop, fd] = await Promise.all([getMyShelf(), getPopularBooks(), getFeed()]);
     setShelf(sh);
     setPopular(pop);
+    setFeed(fd);
   }, [user, lang]);
 
   useFocusEffect(
@@ -125,6 +172,14 @@ export default function CommunityScreen() {
     setSearched(false);
   }, []);
 
+  // Fecha a experiência de busca inteira (limpa, esconde os chips e volta p/ livros).
+  const closeSearch = useCallback(() => {
+    clearSearch();
+    setSearchOpen(false);
+    setMode('books');
+    Keyboard.dismiss();
+  }, [clearSearch]);
+
   // Trocar de modo limpa a busca atual (livros e pessoas têm resultados diferentes).
   const switchMode = useCallback(
     (m: SearchMode) => {
@@ -136,6 +191,20 @@ export default function CommunityScreen() {
 
   const openUser = useCallback((p: PublicProfile) => {
     router.push({ pathname: '/usuario', params: { id: p.id, name: p.name ?? '' } });
+  }, []);
+
+  // Logos 📜 (kudo): otimista — atualiza na hora e reverte se der erro.
+  const onKudo = useCallback(async (item: FeedItem) => {
+    const on = !item.iKudoed;
+    setFeed((prev) =>
+      prev.map((f) => (f.id === item.id ? { ...f, iKudoed: on, kudos: f.kudos + (on ? 1 : -1) } : f)),
+    );
+    const err = await toggleKudo(item.id, on);
+    if (err) {
+      setFeed((prev) =>
+        prev.map((f) => (f.id === item.id ? { ...f, iKudoed: !on, kudos: f.kudos + (on ? -1 : 1) } : f)),
+      );
+    }
   }, []);
 
   // Abre a página do livro. Da busca/Em alta passa o livro inteiro (JSON) p/ não re-buscar.
@@ -175,33 +244,13 @@ export default function CommunityScreen() {
         </Card>
       ) : (
         <>
-          {/* Seletor: buscar livros (catálogo) ou pessoas (leitores p/ seguir) */}
-          <View style={styles.modeRow}>
-            {([
-              ['books', '📚 Livros'],
-              ['people', '👥 Pessoas'],
-            ] as const).map(([m, label]) => {
-              const active = mode === m;
-              return (
-                <Pressable
-                  key={m}
-                  onPress={() => switchMode(m)}
-                  style={[
-                    styles.modeChip,
-                    { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' },
-                  ]}>
-                  <Text style={[styles.modeText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Campo de busca (livros no catálogo / pessoas por nome) */}
+          {/* Campo de busca (livros no catálogo / pessoas por nome). Focar abre os chips. */}
           <View style={styles.searchRow}>
             <View style={[styles.inputWrap, { backgroundColor: c.card, borderColor: c.border }]}>
               <TextInput
                 value={query}
                 onChangeText={setQuery}
+                onFocus={() => setSearchOpen(true)}
                 onSubmitEditing={() => Keyboard.dismiss()}
                 placeholder={mode === 'people' ? 'Buscar leitor pelo nome…' : 'Buscar livro ou autor…'}
                 placeholderTextColor={c.textFaint}
@@ -214,34 +263,79 @@ export default function CommunityScreen() {
                 </Pressable>
               ) : null}
             </View>
-            <Pressable onPress={() => Keyboard.dismiss()} style={[styles.searchBtn, { backgroundColor: c.green }]}>
+            {/* Sem texto, o botão fecha a busca (chips somem); com texto, é o "Buscar". */}
+            <Pressable
+              onPress={() => (query.trim() ? Keyboard.dismiss() : searchOpen ? closeSearch() : setSearchOpen(true))}
+              style={[styles.searchBtn, { backgroundColor: c.green }]}>
               {searching ? (
                 <ActivityIndicator size="small" color={c.onGreen} />
               ) : (
-                <Text style={[styles.searchBtnText, { color: c.onGreen }]}>Buscar</Text>
+                <Text style={[styles.searchBtnText, { color: c.onGreen }]}>
+                  {searchOpen && !query.trim() ? 'Fechar' : 'Buscar'}
+                </Text>
               )}
             </Pressable>
           </View>
 
-          {/* Idioma (regionalização) — só faz sentido na busca de livros */}
-          {mode === 'books' ? (
-            <View style={styles.langRow}>
-              {([
-                ['pt', '🇧🇷 Português'],
-                ['en', '🇺🇸 Inglês'],
-                ['all', '🌐 Todos'],
-              ] as const).map(([l, label]) => {
-                const active = lang === l;
-                return (
-                  <Pressable
-                    key={l}
-                    onPress={() => setLang(l)}
-                    style={[styles.langChip, { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' }]}>
-                    <Text style={[styles.langText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+          {/* Controles CONTEXTUAIS da busca (anti-rolagem: só aparecem com a busca aberta) */}
+          {searchOpen ? (
+            <>
+              {/* Seletor: buscar livros (catálogo) ou pessoas (leitores p/ seguir) */}
+              <View style={styles.modeRow}>
+                {([
+                  ['books', '📚 Livros'],
+                  ['people', '👥 Pessoas'],
+                ] as const).map(([m, label]) => {
+                  const active = mode === m;
+                  return (
+                    <Pressable
+                      key={m}
+                      onPress={() => switchMode(m)}
+                      style={[
+                        styles.modeChip,
+                        { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' },
+                      ]}>
+                      <Text style={[styles.modeText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Idioma (regionalização) — só faz sentido na busca de livros */}
+              {mode === 'books' ? (
+                <View style={styles.langRow}>
+                  {([
+                    ['pt', '🇧🇷 Português'],
+                    ['en', '🇺🇸 Inglês'],
+                    ['all', '🌐 Todos'],
+                  ] as const).map(([l, label]) => {
+                    const active = lang === l;
+                    return (
+                      <Pressable
+                        key={l}
+                        onPress={() => setLang(l)}
+                        style={[styles.langChip, { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' }]}>
+                        <Text style={[styles.langText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+
+              {/* Sugestões — atalhos de busca pronta (praticidade: 1 toque já busca) */}
+              {mode === 'books' && query.trim().length < 2 ? (
+                <View style={styles.suggestWrap}>
+                  {SEARCH_SUGGESTIONS.map((s) => (
+                    <Pressable
+                      key={s}
+                      onPress={() => setQuery(s)}
+                      style={[styles.suggestChip, { borderColor: c.border, backgroundColor: c.card }]}>
+                      <Text style={[styles.suggestText, { color: c.textDim }]}>🔎 {s}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </>
           ) : null}
 
           {/* Banner do tier grátis — abaixo da busca (visível, fora do leitor §2.5). */}
@@ -254,7 +348,7 @@ export default function CommunityScreen() {
                 <Text style={[styles.resultsTitle, { color: c.purple }]}>
                   {mode === 'people' ? '🔎 Pessoas' : '🔎 Resultados'}
                 </Text>
-                <Pressable onPress={clearSearch} hitSlop={8}>
+                <Pressable onPress={closeSearch} hitSlop={8}>
                   <Text style={[styles.clearLink, { color: c.green }]}>‹ Voltar</Text>
                 </Pressable>
               </View>
@@ -347,21 +441,92 @@ export default function CommunityScreen() {
               </Text>
             )
           ) : (
-            /* ---- Tela inicial (livros): Em alta + Populares ---- */
+            /* ---- Tela inicial (livros): Seguindo + Em alta + Populares ---- */
             <>
+              {/* Feed "Seguindo" — leituras de quem você segue (§2.6, veio da ex-aba Atividades) */}
+              {user ? (
+                <>
+                  <SectionTitle name="users">Seguindo</SectionTitle>
+                  {feed.length === 0 ? (
+                    <Text style={[styles.hint, { color: c.textFaint, marginBottom: 6 }]}>
+                      Siga leitores (busque em 👥 Pessoas ou toque no nome de quem escreve resenhas) — as
+                      leituras deles aparecem aqui.
+                    </Text>
+                  ) : (
+                    <>
+                      {(feedExpanded ? feed : feed.slice(0, FEED_PREVIEW)).map((f) => (
+                        <Card key={f.id} style={styles.feedRow}>
+                          <Pressable
+                            onPress={() =>
+                              router.push({ pathname: '/usuario', params: { id: f.user_id, name: f.author_name } })
+                            }>
+                            <Text style={styles.feedAvatar}>{f.author_avatar || '🦉'}</Text>
+                          </Pressable>
+                          <View style={styles.flex}>
+                            <Text style={[styles.feedWho, { color: c.text }]} numberOfLines={1}>
+                              <Text style={{ fontWeight: '800', color: f.author_founder ? c.green : c.text }}>
+                                {f.author_name}
+                                {f.author_founder ? ' 👑' : ''}
+                              </Text>{' '}
+                              leu
+                            </Text>
+                            <Text style={[styles.feedBook, { color: c.textDim }]} numberOfLines={1}>
+                              {f.book_title}
+                            </Text>
+                            <Text style={[styles.feedMeta, { color: c.textFaint }]}>
+                              {fmtFeedDate(new Date(f.created_at).getTime())} ·{' '}
+                              {Math.max(1, Math.round(f.seconds / 60))} min
+                              {f.pages ? ` · ${f.pages} ${f.pages === 1 ? 'pág' : 'págs'}` : ''}
+                            </Text>
+                          </View>
+                          <Pressable
+                            onPress={() => onKudo(f)}
+                            hitSlop={8}
+                            style={styles.kudoBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              f.iKudoed
+                                ? `Tirar seu Logos (${f.kudos})`
+                                : f.kudos > 0
+                                  ? `Dar um Logos — ${f.kudos} Logos`
+                                  : 'Dar um Logos'
+                            }>
+                            {/* "Logos" 📜 = a interação social (antigo "kudo" do Strava) */}
+                            <Text style={[styles.kudoIcon, { opacity: f.iKudoed ? 1 : 0.4 }]}>📜</Text>
+                            {f.kudos > 0 ? (
+                              <Text style={[styles.kudoCount, { color: f.iKudoed ? c.green : c.textFaint }]}>
+                                {f.kudos}
+                              </Text>
+                            ) : null}
+                          </Pressable>
+                        </Card>
+                      ))}
+                      {feed.length > FEED_PREVIEW ? (
+                        <Pressable onPress={() => setFeedExpanded((v) => !v)} style={styles.moreBtn}>
+                          <Text style={[styles.moreText, { color: c.purple }]}>
+                            {feedExpanded ? 'Ver menos ▴' : `Ver mais (${feed.length}) ▾`}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </>
+                  )}
+                </>
+              ) : null}
+
               {featured.length > 0 ? (
                 <>
                   <SectionTitle name="trendingUp">Em alta</SectionTitle>
-                  <View style={styles.grid}>
+                  {/* Prateleira horizontal (anti-rolagem): explorar é deslizar pro lado. */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
                     {featured.map((b) => (
-                      <Pressable key={`${b.source}-${b.id}`} style={styles.gridCell} onPress={() => openCatalog(b)}>
-                        <Cover uri={b.coverUrl} size="grid" />
-                        <Text style={[styles.gridTitle, { color: c.text }]} numberOfLines={2}>
+                      <Pressable key={`${b.source}-${b.id}`} style={styles.shelfCell} onPress={() => openCatalog(b)}>
+                        <Cover uri={b.coverUrl} size="shelf" />
+                        <Text style={[styles.shelfTitle, { color: c.text }]} numberOfLines={2}>
                           {b.title}
                         </Text>
                       </Pressable>
                     ))}
-                  </View>
+                  </ScrollView>
                 </>
               ) : null}
 
@@ -380,26 +545,25 @@ export default function CommunityScreen() {
               ) : popular.length > 0 ? (
                 <>
                   <SectionTitle name="flame">Populares na comunidade</SectionTitle>
-                  {popular.slice(0, 10).map((p) => (
-                    <Pressable key={p.book_key} onPress={() => openPopular(p)}>
-                      <Card style={styles.row}>
-                        <Cover uri={p.cover_url} />
-                        <View style={styles.rowBody}>
-                          <Text style={[styles.bookTitle, { color: c.text }]} numberOfLines={2}>
-                            {p.book_title}
-                          </Text>
-                          <Text style={[styles.readers, { color: c.textFaint }]}>👥 {p.reader_count} leitores</Text>
-                        </View>
-                        <Text style={[styles.addChip, { color: shelfByKey.has(p.book_key) ? c.green : c.purple }]}>
-                          {shelfByKey.has(p.book_key) ? '✓' : '+ Estante'}
+                  {/* Mesma prateleira horizontal do "Em alta" (✓ = já está na sua estante). */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
+                    {popular.slice(0, 10).map((p) => (
+                      <Pressable key={p.book_key} style={styles.shelfCell} onPress={() => openPopular(p)}>
+                        <Cover uri={p.cover_url} size="shelf" />
+                        <Text style={[styles.shelfTitle, { color: c.text }]} numberOfLines={2}>
+                          {p.book_title}
                         </Text>
-                      </Card>
-                    </Pressable>
-                  ))}
+                        <Text style={[styles.shelfMeta, { color: shelfByKey.has(p.book_key) ? c.green : c.textFaint }]}>
+                          👥 {p.reader_count}
+                          {shelfByKey.has(p.book_key) ? ' · ✓' : ''}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
                 </>
               ) : (
                 <Text style={[styles.hint, { color: c.textFaint }]}>
-                  Busque um livro acima para começar. Sua estante fica na aba Leitura.
+                  Busque um livro acima para começar. Sua estante fica no Perfil.
                 </Text>
               )}
             </>
@@ -438,6 +602,9 @@ const styles = StyleSheet.create({
   langRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   langChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   langText: { fontSize: 13, fontWeight: '700' },
+  suggestWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  suggestChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  suggestText: { fontSize: 13, fontWeight: '600' },
   resultsHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 10 },
   resultsTitle: { fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
   clearLink: { fontSize: 15, fontWeight: '800' },
@@ -446,15 +613,25 @@ const styles = StyleSheet.create({
   rowBody: { flex: 1 },
   cover: { borderRadius: 4, overflow: 'hidden' },
   coverSm: { width: 44, height: 64 },
-  gridCover: { width: '100%', aspectRatio: 0.66, borderRadius: 6 },
+  shelfCover: { width: 92, height: 138, borderRadius: 6 },
   bookTitle: { fontSize: 15, fontWeight: '700' },
   author: { fontSize: 13, marginTop: 2 },
-  readers: { fontSize: 12, marginTop: 4 },
   addChip: { fontSize: 13, fontWeight: '800' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridCell: { width: '31.5%', marginBottom: 16 },
-  gridTitle: { fontSize: 12, fontWeight: '600', marginTop: 6 },
+  shelfRow: { gap: 12, paddingBottom: 4 },
+  shelfCell: { width: 92 },
+  shelfTitle: { fontSize: 12, fontWeight: '600', marginTop: 6 },
+  shelfMeta: { fontSize: 11, fontWeight: '700', marginTop: 2 },
   privacy: { marginTop: 18 },
   privacyText: { fontSize: 13, lineHeight: 20 },
   ad: { marginTop: 16 },
+  feedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  feedAvatar: { fontSize: 30 },
+  feedWho: { fontSize: 14 },
+  feedBook: { fontSize: 14, fontWeight: '700', marginTop: 1 },
+  feedMeta: { fontSize: 12, marginTop: 3 },
+  kudoBtn: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, minWidth: 36 },
+  kudoIcon: { fontSize: 22 },
+  kudoCount: { fontSize: 12, fontWeight: '800', marginTop: 2 },
+  moreBtn: { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
+  moreText: { fontSize: 14, fontWeight: '700' },
 });

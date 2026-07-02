@@ -1,7 +1,8 @@
 /**
- * Aba Atividades — cada período de leitura como um "treino" (estilo Strava).
- * Usa dados REAIS (store.stats.perDay): resumo do dia, últimos 7 dias e recordes.
- * Base neutra; verde = números/ação, roxo = detalhe (CLAUDE.md §2.6/§2.7).
+ * Estatísticas — tela empilhada (ex-aba "Atividades", removida da nav em 2026-07-01).
+ * Resumo do dia, totais, recordes e sessões recentes (cada sessão = um "treino", §2.6).
+ * Alcançada pelo Perfil ("Ver estatísticas completas") e pelos cards da Home.
+ * O feed "Seguindo" MUDOU para a aba Comunidade. Dados reais (store.stats.perDay).
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
@@ -12,13 +13,10 @@ import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { restoreActivities, syncActivities } from '@/services/activity-sync';
 import { deriveStats, fmtHMS } from '@/services/progress';
-import { getFeed, toggleKudo, type FeedItem } from '@/services/social';
 import { useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
 import { HUB, hubUI } from '@/theme/hub';
 
-/** Quantos itens do feed "Seguindo" mostrar antes do "Ver mais" (não vira lista infinita). */
-const FEED_PREVIEW = 5;
 /** Sessões recentes: poucas por padrão, e um teto ao expandir (evita rolagem gigante). */
 const SESSIONS_PREVIEW = 3;
 const SESSIONS_MAX = 15;
@@ -38,41 +36,22 @@ function fmtSessionDate(ts: number): string {
   return d.toLocaleDateString('pt-BR');
 }
 
-export default function ActivitiesScreen() {
+export default function StatsScreen() {
   const c = hubUI;
   const stats = useLibrary((s) => s.stats);
   const sessions = useLibrary((s) => s.sessions);
   const session = useAuth((s) => s.session);
   const configured = useAuth((s) => s.configured);
   const d = deriveStats(stats);
-  const [feed, setFeed] = useState<FeedItem[]>([]);
-  const [feedOpen, setFeedOpen] = useState(false); // recolhido por padrão (economiza espaço)
-  const [feedExpanded, setFeedExpanded] = useState(false); // feed: mostra poucas e expande
   const [allSessions, setAllSessions] = useState(false); // sessões recentes: mostra poucas e expande
 
-  // Ao abrir a aba: sobe sessões pendentes (no-op se deslogado) e carrega o feed.
+  // Ao abrir: sobe sessões pendentes (no-op se deslogado) e puxa o histórico da nuvem.
   useFocusEffect(
     useCallback(() => {
-      void restoreActivities(); // puxa histórico/estatísticas da nuvem (1× por usuário)
+      void restoreActivities(); // histórico/estatísticas da nuvem (1× por usuário)
       syncActivities();
-      if (session) getFeed().then(setFeed);
-      else setFeed([]);
-    }, [session]),
+    }, []),
   );
-
-  const onKudo = useCallback(async (item: FeedItem) => {
-    const on = !item.iKudoed;
-    // otimista: atualiza na hora; reverte se der erro
-    setFeed((prev) =>
-      prev.map((f) => (f.id === item.id ? { ...f, iKudoed: on, kudos: f.kudos + (on ? 1 : -1) } : f)),
-    );
-    const err = await toggleKudo(item.id, on);
-    if (err) {
-      setFeed((prev) =>
-        prev.map((f) => (f.id === item.id ? { ...f, iKudoed: !on, kudos: f.kudos + (on ? -1 : 1) } : f)),
-      );
-    }
-  }, []);
 
   const todayKey = new Date().toISOString().slice(0, 10);
   const todayMin = Math.round((stats.perDay[todayKey] ?? 0) / 60);
@@ -82,86 +61,16 @@ export default function ActivitiesScreen() {
   return (
     <ScreenBG hub>
       <View style={styles.titleRow}>
-        <Text style={[styles.title, { color: HUB.onBg }]}>Atividades</Text>
+        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.back}>
+          <Text style={[styles.backText, { color: HUB.onBgDim }]}>‹ Voltar</Text>
+        </Pressable>
         <Pressable
           onPress={() => router.navigate('/compartilhar')}
           style={[styles.shareChip, { borderColor: 'rgba(255,255,255,0.55)' }]}>
           <Text style={[styles.shareChipText, { color: HUB.onBg }]}>📤 Compartilhar</Text>
         </Pressable>
       </View>
-
-      {/* Feed — leituras de quem você segue (camada social, §2.6). Recolhível. */}
-      {session ? (
-        <>
-          <Pressable style={styles.feedHeader} onPress={() => setFeedOpen((o) => !o)}>
-            <View style={styles.feedHeaderLeft}>
-              <Text style={styles.feedHeaderIcon}>📡</Text>
-              <Text style={[styles.feedHeaderTitle, { color: HUB.onBg }]}>
-                Seguindo{feed.length > 0 ? ` (${feed.length})` : ''}
-              </Text>
-            </View>
-            <Text style={[styles.feedChevron, { color: HUB.onBgDim }]}>{feedOpen ? '▾' : '▸'}</Text>
-          </Pressable>
-          {!feedOpen ? null : feed.length === 0 ? (
-            <Text style={[styles.hint, { color: HUB.onBgDim, marginTop: 0, textAlign: 'left' }]}>
-              Siga leitores (toque no nome de quem escreve resenhas) e ative seu perfil público no Perfil para
-              que as leituras apareçam aqui.
-            </Text>
-          ) : (
-            <>
-            {(feedExpanded ? feed : feed.slice(0, FEED_PREVIEW)).map((f) => (
-              <Card hub key={f.id} style={styles.feedRow}>
-                <Pressable
-                  onPress={() => router.push({ pathname: '/usuario', params: { id: f.user_id, name: f.author_name } })}>
-                  <Text style={styles.feedAvatar}>{f.author_avatar || '🦉'}</Text>
-                </Pressable>
-                <View style={styles.flex}>
-                  <Text style={[styles.feedWho, { color: c.text }]} numberOfLines={1}>
-                    <Text style={{ fontWeight: '800', color: f.author_founder ? c.green : c.text }}>
-                      {f.author_name}
-                      {f.author_founder ? ' 👑' : ''}
-                    </Text>{' '}
-                    leu
-                  </Text>
-                  <Text style={[styles.feedBook, { color: c.textDim }]} numberOfLines={1}>
-                    {f.book_title}
-                  </Text>
-                  <Text style={[styles.feedMeta, { color: c.textFaint }]}>
-                    {fmtSessionDate(new Date(f.created_at).getTime())} · {Math.max(1, Math.round(f.seconds / 60))} min
-                    {f.pages ? ` · ${f.pages} ${f.pages === 1 ? 'pág' : 'págs'}` : ''}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => onKudo(f)}
-                  hitSlop={8}
-                  style={styles.kudoBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    f.iKudoed
-                      ? `Tirar seu Logos (${f.kudos})`
-                      : f.kudos > 0
-                        ? `Dar um Logos — ${f.kudos} Logos`
-                        : 'Dar um Logos'
-                  }>
-                  {/* "Logos" 📜 = a interação social (antigo "kudo" do Strava) */}
-                  <Text style={[styles.kudoIcon, { opacity: f.iKudoed ? 1 : 0.4 }]}>📜</Text>
-                  {f.kudos > 0 ? (
-                    <Text style={[styles.kudoCount, { color: f.iKudoed ? c.green : c.textFaint }]}>{f.kudos}</Text>
-                  ) : null}
-                </Pressable>
-              </Card>
-            ))}
-            {feed.length > FEED_PREVIEW ? (
-              <Pressable onPress={() => setFeedExpanded((v) => !v)} style={styles.moreBtn}>
-                <Text style={[styles.moreText, { color: HUB.onBg }]}>
-                  {feedExpanded ? 'Ver menos ▴' : `Ver mais (${feed.length}) ▾`}
-                </Text>
-              </Pressable>
-            ) : null}
-            </>
-          )}
-        </>
-      ) : null}
+      <Text style={[styles.title, { color: HUB.onBg }]}>Estatísticas</Text>
 
       {/* Resumo do dia */}
       <SectionTitle hub icon="🏃">Resumo do dia</SectionTitle>
@@ -268,7 +177,7 @@ export default function ActivitiesScreen() {
 
       {d.totalSeconds === 0 ? (
         <Text style={[styles.hint, { color: HUB.onBgDim }]}>
-          Comece a ler na aba Leitura — o tempo é registrado automaticamente e aparece aqui.
+          Comece a ler um livro — o tempo é registrado automaticamente e aparece aqui.
         </Text>
       ) : null}
     </ScreenBG>
@@ -311,8 +220,9 @@ function WeekBars({ data }: { data: { label: string; minutes: number }[] }) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  back: { paddingVertical: 4, paddingRight: 8 },
+  backText: { fontSize: 16, fontWeight: '600' },
   title: { fontSize: 28, fontWeight: '800' },
   shareChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   shareChipText: { fontSize: 13, fontWeight: '700' },
@@ -347,17 +257,4 @@ const styles = StyleSheet.create({
   moreBtn: { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
   moreText: { fontSize: 14, fontWeight: '700' },
   ad: { marginTop: 16 },
-  feedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 10 },
-  feedHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  feedHeaderIcon: { fontSize: 18 },
-  feedHeaderTitle: { fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
-  feedChevron: { fontSize: 16, fontWeight: '800' },
-  feedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  feedAvatar: { fontSize: 30 },
-  feedWho: { fontSize: 14 },
-  feedBook: { fontSize: 14, fontWeight: '700', marginTop: 1 },
-  feedMeta: { fontSize: 12, marginTop: 3 },
-  kudoBtn: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, minWidth: 36 },
-  kudoIcon: { fontSize: 22 },
-  kudoCount: { fontSize: 12, fontWeight: '800', marginTop: 2 },
 });

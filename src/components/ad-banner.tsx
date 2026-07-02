@@ -4,7 +4,7 @@
  * Regras que este componente garante:
  *  - **Tier grátis apenas:** `useHasAds()` (plano pago = nada renderiza).
  *  - **Nunca no leitor:** é responsabilidade de QUEM usa — só montamos este banner em telas
- *    fora de `/reader` (biblioteca, explorar, atividades). Não importar dentro do leitor.
+ *    fora de `/reader` (biblioteca, explorar, estatísticas). Não importar dentro do leitor.
  *  - **À prova de Expo Go / módulo ausente:** sem o nativo, vira no-op (não quebra).
  *
  * Anúncio adaptativo ancorado (altura recomendada pelo AdMob para a largura da tela).

@@ -56,12 +56,13 @@ function UsersIcon({ color, size = 23 }: IconProps) {
   );
 }
 
-function ChartIcon({ color, size = 23 }: IconProps) {
+function ShelfIcon({ color, size = 23 }: IconProps) {
+  // Estante: dois livros em pé + um inclinado (aba Biblioteca).
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M5 20V11" />
-      <Path d="M12 20V5" />
-      <Path d="M19 20v-6" />
+      <Path d="M4.5 4.5h3.4v15H4.5z" />
+      <Path d="M10.3 4.5h3.4v15h-3.4z" />
+      <Path d="M16.2 5.6l3.2.9-3.6 12.9-3.2-.9z" />
     </Svg>
   );
 }
@@ -85,9 +86,9 @@ function BookOpenIcon({ color, size = 26 }: IconProps) {
 }
 
 const META: Record<string, { Icon: ComponentType<IconProps>; label: string }> = {
-  index: { Icon: HomeIcon, label: 'Leitura' },
+  index: { Icon: HomeIcon, label: 'Início' },
+  biblioteca: { Icon: ShelfIcon, label: 'Biblioteca' },
   comunidade: { Icon: UsersIcon, label: 'Comunidade' },
-  atividades: { Icon: ChartIcon, label: 'Atividades' },
   perfil: { Icon: UserIcon, label: 'Perfil' },
 };
 
@@ -128,7 +129,7 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
     );
   }
 
-  // Slots: [Leitura, Comunidade, (Ler central), Atividades, Perfil]
+  // Slots: [Início, Biblioteca, (Ler central), Comunidade, Perfil]
   const slots: ReactNode[] = [];
   state.routes.forEach((route, i) => {
     slots.push(tabButton(route, state.index === i));
@@ -164,8 +165,8 @@ export default function AppTabs() {
       screenOptions={{ headerShown: false }}
       tabBar={(props) => <FloatingTabBar {...(props as unknown as TabBarProps)} />}>
       <Tabs.Screen name="index" />
+      <Tabs.Screen name="biblioteca" />
       <Tabs.Screen name="comunidade" />
-      <Tabs.Screen name="atividades" />
       <Tabs.Screen name="perfil" />
     </Tabs>
   );

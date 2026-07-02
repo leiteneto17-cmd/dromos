@@ -12,13 +12,13 @@ export default function AppTabs() {
       <TabList asChild>
         <View style={[styles.bar, { backgroundColor: c.bg, borderTopColor: c.border }]}>
           <TabTrigger name="index" href="/" asChild>
-            <TabButton>📖 Leitura</TabButton>
+            <TabButton>📖 Início</TabButton>
+          </TabTrigger>
+          <TabTrigger name="biblioteca" href="/biblioteca" asChild>
+            <TabButton>📚 Biblioteca</TabButton>
           </TabTrigger>
           <TabTrigger name="comunidade" href="/comunidade" asChild>
             <TabButton>👥 Comunidade</TabButton>
-          </TabTrigger>
-          <TabTrigger name="atividades" href="/atividades" asChild>
-            <TabButton>🔥 Atividades</TabButton>
           </TabTrigger>
           <TabTrigger name="perfil" href="/perfil" asChild>
             <TabButton>👤 Perfil</TabButton>

@@ -186,6 +186,10 @@ export default function ProfileScreen() {
           <PressableScale onPress={() => router.navigate('/compartilhar')} style={[styles.shareCta, { backgroundColor: c.green }]}>
             <Text style={[styles.shareCtaText, { color: c.onGreen }]}>📤 Compartilhar</Text>
           </PressableScale>
+          {/* Tela completa (ex-aba Atividades): resumo do dia, recordes e sessões. */}
+          <PressableScale onPress={() => router.navigate('/estatisticas')} style={styles.fullStatsLink}>
+            <Text style={[styles.fullStatsText, { color: c.purple }]}>Ver estatísticas completas ›</Text>
+          </PressableScale>
         </>
       ) : null}
 
@@ -308,6 +312,8 @@ const styles = StyleSheet.create({
   statsChevron: { fontSize: 16, fontWeight: '800' },
   shareCta: { marginTop: 14, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   shareCtaText: { fontSize: 15, fontWeight: '800' },
+  fullStatsLink: { alignItems: 'center', paddingVertical: 12 },
+  fullStatsText: { fontSize: 14, fontWeight: '800' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   modalTitle: { fontSize: 22, fontWeight: '800' },
   close: { fontSize: 15, fontWeight: '700' },

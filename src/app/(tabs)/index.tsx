@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { AdBanner } from '@/components/ad-banner';
-import { importBookFlow } from '@/app/biblioteca';
+import { importBookFlow } from '@/app/(tabs)/biblioteca';
 import { BottomTabInset } from '@/constants/theme';
 import { restoreActivities } from '@/services/activity-sync';
 import { backfillCovers } from '@/services/cover-backfill';
@@ -174,7 +174,7 @@ export default function HubScreen() {
 
           {/* Atividade recente (dados reais da última sessão) — card branco */}
           {lastSession ? (
-            <Pressable onPress={() => router.navigate('/atividades')}>
+            <Pressable onPress={() => router.navigate('/estatisticas')}>
               <View style={styles.feedCard}>
                 <Text style={styles.feedKicker}>Atividade recente</Text>
                 <Text style={styles.feedText}>
@@ -197,14 +197,16 @@ export default function HubScreen() {
             </Pressable>
           ) : null}
 
-          {/* Gráfico semanal estilo Strava — card branco, barras verdes */}
-          <View style={styles.feedCard}>
-            <View style={styles.weekHead}>
-              <Text style={styles.feedKicker}>Leitura na semana</Text>
-              <Text style={styles.weekTotal}>{weekMinutes} min</Text>
+          {/* Gráfico semanal estilo Strava — card branco, barras verdes. Toque → /estatisticas. */}
+          <Pressable onPress={() => router.navigate('/estatisticas')}>
+            <View style={styles.feedCard}>
+              <View style={styles.weekHead}>
+                <Text style={styles.feedKicker}>Leitura na semana</Text>
+                <Text style={styles.weekTotal}>{weekMinutes} min</Text>
+              </View>
+              <WeekBars data={derived.last7} />
             </View>
-            <WeekBars data={derived.last7} />
-          </View>
+          </Pressable>
 
           {/* Banner do tier grátis — no meio do feed (visível, fora do leitor §2.5).
               No-op p/ plano pago / Expo Go. */}
