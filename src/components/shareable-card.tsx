@@ -71,6 +71,8 @@ export function ShareableCard({
       <Text style={s.sealText}>👑 Fundador</Text>
     </View>
   ) : null;
+  // Com o selo, o conteúdo desce — senão ele atropela o título (ex.: kicker longo do recap).
+  const sealPad = showFounder ? s.withSeal : null;
   const bookmarks = useLibrary((s) => s.bookmarks);
   const highlights = useLibrary((s) => s.highlights);
   const stats = useLibrary((s) => s.stats);
@@ -255,7 +257,7 @@ export function ShareableCard({
   if (variant === 'transparente') {
     // Fundo transparente → o PNG capturado fica sem fundo (sticker p/ Story).
     return (
-      <View style={[s.card, s.transparent]}>
+      <View style={[s.card, s.transparent, sealPad]}>
         {seal}
         {content}
       </View>
@@ -266,7 +268,7 @@ export function ShareableCard({
   const bgUri = variant === 'capa' ? refBook?.coverUrl : variant === 'foto' ? photoUri : undefined;
   if ((variant === 'capa' || variant === 'foto') && bgUri) {
     return (
-      <View style={s.card}>
+      <View style={[s.card, sealPad]}>
         <Image source={{ uri: bgUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
         <LinearGradient colors={SCRIM} style={StyleSheet.absoluteFill} />
         {seal}
@@ -277,7 +279,7 @@ export function ShareableCard({
 
   // capa/foto sem imagem disponível → cai no gradiente (com aviso amigável no rodapé).
   return (
-    <LinearGradient colors={SocialGradient} style={s.card}>
+    <LinearGradient colors={SocialGradient} style={[s.card, sealPad]}>
       {seal}
       {content}
       {variant === 'capa' && !bgUri ? (
@@ -301,6 +303,8 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   transparent: { backgroundColor: 'transparent' },
+  /** Espaço extra no topo quando o selo de fundador está presente (não cobre o título). */
+  withSeal: { paddingTop: 52 },
   // Selo de fundador (canto superior direito do card compartilhável).
   seal: {
     position: 'absolute',
