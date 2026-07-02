@@ -18,6 +18,10 @@ const TTS_KEY_STORE = 'leitura_tts_key';
 const TTS_CFG_STORE = 'leitura_tts_cfg';
 const DEVICE_VOICE_STORE = 'leitura_device_voice';
 const MANAGED_VOICE_STORE = 'leitura_managed_voice';
+const VOICE_ENGINE_STORE = 'leitura_voice_engine';
+
+/** Preferência do "Ouvir": nuvem (ElevenLabs/neural gerida) ou voz do aparelho. */
+export type VoiceEngine = 'cloud' | 'device';
 
 type AIState = {
   // --- Dicionário (LLM) ---
@@ -33,6 +37,8 @@ type AIState = {
   // --- Voz neural gerida (Azure via tts-proxy — [[voz-tts-estrategia]]) ---
   /** Voz escolhida da nuvem do +leitura ('francisca' | 'antonio'). */
   managedVoice: string;
+  /** Motor preferido do "Ouvir" (seletor de voz do leitor). Default: nuvem. */
+  voiceEngine: VoiceEngine;
   // --- Voz do aparelho (grátis, expo-speech) ---
   /** Identificador da voz do SO escolhida (null = voz padrão do sistema). */
   deviceVoice: string | null;
@@ -51,6 +57,7 @@ export const useAI = create<AIState>(() => ({
   ttsModel: TTS_DEFAULT_MODEL,
   hasTtsKey: false,
   managedVoice: 'francisca',
+  voiceEngine: 'cloud',
   deviceVoice: null,
   deviceVoiceName: '',
   ready: false,
@@ -59,13 +66,14 @@ export const useAI = create<AIState>(() => ({
 // Carga inicial (no import): restaura provider/modelo/voz e detecta se há chaves.
 (async () => {
   try {
-    const [cfgRaw, key, ttsCfgRaw, ttsKey, deviceRaw, managedRaw] = await Promise.all([
+    const [cfgRaw, key, ttsCfgRaw, ttsKey, deviceRaw, managedRaw, engineRaw] = await Promise.all([
       SecureStore.getItemAsync(CFG_STORE),
       SecureStore.getItemAsync(KEY_STORE),
       SecureStore.getItemAsync(TTS_CFG_STORE),
       SecureStore.getItemAsync(TTS_KEY_STORE),
       SecureStore.getItemAsync(DEVICE_VOICE_STORE),
       SecureStore.getItemAsync(MANAGED_VOICE_STORE),
+      SecureStore.getItemAsync(VOICE_ENGINE_STORE),
     ]);
     const cfg = cfgRaw ? (JSON.parse(cfgRaw) as { provider?: AIProvider; model?: string }) : null;
     const provider = cfg?.provider ?? 'gemini';
@@ -84,6 +92,7 @@ export const useAI = create<AIState>(() => ({
       ttsModel: ttsCfg?.model || TTS_DEFAULT_MODEL,
       hasTtsKey: Boolean(ttsKey),
       managedVoice: managedRaw || 'francisca',
+      voiceEngine: engineRaw === 'device' ? 'device' : 'cloud',
       deviceVoice: deviceCfg?.voice || null,
       deviceVoiceName: deviceCfg?.name || '',
       ready: true,
@@ -160,6 +169,12 @@ export async function clearTtsKey(): Promise<void> {
 export async function saveManagedVoice(voice: string): Promise<void> {
   await SecureStore.setItemAsync(MANAGED_VOICE_STORE, voice);
   useAI.setState({ managedVoice: voice });
+}
+
+/** Salva o motor preferido do "Ouvir" (seletor de voz do leitor). */
+export async function saveVoiceEngine(engine: VoiceEngine): Promise<void> {
+  await SecureStore.setItemAsync(VOICE_ENGINE_STORE, engine);
+  useAI.setState({ voiceEngine: engine });
 }
 
 // ---------- Voz do aparelho (grátis) ----------

@@ -14,12 +14,14 @@
  * Tudo é renderizado com FlatList (virtualização): só os parágrafos visíveis são
  * montados, e nada é reprocessado ao navegar (CLAUDE.md §4.6).
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { BionicParagraph } from '@/components/bionic-text';
+import { VoiceSheet } from '@/components/voice-sheet';
 import { BookmarksSheet } from '@/components/bookmarks-sheet';
 import { ReadingA11ySheet } from '@/components/reading-a11y-sheet';
 import { SelectionBar } from '@/components/selection-bar';
@@ -62,6 +64,8 @@ import {
 const EMPTY: string[] = [];
 const EMPTY_BM: import('@/store/library').Bookmark[] = [];
 const EMPTY_HL: import('@/store/library').Highlight[] = [];
+/** Flag "já viu o tooltip do seletor de voz" (1ª vez que a barra de áudio aparece). */
+const VOICE_TIP_KEY = 'leitura-voice-tip-v1';
 
 /** ~parágrafos por "página equivalente" (EPUB/PDF reflow não têm páginas reais — §4.9). */
 const PARAS_PER_PAGE = 4;
@@ -527,6 +531,24 @@ export default function ReaderScreen() {
   const read = useReadAloud(paragraphs);
   const readRef = useRef(read.state);
   readRef.current = read.state;
+
+  // Seletor de VOZ no ponto de uso (botão 🎙️ da barra de áudio) + tooltip de 1ª vez.
+  const [showVoiceSheet, setShowVoiceSheet] = useState(false);
+  const [voiceTip, setVoiceTip] = useState(false);
+  useEffect(() => {
+    if (!read.state.active) return;
+    let alive = true;
+    AsyncStorage.getItem(VOICE_TIP_KEY).then((seen) => {
+      if (alive && !seen) setVoiceTip(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [read.state.active]);
+  const dismissVoiceTip = useCallback(() => {
+    setVoiceTip(false);
+    AsyncStorage.setItem(VOICE_TIP_KEY, '1').catch(() => {});
+  }, []);
 
   const isPremium = useIsPremium();
   // Áudio/voz é recurso Premium (§6). No grátis, "Ouvir" leva à assinatura em vez de tocar.
@@ -1108,6 +1130,16 @@ export default function ReaderScreen() {
           </Text>
           <View style={styles.audioBtns}>
             <Pressable
+              onPress={() => {
+                dismissVoiceTip();
+                setShowVoiceSheet(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Trocar a voz da leitura"
+              style={[styles.audioBtn, { borderColor: t.border }]}>
+              <Text style={{ fontSize: 14 }}>🎙️</Text>
+            </Pressable>
+            <Pressable
               onPress={toggleFollow}
               accessibilityRole="switch"
               accessibilityState={{ checked: follow }}
@@ -1157,6 +1189,17 @@ export default function ReaderScreen() {
               <Text style={{ color: t.text, fontSize: 15 }}>⏹</Text>
             </Pressable>
           </View>
+
+          {/* Tooltip de 1ª vez: aponta o seletor de voz (some para sempre ao tocar). */}
+          {voiceTip ? (
+            <Pressable
+              onPress={dismissVoiceTip}
+              style={[styles.voiceTip, { backgroundColor: t.accent }]}>
+              <Text style={[styles.voiceTipText, { color: t.surface }]}>
+                🎙️ Troque a voz e a velocidade aqui
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -1215,6 +1258,17 @@ export default function ReaderScreen() {
 
       {showA11y ? (
         <ReadingA11ySheet t={t} prefs={prefs} setPrefs={setReaderPrefs} onClose={() => setShowA11y(false)} />
+      ) : null}
+
+      {showVoiceSheet ? (
+        <VoiceSheet
+          t={t}
+          onApplied={() => {
+            // Sessão ativa? Re-fala o parágrafo atual já com a voz nova (troca imediata).
+            if (readRef.current.active) read.start(readRef.current.paraIndex);
+          }}
+          onClose={() => setShowVoiceSheet(false)}
+        />
       ) : null}
 
       {showBookmarks ? (
@@ -1298,6 +1352,20 @@ const styles = StyleSheet.create({
   },
   audioLabel: { fontSize: 13, flexShrink: 1 },
   audioBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  voiceTip: {
+    position: 'absolute',
+    right: 12,
+    top: -40,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  voiceTipText: { fontSize: 13, fontWeight: '700' },
   audioBtn: {
     minWidth: 44,
     height: 36,

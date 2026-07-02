@@ -58,27 +58,13 @@ export function useReadAloud(paragraphs: string[]) {
   const [state, setState] = useState<ReadAloudState>(IDLE);
   const [rate, setRate] = useState(1.0);
 
-  // config de voz (BYOK) — lida de forma reativa, espelhada em refs para os callbacks
-  const hasTtsKey = useAI((s) => s.hasTtsKey);
-  const ttsVoice = useAI((s) => s.ttsVoice);
-  const ttsModel = useAI((s) => s.ttsModel);
-  const managedVoice = useAI((s) => s.managedVoice);
-  const deviceVoice = useAI((s) => s.deviceVoice);
-
+  // Config de voz: lida FRESCA via useAI.getState() na hora de tocar/sintetizar —
+  // assim o seletor de voz do leitor (voice-sheet) muda a voz e reinicia o parágrafo
+  // no mesmo toque, sem esperar re-render (refs ficariam um render atrasados).
   const parasRef = useRef(paragraphs);
   parasRef.current = paragraphs;
   const rateRef = useRef(rate);
   rateRef.current = rate;
-  const hasTtsKeyRef = useRef(hasTtsKey);
-  hasTtsKeyRef.current = hasTtsKey;
-  const voiceRef = useRef(ttsVoice);
-  voiceRef.current = ttsVoice;
-  const modelRef = useRef(ttsModel);
-  modelRef.current = ttsModel;
-  const managedVoiceRef = useRef(managedVoice);
-  managedVoiceRef.current = managedVoice;
-  const deviceVoiceRef = useRef(deviceVoice);
-  deviceVoiceRef.current = deviceVoice;
 
   const engineRef = useRef<ReadEngine>('device');
   const activeRef = useRef(false); // guarda do motor de aparelho
@@ -134,7 +120,7 @@ export function useReadAloud(paragraphs: string[]) {
       Speech.speak(base > 0 ? paras[i].slice(base) : paras[i], {
         language: 'pt-BR',
         rate: rateRef.current,
-        voice: deviceVoiceRef.current ?? undefined,
+        voice: useAI.getState().deviceVoice ?? undefined,
         // Só atualiza um REF (sem re-render) com a posição lida → permite retomar de onde
         // parou no resume. O charIndex vem relativo ao trecho falado → soma o offset base.
         onBoundary: (e: Boundary) => {
@@ -157,9 +143,9 @@ export function useReadAloud(paragraphs: string[]) {
   // Com chave própria → ElevenLabs; sem chave → voz neural gerida (tts-proxy).
   // O cache é indexado por voz+modelo+texto, então trocar de motor/voz não mistura áudios.
   const getOrSynthesize = useCallback((text: string): Promise<CachedAudio> => {
-    const byok = hasTtsKeyRef.current;
-    const voice = byok ? voiceRef.current : `azure:${managedVoiceRef.current}`;
-    const model = byok ? modelRef.current : 'neural';
+    const { hasTtsKey: byok, ttsVoice, ttsModel, managedVoice } = useAI.getState();
+    const voice = byok ? ttsVoice : `azure:${managedVoice}`;
+    const model = byok ? ttsModel : 'neural';
     const key = hashKey(voice, model, text);
     const inflight = inflightRef.current.get(key);
     if (inflight) return inflight; // já está gerando este trecho — reaproveita
@@ -169,12 +155,12 @@ export function useReadAloud(paragraphs: string[]) {
       if (byok) {
         const apiKey = await getTtsKey();
         if (!apiKey) throw new Error('sem-chave');
-        const out = await synthesize({ key: apiKey, voiceId: voiceRef.current, model, text });
+        const out = await synthesize({ key: apiKey, voiceId: ttsVoice, model, text });
         if (!out.audioBase64) throw new Error('audio-vazio');
         return saveCachedAudio(key, out.audioBase64, out.alignment);
       }
       // Gerida: sem timestamps por caractere (o "ouvir a partir daqui" começa do parágrafo).
-      const audio = await synthesizeManaged({ text, voice: managedVoiceRef.current });
+      const audio = await synthesizeManaged({ text, voice: managedVoice });
       return saveCachedAudio(key, audio, { starts: [], ends: [] });
     })();
     inflightRef.current.set(key, work);
@@ -255,9 +241,14 @@ export function useReadAloud(paragraphs: string[]) {
       sessionRef.current++; // nova sessão: invalida qualquer trabalho premium pendente
       Speech.stop();
       cleanupPlayer();
-      // Nuvem (BYOK ou gerida) quando disponível; senão, voz do aparelho.
-      if (hasTtsKeyRef.current || managedTtsAvailable()) playPremiumFrom(from, charOffset);
-      else speakFrom(from, charOffset);
+      // Preferência do seletor de voz: 'device' força a voz do aparelho. Senão,
+      // nuvem (BYOK ou gerida) quando disponível; em último caso, aparelho.
+      const { hasTtsKey, voiceEngine } = useAI.getState();
+      if (voiceEngine !== 'device' && (hasTtsKey || managedTtsAvailable())) {
+        playPremiumFrom(from, charOffset);
+      } else {
+        speakFrom(from, charOffset);
+      }
     },
     [cleanupPlayer, playPremiumFrom, speakFrom],
   );
