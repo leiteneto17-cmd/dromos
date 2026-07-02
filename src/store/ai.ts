@@ -37,7 +37,9 @@ type AIState = {
   // --- Voz neural gerida (Azure via tts-proxy — [[voz-tts-estrategia]]) ---
   /** Voz escolhida da nuvem do +leitura ('francisca' | 'antonio'). */
   managedVoice: string;
-  /** Motor preferido do "Ouvir" (seletor de voz do leitor). Default: nuvem. */
+  /** Motor preferido do "Ouvir" (seletor de voz do leitor). Default: voz do APARELHO
+   * (decisão do usuário 2026-07-02: a neural da nuvem é escolha explícita — economiza
+   * a cota do Azure e deixa claro o que é grátis). */
   voiceEngine: VoiceEngine;
   // --- Voz do aparelho (grátis, expo-speech) ---
   /** Identificador da voz do SO escolhida (null = voz padrão do sistema). */
@@ -57,7 +59,7 @@ export const useAI = create<AIState>(() => ({
   ttsModel: TTS_DEFAULT_MODEL,
   hasTtsKey: false,
   managedVoice: 'francisca',
-  voiceEngine: 'cloud',
+  voiceEngine: 'device',
   deviceVoice: null,
   deviceVoiceName: '',
   ready: false,
@@ -92,7 +94,7 @@ export const useAI = create<AIState>(() => ({
       ttsModel: ttsCfg?.model || TTS_DEFAULT_MODEL,
       hasTtsKey: Boolean(ttsKey),
       managedVoice: managedRaw || 'francisca',
-      voiceEngine: engineRaw === 'device' ? 'device' : 'cloud',
+      voiceEngine: engineRaw === 'cloud' ? 'cloud' : 'device',
       deviceVoice: deviceCfg?.voice || null,
       deviceVoiceName: deviceCfg?.name || '',
       ready: true,

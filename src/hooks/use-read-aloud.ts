@@ -71,6 +71,12 @@ export function useReadAloud(paragraphs: string[]) {
   const sessionRef = useRef(0); // token que invalida trabalho assíncrono premium
   const curParaRef = useRef(0); // parágrafo atual — p/ resume sem depender do estado React
   const lastCharRef = useRef(0); // offset de caractere já lido no parágrafo (device) — p/ retomar
+  // Pausa pedida ENQUANTO o áudio ainda era gerado: quando a síntese terminar, o player
+  // NÃO deve tocar sozinho (era o "pause que não responde" → áudio começava depois).
+  const pausedRef = useRef(false);
+  // Síntese em andamento p/ o parágrafo atual: o resume não dispara uma SEGUNDA corrente
+  // de playPremiumFrom (era a causa dos áudios duplicados/sobrepostos).
+  const genLoadingRef = useRef(false);
   const playerRef = useRef<AudioPlayer | null>(null);
   const subRef = useRef<Sub | null>(null);
   // sínteses em voo (por hash) — evita gerar o mesmo parágrafo 2x (prefetch + avanço)
@@ -106,6 +112,7 @@ export function useReadAloud(paragraphs: string[]) {
       }
       engineRef.current = 'device';
       activeRef.current = true;
+      pausedRef.current = false;
       curParaRef.current = i;
       // começa do trecho escolhido (offset; some nos próximos parágrafos)
       const base = startChar > 0 && startChar < paras[i].length ? startChar : 0;
@@ -178,6 +185,7 @@ export function useReadAloud(paragraphs: string[]) {
       }
       engineRef.current = 'premium';
       curParaRef.current = i;
+      genLoadingRef.current = true;
       setState({
         active: true,
         playing: true,
@@ -189,6 +197,8 @@ export function useReadAloud(paragraphs: string[]) {
       getOrSynthesize(paras[i])
         .then((audio) => {
           if (token !== sessionRef.current) return; // parou/trocou durante a síntese
+          genLoadingRef.current = false;
+          Speech.stop(); // defesa: mata qualquer voz do aparelho remanescente (sem sobrepor)
           cleanupPlayer();
           // updateInterval alto: sem karaokê, o status só serve p/ o seek inicial e p/
           // detectar o fim do parágrafo — não precisa de poll fino (mais leve).
@@ -219,13 +229,20 @@ export function useReadAloud(paragraphs: string[]) {
             }
           });
           subRef.current = sub;
-          player.play();
+          // Se o usuário pausou DURANTE a geração, deixa o player pronto mas parado —
+          // o resume() toca. Antes o play() disparava mesmo depois do pause.
+          if (pausedRef.current) {
+            setState((s) => (s.paraIndex === i ? { ...s, playing: false } : s));
+          } else {
+            player.play();
+          }
           // adianta o próximo parágrafo para reduzir a pausa (já fica em cache)
           const next = paras[i + 1];
           if (next) getOrSynthesize(next).catch(() => {});
         })
         .catch(() => {
           if (token !== sessionRef.current) return;
+          genLoadingRef.current = false;
           // sem chave ou falha de rede → cai para a voz grátis do aparelho
           engineRef.current = 'device';
           activeRef.current = true;
@@ -239,6 +256,7 @@ export function useReadAloud(paragraphs: string[]) {
   const start = useCallback(
     (from = 0, charOffset = 0) => {
       sessionRef.current++; // nova sessão: invalida qualquer trabalho premium pendente
+      pausedRef.current = false;
       Speech.stop();
       cleanupPlayer();
       // Preferência do seletor de voz: 'device' força a voz do aparelho. Senão,
@@ -254,6 +272,7 @@ export function useReadAloud(paragraphs: string[]) {
   );
 
   const pause = useCallback(() => {
+    pausedRef.current = true; // vale também p/ síntese em andamento (não toca ao terminar)
     if (engineRef.current === 'premium') {
       try {
         playerRef.current?.pause();
@@ -269,6 +288,7 @@ export function useReadAloud(paragraphs: string[]) {
   }, []);
 
   const resume = useCallback(() => {
+    pausedRef.current = false;
     if (engineRef.current === 'premium') {
       if (playerRef.current) {
         try {
@@ -277,6 +297,10 @@ export function useReadAloud(paragraphs: string[]) {
         } catch {
           playPremiumFrom(curParaRef.current); // player perdido — refaz o parágrafo
         }
+      } else if (genLoadingRef.current) {
+        // A síntese do parágrafo ainda está em voo: só marca "tocando" — quando ela
+        // terminar, toca sozinha. NUNCA iniciar outra corrente aqui (áudio duplicado).
+        setState((s) => ({ ...s, playing: true }));
       } else {
         playPremiumFrom(curParaRef.current);
       }
@@ -290,6 +314,8 @@ export function useReadAloud(paragraphs: string[]) {
   const stop = useCallback(() => {
     sessionRef.current++;
     activeRef.current = false;
+    pausedRef.current = false;
+    genLoadingRef.current = false;
     Speech.stop();
     cleanupPlayer();
     finishSession();

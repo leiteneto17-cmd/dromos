@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -67,6 +68,28 @@ export default function SimuladoScreen() {
     });
   }
 
+  /** Gabarito compacto: "1-B · 2-D · 3-A…". */
+  const gabarito = questoes.map((q, i) => `${i + 1}-${LETTERS[q.correta]}`).join(' · ');
+
+  /** Exporta o simulado como TEXTO (share sheet nativo): questões + gabarito + explicações. */
+  function exportar() {
+    const linhas: string[] = [
+      `🎓 Simulado estilo ENEM — ${title}${author ? ` (${author})` : ''}`,
+      '',
+    ];
+    questoes.forEach((q, i) => {
+      linhas.push(`${i + 1}) ${q.pergunta}`);
+      q.alternativas.forEach((alt, ai) => linhas.push(`   ${LETTERS[ai]}) ${alt}`));
+      linhas.push('');
+    });
+    linhas.push(`✅ Gabarito: ${gabarito}`, '');
+    questoes.forEach((q, i) => {
+      if (q.explicacao) linhas.push(`${i + 1}. ${q.explicacao}`);
+    });
+    linhas.push('', 'Gerado no +leitura 📚');
+    Share.share({ message: linhas.join('\n') }).catch(() => {});
+  }
+
   return (
     <ScreenBG scroll={false}>
       <View style={styles.header}>
@@ -109,6 +132,7 @@ export default function SimuladoScreen() {
                     ? 'Mandou bem! Revise as explicações abaixo. 💪'
                     : 'Sem crise — leia as explicações e tente outro simulado. 📚'}
               </Text>
+              <Text style={[styles.gabarito, { color: c.purple }]}>Gabarito: {gabarito}</Text>
             </Card>
           ) : null}
 
@@ -152,9 +176,14 @@ export default function SimuladoScreen() {
 
           {questoes.length > 0 ? (
             corrected ? (
-              <Pressable onPress={gerar} style={[styles.cta, { backgroundColor: c.green }]}>
-                <Text style={[styles.ctaText, { color: c.onGreen }]}>🔁 Gerar outro simulado</Text>
-              </Pressable>
+              <>
+                <Pressable onPress={exportar} style={[styles.ctaOutline, { borderColor: c.purple }]}>
+                  <Text style={[styles.ctaText, { color: c.purple }]}>📤 Exportar questões</Text>
+                </Pressable>
+                <Pressable onPress={gerar} style={[styles.cta, { backgroundColor: c.green }]}>
+                  <Text style={[styles.ctaText, { color: c.onGreen }]}>🔁 Gerar outro simulado</Text>
+                </Pressable>
+              </>
             ) : (
               <Pressable
                 onPress={() => setCorrected(true)}
@@ -190,6 +219,7 @@ const styles = StyleSheet.create({
   scoreCard: { alignItems: 'center', gap: 4, borderWidth: 1.5 },
   scoreBig: { fontSize: 34, fontWeight: '900' },
   scoreSub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  gabarito: { fontSize: 13, fontWeight: '800', marginTop: 4, textAlign: 'center' },
   qCard: { gap: 8 },
   qNum: { fontSize: 12, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
   qText: { fontSize: 15, lineHeight: 22, fontWeight: '600' },
@@ -206,5 +236,6 @@ const styles = StyleSheet.create({
   altText: { flex: 1, fontSize: 14, lineHeight: 20 },
   explain: { fontSize: 13, lineHeight: 19, marginTop: 4 },
   cta: { borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  ctaOutline: { borderRadius: 14, borderWidth: 1.5, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
   ctaText: { fontSize: 15, fontWeight: '800' },
 });

@@ -235,11 +235,14 @@ export default function ReaderScreen() {
   const highlights = useLibrary((s) => (currentBook ? s.highlights[currentBook.id] ?? EMPTY_HL : EMPTY_HL));
   const addHighlight = useLibrary((s) => s.addHighlight);
   const removeHighlight = useLibrary((s) => s.removeHighlight);
-  // Voz de nuvem disponível: chave própria (ElevenLabs) OU a neural gerida (logado).
-  // A assinatura de useAuth mantém o valor reativo ao entrar/sair da conta.
+  // Voz de nuvem disponível E preferida: chave própria (ElevenLabs) ou neural gerida
+  // (logado), com o seletor de voz em "nuvem" (default = voz do aparelho). Controla só
+  // o ícone 🎙️/🔊 do botão Ouvir. useAuth mantém reativo ao entrar/sair da conta.
   const hasTtsKey = useAI((s) => s.hasTtsKey);
+  const voiceEnginePref = useAI((s) => s.voiceEngine);
   const hasSession = useAuth((s) => !!s.session);
-  const hasPremiumVoice = hasTtsKey || (hasSession && managedTtsAvailable());
+  const hasPremiumVoice =
+    voiceEnginePref === 'cloud' && (hasTtsKey || (hasSession && managedTtsAvailable()));
 
   const t = ReadingThemes[themeName];
   const { width: winWidth } = useWindowDimensions();
@@ -1196,7 +1199,7 @@ export default function ReaderScreen() {
               onPress={dismissVoiceTip}
               style={[styles.voiceTip, { backgroundColor: t.accent }]}>
               <Text style={[styles.voiceTipText, { color: t.surface }]}>
-                🎙️ Troque a voz e a velocidade aqui
+                🌟 Toque no 🎙️ e experimente a voz neural realista
               </Text>
             </Pressable>
           ) : null}

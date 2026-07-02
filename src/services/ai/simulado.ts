@@ -9,9 +9,33 @@
  * grátis/gerida via ai-proxy (precisa estar logado; consome a cota diária).
  * Foco em COMPREENSÃO/interpretação (§4.8 — gamificação saudável), não decoreba.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { managedAIAvailable, managedChatJSON } from '@/services/ai/managed';
 import { chatJSON } from '@/services/ai/providers';
 import { getApiKey, useAI } from '@/store/ai';
+
+/** Limite LOCAL de simulados/dia na IA gerida (protege a cota do ai-proxy — o servidor
+ * ainda tem o teto global de chamadas/dia). BYOK não tem limite: a chave é do usuário. */
+const DAILY_LIMIT = 5;
+const USO_KEY = 'leitura-simulado-uso';
+
+async function simuladosHoje(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(USO_KEY);
+    const d = raw ? (JSON.parse(raw) as { day?: string; count?: number }) : null;
+    return d?.day === new Date().toDateString() ? d.count ?? 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function consumirSimulado(): Promise<void> {
+  const count = (await simuladosHoje()) + 1;
+  AsyncStorage.setItem(USO_KEY, JSON.stringify({ day: new Date().toDateString(), count })).catch(
+    () => {},
+  );
+}
 
 export type QuizQuestion = {
   pergunta: string;
@@ -49,6 +73,12 @@ export async function gerarSimulado(title: string, author: string): Promise<Quiz
       needsKey: true,
     };
   }
+  if (useManaged && (await simuladosHoje()) >= DAILY_LIMIT) {
+    return {
+      ok: false,
+      error: `Você já gerou os ${DAILY_LIMIT} simulados de hoje 😴 Volte amanhã — ou conecte sua própria chave em Integrações para gerar sem limite.`,
+    };
+  }
 
   const user = `Obra: "${title}", de ${author}. Gere o simulado sobre esta obra.`;
   try {
@@ -66,6 +96,7 @@ export async function gerarSimulado(title: string, author: string): Promise<Quiz
     if (!questoes || questoes.length < 3) {
       return { ok: false, error: 'A IA respondeu num formato inesperado. Tente gerar de novo.' };
     }
+    if (useManaged) await consumirSimulado(); // só conta quando deu certo
     return { ok: true, questoes };
   } catch (e) {
     return {

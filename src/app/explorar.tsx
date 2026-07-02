@@ -200,18 +200,15 @@ export default function ExplorarScreen() {
         explore os mais lidos.
       </Text>
 
-      {/* Cantinho do Estudo — prateleira ENEM/vestibular (validação do pilar de estudo) */}
-      <Pressable onPress={() => router.push('/enem')}>
-        <Card style={[styles.enemCard, { borderColor: c.purple }]}>
-          <Text style={styles.enemEmoji}>🎓</Text>
-          <View style={styles.enemBody}>
-            <Text style={[styles.enemTitle, { color: c.text }]}>Clássicos de prova · ENEM</Text>
-            <Text style={[styles.enemSub, { color: c.textFaint }]} numberOfLines={2}>
-              As obras que caem nas provas, grátis em PT + simulado por IA
-            </Text>
-          </View>
-          <Text style={[styles.enemArrow, { color: c.purple }]}>›</Text>
-        </Card>
+      {/* Cantinho do Estudo — atalho DISCRETO (não pode roubar o foco do Explorar) */}
+      <Pressable
+        onPress={() => router.push('/enem')}
+        style={[styles.enemRow, { backgroundColor: c.card, borderColor: c.border }]}>
+        <Text style={[styles.enemText, { color: c.textDim }]} numberOfLines={1}>
+          🎓 <Text style={{ fontWeight: '800', color: c.text }}>Clássicos de prova · ENEM</Text>
+          {'  '}obras + simulado por IA
+        </Text>
+        <Text style={[styles.enemArrow, { color: c.purple }]}>›</Text>
       </Pressable>
 
       {/* Fonte do acervo (só aparece quando há mais de uma) */}
@@ -378,18 +375,18 @@ const styles = StyleSheet.create({
   backText: { fontSize: 16, fontWeight: '600' },
   title: { fontSize: 28, fontWeight: '800' },
   subtitle: { fontSize: 14, lineHeight: 20, marginTop: 2, marginBottom: 12 },
-  enemCard: {
+  enemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderWidth: 1.5,
-    marginBottom: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 10,
   },
-  enemEmoji: { fontSize: 26 },
-  enemBody: { flex: 1, gap: 2 },
-  enemTitle: { fontSize: 15, fontWeight: '800' },
-  enemSub: { fontSize: 12.5, lineHeight: 17 },
-  enemArrow: { fontSize: 24, fontWeight: '800' },
+  enemText: { flex: 1, fontSize: 13 },
+  enemArrow: { fontSize: 18, fontWeight: '800' },
   sourceRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   sourceChip: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   sourceText: { fontSize: 13, fontWeight: '700' },
