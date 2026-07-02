@@ -642,6 +642,39 @@ end; $$;
 grant execute on function public.ai_quota_consume(int) to authenticated;
 
 -- =====================================================================
+-- COTA DA VOZ NEURAL GERIDA (tts-proxy — [[voz-tts-estrategia]], 2026-07-02).
+-- Igual à ai_usage, mas conta CARACTERES (áudio gasta muito mais que dicionário:
+-- 1 parágrafo ≈ 500 chars). Protege a cota grátis do Azure (500 mil chars/mês,
+-- UMA chave p/ todos). Tabela fechada (RLS sem policy); só a função mexe.
+-- =====================================================================
+create table if not exists public.tts_usage (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  day date not null default current_date,
+  chars int not null default 0,
+  primary key (user_id, day)
+);
+alter table public.tts_usage enable row level security;
+-- (intencional: NENHUMA policy → cliente não acessa direto; só a função abaixo)
+
+-- Consome p_chars da cota do DIA do usuário e diz se AINDA está dentro do limite.
+create or replace function public.tts_quota_consume(p_chars int, p_limit int)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid := auth.uid();
+  v_chars int;
+begin
+  if v_user is null then return false; end if;
+  if p_chars is null or p_chars < 0 then return false; end if;
+  insert into public.tts_usage (user_id, day, chars)
+    values (v_user, current_date, p_chars)
+    on conflict (user_id, day) do update set chars = public.tts_usage.chars + excluded.chars
+    returning chars into v_chars;
+  return v_chars <= p_limit;
+end; $$;
+grant execute on function public.tts_quota_consume(int, int) to authenticated;
+
+-- =====================================================================
 -- BRASÃO DE FUNDADOR — os 50 PRIMEIROS cadastrados ganham (lançamento).
 -- (a coluna is_founder é criada lá em cima, na seção da camada social.)
 -- =====================================================================

@@ -241,6 +241,15 @@ APIs de TTS e LLM **cobram por caractere/token**. Isso define o modelo de negóc
 - **Dicionário básico (botão "Significado") agora é em PORTUGUÊS** (Wiktionary PT, cai p/ EN) —
   `src/services/dictionary-basic.ts`. Antes era só inglês (`api.dictionaryapi.dev/.../en`), por isso
   "palavra brasileira não era encontrada". O significado rico/contextual continua sendo o "✨ Explicar (IA)".
+- **DECISÃO (do usuário, 2026-07-02) — VOZ NEURAL GERIDA via proxy (Azure TTS, nossa chave no servidor):**
+  a âncora do plano premium é "qualquer livro vira audiolivro em pt-BR". Edge Function
+  `supabase/functions/tts-proxy` (mesmo padrão do `ai-proxy`) → Azure TTS **tier grátis F0**
+  (500 mil chars/mês; vozes `pt-BR-FranciscaNeural`/`AntonioNeural`), cota diária de **caracteres**
+  por usuário (`tts_quota_consume` no schema.sql) + cache local do MP3 (nunca regera). Ordem dos
+  motores do "Ouvir" (`src/hooks/use-read-aloud.ts`): ElevenLabs BYOK → neural gerida → voz do
+  aparelho (fallback silencioso). Escada de provedores decidida: Azure grátis → API paga (Azure pago
+  ≈ preço do OpenAI e mantém word timestamps p/ o karaokê §2.1) → GPU própria só com escala real.
+  **Não montar infraestrutura complexa antes de o app validar no mercado.**
 
 ---
 

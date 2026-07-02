@@ -43,7 +43,9 @@ import { cleanSnippet, cleanWord, splitParagraphs } from '@/services/text-utils'
 import { syncActivities } from '@/services/activity-sync';
 import { markBookReading } from '@/services/community';
 import { syncBadges } from '@/store/profile';
+import { managedTtsAvailable } from '@/services/ai/tts-managed';
 import { getTtsKey, useAI } from '@/store/ai';
+import { useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
 import { useIsPremium } from '@/store/plan';
 import { useSession } from '@/store/session';
@@ -229,7 +231,11 @@ export default function ReaderScreen() {
   const highlights = useLibrary((s) => (currentBook ? s.highlights[currentBook.id] ?? EMPTY_HL : EMPTY_HL));
   const addHighlight = useLibrary((s) => s.addHighlight);
   const removeHighlight = useLibrary((s) => s.removeHighlight);
-  const hasPremiumVoice = useAI((s) => s.hasTtsKey);
+  // Voz de nuvem disponível: chave própria (ElevenLabs) OU a neural gerida (logado).
+  // A assinatura de useAuth mantém o valor reativo ao entrar/sair da conta.
+  const hasTtsKey = useAI((s) => s.hasTtsKey);
+  const hasSession = useAuth((s) => !!s.session);
+  const hasPremiumVoice = hasTtsKey || (hasSession && managedTtsAvailable());
 
   const t = ReadingThemes[themeName];
   const { width: winWidth } = useWindowDimensions();

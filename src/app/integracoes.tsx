@@ -25,6 +25,7 @@ import { adsUnsupported } from '@/services/ads';
 import { PROVIDERS, validateKey, type AIProvider } from '@/services/ai/providers';
 import { getUsage, listVoices, synthesize, type ElevenVoice, type TtsUsage } from '@/services/ai/tts';
 import { listDeviceVoices, previewDeviceVoice, type DeviceVoice } from '@/services/ai/tts-device';
+import { MANAGED_VOICES, managedTtsAvailable, synthesizeManaged } from '@/services/ai/tts-managed';
 import {
   clearAIKey,
   clearDeviceVoice,
@@ -32,6 +33,7 @@ import {
   getTtsKey,
   saveAIConfig,
   saveDeviceVoice,
+  saveManagedVoice,
   saveTtsConfig,
   useAI,
 } from '@/store/ai';
@@ -88,6 +90,12 @@ export default function IntegracoesScreen() {
   const deviceVoiceName = useAI((s) => s.deviceVoiceName);
   const [deviceVoices, setDeviceVoices] = useState<DeviceVoice[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(false);
+
+  // --- Voz neural gerida (Azure via tts-proxy) ---
+  const managedVoice = useAI((s) => s.managedVoice);
+  const [managedTesting, setManagedTesting] = useState(false);
+  const [managedErr, setManagedErr] = useState<string | null>(null);
+  const [managedOk, setManagedOk] = useState<string | null>(null);
 
   const carregarUso = useCallback(async () => {
     const k = await getTtsKey();
@@ -238,6 +246,38 @@ export default function IntegracoesScreen() {
       setTtsError(e instanceof Error ? e.message : 'Falha ao gerar o áudio.');
     } finally {
       setTesting(false);
+    }
+  }
+
+  // Gera uma frase de exemplo na voz neural gerida e toca (prova que o proxy funciona).
+  async function testarVozNeural() {
+    setManagedErr(null);
+    setManagedOk(null);
+    if (!managedTtsAvailable()) {
+      setManagedErr('Entre na sua conta para usar a voz neural.');
+      return;
+    }
+    setManagedTesting(true);
+    try {
+      const audio = await synthesizeManaged({
+        text: 'Esta é a voz neural do mais leitura. Boa leitura!',
+        voice: managedVoice,
+      });
+      const dir = `${FileSystem.cacheDirectory}tts`;
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
+      const uri = `${dir}/managed-sample.mp3`;
+      await FileSystem.writeAsStringAsync(uri, audio, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      playerRef.current?.remove();
+      const player = createAudioPlayer({ uri });
+      playerRef.current = player;
+      player.play();
+      setManagedOk('Tocando a voz neural… 🔊');
+    } catch (e) {
+      setManagedErr(e instanceof Error ? e.message : 'Falha ao gerar o áudio.');
+    } finally {
+      setManagedTesting(false);
     }
   }
 
@@ -426,6 +466,53 @@ export default function IntegracoesScreen() {
             • iPhone: Ajustes → Acessibilidade → Conteúdo Falado → Vozes → Português.{'\n'}
             • Android: Configurações → Sistema → Texto para fala → instale/atualize o motor e baixe vozes.
           </Text>
+
+          {/* Voz neural gerida (nuvem do +leitura, Azure via tts-proxy) */}
+          <Text style={[styles.sectionSub, { color: c.text, marginTop: 22 }]}>
+            🌟 Voz neural do +leitura
+          </Text>
+          <Text style={[styles.note, { color: c.textFaint, textAlign: 'left', marginTop: 0, marginBottom: 10 }]}>
+            Voz realista em português, direto da nossa nuvem — sem precisar de chave. Incluída no
+            Premium, com limite diário. É usada no “Ouvir” quando você não conecta uma chave do
+            ElevenLabs abaixo.
+          </Text>
+          <View style={styles.suggestions}>
+            {MANAGED_VOICES.map((v) => {
+              const active = managedVoice === v.id;
+              return (
+                <Pressable
+                  key={v.id}
+                  onPress={() => {
+                    saveManagedVoice(v.id);
+                    setManagedOk(null);
+                    setManagedErr(null);
+                  }}
+                  style={[
+                    styles.sugChip,
+                    { borderColor: active ? c.green : c.border },
+                    active && { borderWidth: 2 },
+                  ]}>
+                  <Text style={[styles.sugText, { color: active ? c.green : c.textDim }]}>
+                    {v.name} · {v.desc}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Pressable
+            onPress={testarVozNeural}
+            disabled={managedTesting}
+            style={[styles.testBtn, { borderColor: c.green, opacity: managedTesting ? 0.7 : 1 }]}>
+            {managedTesting ? (
+              <ActivityIndicator color={c.green} />
+            ) : (
+              <Text style={{ color: c.green, fontWeight: '800', fontSize: 15 }}>
+                ▶ Testar voz neural
+              </Text>
+            )}
+          </Pressable>
+          {managedErr ? <Text style={[styles.error, { color: '#E5484D' }]}>{managedErr}</Text> : null}
+          {managedOk ? <Text style={[styles.ok, { color: c.green }]}>{managedOk}</Text> : null}
 
           {/* Voz premium (ElevenLabs) */}
           <Text style={[styles.sectionSub, { color: c.text, marginTop: 22 }]}>

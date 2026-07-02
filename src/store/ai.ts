@@ -17,6 +17,7 @@ const CFG_STORE = 'leitura_ai_cfg';
 const TTS_KEY_STORE = 'leitura_tts_key';
 const TTS_CFG_STORE = 'leitura_tts_cfg';
 const DEVICE_VOICE_STORE = 'leitura_device_voice';
+const MANAGED_VOICE_STORE = 'leitura_managed_voice';
 
 type AIState = {
   // --- Dicionário (LLM) ---
@@ -29,6 +30,9 @@ type AIState = {
   ttsVoiceName: string;
   ttsModel: string;
   hasTtsKey: boolean;
+  // --- Voz neural gerida (Azure via tts-proxy — [[voz-tts-estrategia]]) ---
+  /** Voz escolhida da nuvem do +leitura ('francisca' | 'antonio'). */
+  managedVoice: string;
   // --- Voz do aparelho (grátis, expo-speech) ---
   /** Identificador da voz do SO escolhida (null = voz padrão do sistema). */
   deviceVoice: string | null;
@@ -46,6 +50,7 @@ export const useAI = create<AIState>(() => ({
   ttsVoiceName: 'Rachel',
   ttsModel: TTS_DEFAULT_MODEL,
   hasTtsKey: false,
+  managedVoice: 'francisca',
   deviceVoice: null,
   deviceVoiceName: '',
   ready: false,
@@ -54,12 +59,13 @@ export const useAI = create<AIState>(() => ({
 // Carga inicial (no import): restaura provider/modelo/voz e detecta se há chaves.
 (async () => {
   try {
-    const [cfgRaw, key, ttsCfgRaw, ttsKey, deviceRaw] = await Promise.all([
+    const [cfgRaw, key, ttsCfgRaw, ttsKey, deviceRaw, managedRaw] = await Promise.all([
       SecureStore.getItemAsync(CFG_STORE),
       SecureStore.getItemAsync(KEY_STORE),
       SecureStore.getItemAsync(TTS_CFG_STORE),
       SecureStore.getItemAsync(TTS_KEY_STORE),
       SecureStore.getItemAsync(DEVICE_VOICE_STORE),
+      SecureStore.getItemAsync(MANAGED_VOICE_STORE),
     ]);
     const cfg = cfgRaw ? (JSON.parse(cfgRaw) as { provider?: AIProvider; model?: string }) : null;
     const provider = cfg?.provider ?? 'gemini';
@@ -77,6 +83,7 @@ export const useAI = create<AIState>(() => ({
       ttsVoiceName: ttsCfg?.voiceName || 'Rachel',
       ttsModel: ttsCfg?.model || TTS_DEFAULT_MODEL,
       hasTtsKey: Boolean(ttsKey),
+      managedVoice: managedRaw || 'francisca',
       deviceVoice: deviceCfg?.voice || null,
       deviceVoiceName: deviceCfg?.name || '',
       ready: true,
@@ -145,6 +152,14 @@ export async function saveTtsConfig(args: {
 export async function clearTtsKey(): Promise<void> {
   await SecureStore.deleteItemAsync(TTS_KEY_STORE);
   useAI.setState({ hasTtsKey: false });
+}
+
+// ---------- Voz neural gerida (Azure via tts-proxy) ----------
+
+/** Salva a voz da nuvem do +leitura escolhida ('francisca' | 'antonio'). */
+export async function saveManagedVoice(voice: string): Promise<void> {
+  await SecureStore.setItemAsync(MANAGED_VOICE_STORE, voice);
+  useAI.setState({ managedVoice: voice });
 }
 
 // ---------- Voz do aparelho (grátis) ----------

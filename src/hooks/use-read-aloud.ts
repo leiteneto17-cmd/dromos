@@ -1,11 +1,16 @@
 /**
- * "Ouvir" — audiobook assistido (CLAUDE.md §2.1). Dois motores, mesma interface; o
- * motor é escolhido na hora de tocar:
+ * "Ouvir" — audiobook assistido (CLAUDE.md §2.1). Três motores, mesma interface; o
+ * motor é escolhido na hora de tocar, nesta ordem:
  *
- *  - GRÁTIS (voz do aparelho, expo-speech): sem chave, offline, funciona no Expo Go.
- *  - PREMIUM (ElevenLabs BYOK): voz humana realista. Sintetiza cada parágrafo, toca
- *    com expo-audio, cacheia o áudio (§5) p/ não regerar/gastar cota, e faz prefetch
- *    do próximo parágrafo. Sem chave (ou se a síntese falhar) cai na voz grátis.
+ *  1. ULTRA (ElevenLabs BYOK): o usuário trouxe a própria chave → prioridade.
+ *  2. NEURAL GERIDA (Azure via Edge Function tts-proxy — [[voz-tts-estrategia]]):
+ *     vozes Francisca/Antonio da nuvem do +leitura, sem chave do usuário. Exige
+ *     login (a função verifica o JWT) e tem cota diária de caracteres.
+ *  3. GRÁTIS (voz do aparelho, expo-speech): sem chave, offline, funciona no Expo Go.
+ *
+ * Os motores 1–2 sintetizam cada parágrafo, tocam com expo-audio, cacheiam o áudio
+ * (§5) p/ não regerar/gastar cota, e fazem prefetch do próximo parágrafo. Qualquer
+ * falha (sem chave, sem rede, cota do dia) cai na voz grátis sem interromper.
  *
  * DESTAQUE: o leitor (reader.tsx) realça apenas o PARÁGRAFO sendo lido (a partir de
  * `state.paraIndex`) — muda 1× por parágrafo, custo desprezível. O karaokê
@@ -18,6 +23,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { synthesize } from '@/services/ai/tts';
 import { hashKey, loadCachedAudio, saveCachedAudio, type CachedAudio } from '@/services/ai/tts-cache';
+import { managedTtsAvailable, synthesizeManaged } from '@/services/ai/tts-managed';
 import { getTtsKey, useAI } from '@/store/ai';
 
 export type ReadEngine = 'device' | 'premium';
@@ -56,6 +62,7 @@ export function useReadAloud(paragraphs: string[]) {
   const hasTtsKey = useAI((s) => s.hasTtsKey);
   const ttsVoice = useAI((s) => s.ttsVoice);
   const ttsModel = useAI((s) => s.ttsModel);
+  const managedVoice = useAI((s) => s.managedVoice);
   const deviceVoice = useAI((s) => s.deviceVoice);
 
   const parasRef = useRef(paragraphs);
@@ -68,6 +75,8 @@ export function useReadAloud(paragraphs: string[]) {
   voiceRef.current = ttsVoice;
   const modelRef = useRef(ttsModel);
   modelRef.current = ttsModel;
+  const managedVoiceRef = useRef(managedVoice);
+  managedVoiceRef.current = managedVoice;
   const deviceVoiceRef = useRef(deviceVoice);
   deviceVoiceRef.current = deviceVoice;
 
@@ -144,21 +153,29 @@ export function useReadAloud(paragraphs: string[]) {
     [finishSession],
   );
 
-  // ---------- Motor PREMIUM (ElevenLabs) ----------
+  // ---------- Motores de NUVEM (ElevenLabs BYOK ou Azure gerida) ----------
+  // Com chave própria → ElevenLabs; sem chave → voz neural gerida (tts-proxy).
+  // O cache é indexado por voz+modelo+texto, então trocar de motor/voz não mistura áudios.
   const getOrSynthesize = useCallback((text: string): Promise<CachedAudio> => {
-    const voice = voiceRef.current;
-    const model = modelRef.current;
+    const byok = hasTtsKeyRef.current;
+    const voice = byok ? voiceRef.current : `azure:${managedVoiceRef.current}`;
+    const model = byok ? modelRef.current : 'neural';
     const key = hashKey(voice, model, text);
     const inflight = inflightRef.current.get(key);
     if (inflight) return inflight; // já está gerando este trecho — reaproveita
     const work = (async () => {
       const cached = await loadCachedAudio(key);
       if (cached) return cached;
-      const apiKey = await getTtsKey();
-      if (!apiKey) throw new Error('sem-chave');
-      const out = await synthesize({ key: apiKey, voiceId: voice, model, text });
-      if (!out.audioBase64) throw new Error('audio-vazio');
-      return saveCachedAudio(key, out.audioBase64, out.alignment);
+      if (byok) {
+        const apiKey = await getTtsKey();
+        if (!apiKey) throw new Error('sem-chave');
+        const out = await synthesize({ key: apiKey, voiceId: voiceRef.current, model, text });
+        if (!out.audioBase64) throw new Error('audio-vazio');
+        return saveCachedAudio(key, out.audioBase64, out.alignment);
+      }
+      // Gerida: sem timestamps por caractere (o "ouvir a partir daqui" começa do parágrafo).
+      const audio = await synthesizeManaged({ text, voice: managedVoiceRef.current });
+      return saveCachedAudio(key, audio, { starts: [], ends: [] });
     })();
     inflightRef.current.set(key, work);
     work.finally(() => inflightRef.current.delete(key)).catch(() => {});
@@ -238,7 +255,8 @@ export function useReadAloud(paragraphs: string[]) {
       sessionRef.current++; // nova sessão: invalida qualquer trabalho premium pendente
       Speech.stop();
       cleanupPlayer();
-      if (hasTtsKeyRef.current) playPremiumFrom(from, charOffset);
+      // Nuvem (BYOK ou gerida) quando disponível; senão, voz do aparelho.
+      if (hasTtsKeyRef.current || managedTtsAvailable()) playPremiumFrom(from, charOffset);
       else speakFrom(from, charOffset);
     },
     [cleanupPlayer, playPremiumFrom, speakFrom],
