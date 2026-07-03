@@ -21,7 +21,8 @@ mais retenção, mais vocabulário, mais consistência.
 
 Uma única base de código rodando em **iPhone (iOS)** e **Android**.
 
-Nome de trabalho do app: **MindReaderApp** (pasta do projeto: `+leitura`).
+Nome do app: **Dromos** (+leitura) — decidido em 2026-07-03; substitui o nome de trabalho
+"MindReaderApp". Pasta do projeto: `+leitura`.
 
 ---
 

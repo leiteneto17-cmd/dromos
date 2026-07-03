@@ -6,7 +6,7 @@
   da leitura"** — hábito social, leitura e bons hábitos. Estudo/ENEM é vertical que
   monetiza, não a identidade. Não inverter.
 - **Já construído e no ar:** sessões de leitura, feed "Seguindo" (na aba Comunidade, aberto
-  por padrão), kudos ("Logos" 📜), follows, comentários (scraps), estatísticas/recordes
+  por padrão), **Logos** 📜 (nosso nome para curtidas — NÃO usar "kudos"), follows, comentários (scraps), estatísticas/recordes
   (tela `/estatisticas`), streak, metas + coach IA, conquistas/badges, card compartilhável
   (`/compartilhar`, react-native-view-shot).
 - **Pacote Hábito v1 (commit `577caaa`, TESTADO):** card Hábito no topo da Home (🔥 streak +
@@ -26,7 +26,11 @@
   qualquer expansão de UGC.
 
 ## Roadmap / próximos passos
-1. **Clube do livro (social v2)** — precisa de backend + moderação §4.8. Próximo grande item.
+1. **Clube do livro GUIADO (social v2)** — REFORMULADO (2026-07-03, decisão do usuário
+   após parecer CPO): ver `ROADMAP-CLUBE.md` (v2) — MVP funciona com N=1 (cronograma por
+   capítulos + discussão por IA anti-spoiler) e N=2 (convite por link/código); descoberta
+   pública/ranking adiados p/ v3 pós-rede. Parecer: `PARECER-CPO-2026-07-03.md`.
+   Próximo passo de código: **Feature G1** (schema clubs/members/stages/posts + RLS).
 2. Ranking de desafios entre amigos.
 3. Notificação de domingo do recap (opcional; expo-notifications via require preguiçoso).
 4. Checklist de boas-vindas na Home (junto do paywall).
