@@ -77,6 +77,12 @@ const HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="view
     return out;
   }
 
+  // Recebe o base64 em PEDAÇOS (injeções sequenciais) — uma única string de vários MB
+  // no evaluateJavascript estoura a memória do renderer no Android (render process gone).
+  var __buf = '';
+  window.__feed = function(s){ __buf += s; };
+  window.__run = function(){ var b = __buf; __buf = ''; window.__extract(b); };
+
   window.__extract = function(b64){
     post({ type:'progress', stage:'loading' });
     var bytes;
@@ -174,7 +180,15 @@ export function PdfExtractor({ uri, onResult, onError, onProgress }: Props) {
   useEffect(() => {
     if (b64 && ready && ref.current && !sent.current) {
       sent.current = true;
-      ref.current.injectJavaScript(`window.__extract && window.__extract(${JSON.stringify(b64)});true;`);
+      // Em pedaços de ~512 KB: injetar o arquivo inteiro numa chamada só derrubava o
+      // renderer da WebView (e o app junto) com PDFs de poucos MB.
+      const CHUNK = 512 * 1024;
+      for (let i = 0; i < b64.length; i += CHUNK) {
+        ref.current.injectJavaScript(
+          `window.__feed && window.__feed(${JSON.stringify(b64.slice(i, i + CHUNK))});true;`,
+        );
+      }
+      ref.current.injectJavaScript('window.__run && window.__run();true;');
     }
   }, [b64, ready]);
 
@@ -210,6 +224,22 @@ export function PdfExtractor({ uri, onResult, onError, onProgress }: Props) {
       onMessage={onMessage}
       onLoadEnd={() => setReady(true)}
       onError={() => onError('Não foi possível iniciar o conversor de PDF.')}
+      // Renderer da WebView morreu (OOM em PDF pesado)? Sem estes handlers o APP INTEIRO
+      // crasha (Android "render process gone" / iOS content process). Vira erro amigável.
+      onRenderProcessGone={() => {
+        if (!done.current) {
+          done.current = true;
+          clearWatchdog();
+          onError('O conversor ficou sem memória com este PDF. Tente novamente ou use um PDF mais leve.');
+        }
+      }}
+      onContentProcessDidTerminate={() => {
+        if (!done.current) {
+          done.current = true;
+          clearWatchdog();
+          onError('O conversor ficou sem memória com este PDF. Tente novamente ou use um PDF mais leve.');
+        }
+      }}
       javaScriptEnabled
       // Blindagem (CLAUDE.md §4.9): a WebView só processa a string que injetamos —
       // sem acesso ao sistema de arquivos nem a janelas/navegação externas. Reduz a

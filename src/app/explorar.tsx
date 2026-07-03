@@ -323,7 +323,9 @@ export default function ExplorarScreen() {
                     <Image source={{ uri: item.coverUrl }} style={styles.cover} resizeMode="cover" />
                   ) : (
                     <View style={[styles.cover, styles.coverPlaceholder, { backgroundColor: c.cardElevated, borderColor: c.border }]}>
-                      <Text style={[styles.coverPlaceholderText, { color: c.textFaint }]}>EPUB</Text>
+                      <Text style={[styles.coverPlaceholderText, { color: c.textFaint }]}>
+                        {(item.format ?? 'epub').toUpperCase()}
+                      </Text>
                     </View>
                   )}
                   <View style={styles.rowBody}>

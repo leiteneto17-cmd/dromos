@@ -88,6 +88,18 @@ const SEED: CuratedEntry[] = [
   { title: 'Iracema', author: 'José de Alencar', language: 'pt', epubUrl: 'https://www.gutenberg.org/ebooks/67740.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/67740/pg67740.cover.medium.jpg' },
 ];
 
+/**
+ * Formato do arquivo com blindagem contra cadastro errado no banco: a EXTENSÃO da URL
+ * vence o campo `format` (a coluna tem default 'epub' — um INSERT sem ela mandava PDF
+ * pro pipeline de EPUB e quebrava o leitor). Sem extensão reconhecível, vale o declarado.
+ */
+function inferFormat(declared: string | undefined | null, url: string): 'epub' | 'pdf' {
+  const path = url.split(/[?#]/)[0].toLowerCase();
+  if (path.endsWith('.pdf')) return 'pdf';
+  if (path.endsWith('.epub')) return 'epub';
+  return declared === 'pdf' ? 'pdf' : 'epub';
+}
+
 function toCatalogBook(e: CuratedEntry, i: number): CatalogBook {
   return {
     id: `curated-${i}-${e.title}`,
@@ -97,7 +109,7 @@ function toCatalogBook(e: CuratedEntry, i: number): CatalogBook {
     language: e.language,
     coverUrl: e.coverUrl ?? null,
     epubUrl: e.epubUrl,
-    format: e.format === 'pdf' ? 'pdf' : 'epub',
+    format: inferFormat(e.format, e.epubUrl),
   };
 }
 
