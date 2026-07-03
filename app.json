@@ -71,7 +71,9 @@
       "supabaseUrl": "https://tffpsfjrqgayrosgmsxy.supabase.co",
       "supabaseAnonKey": "sb_publishable_2nyZxwOzK4usAWVtBQ3qIA_0Y6gGemz",
       "aiProxyFunction": "hyper-task",
-      "ttsProxyFunction": "tts-proxy-"
+      "ttsProxyFunction": "tts-proxy-",
+      "revenueCatAndroidKey": "",
+      "revenueCatIosKey": ""
     }
   }
 }

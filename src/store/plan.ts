@@ -5,11 +5,13 @@
  *   - 'free'    → grátis COM anúncios. SÓ o leitor: importar/ler EPUB/PDF, Bionic, temas,
  *                 marcações, atividades/estatísticas. SEM áudio/vozes, SEM Metas, SEM Coach,
  *                 SEM dicionário por IA, SEM social avançado.
- *   - 'premium' → R$ 4,90/mês, TUDO liberado e SEM anúncios.
+ *   - 'premium' → R$ 5,90/mês ou R$ 59,90/ano (preço revisto 2026-07-02), TUDO liberado e
+ *                 SEM anúncios.
  *
- * Sem enforcement de COBRANÇA ainda: a compra real é via IAP nativo (App Store / Google Play)
- * unificado por RevenueCat (Fase 4). O RevenueCat só vai chamar `setPlan('premium')` quando a
- * loja confirmar a assinatura. Até lá, o seletor de teste em Integrações flipa o plano.
+ * COBRANÇA: IAP nativo (App Store / Google Play) unificado por RevenueCat — integração em
+ * `services/purchases.ts` (chama `setPlan('premium')` quando a loja confirma; upgrade-only
+ * até as lojas estarem configuradas). O seletor de teste em Integrações segue flipando o
+ * plano enquanto durar a fase de teste.
  *
  * Também guarda a JANELA "sem anúncios" temporária (`adFreeUntil`) — recompensa do rewarded:
  * o usuário grátis assiste um vídeo e ganha X minutos sem anúncios.

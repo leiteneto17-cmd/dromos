@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
@@ -7,6 +8,7 @@ import { CelebrationOverlay } from '@/components/celebration-overlay';
 import { OnboardingOverlay } from '@/components/onboarding-overlay';
 import { useUI } from '@/hooks/use-ui';
 import { initAds } from '@/services/ads';
+import { initPurchases } from '@/services/purchases';
 import { setupNotificationHandler } from '@/services/reminders';
 import { useAuth } from '@/store/auth';
 
@@ -55,6 +57,13 @@ export default function RootLayout() {
   // Liberado quando logado. Se o Supabase NÃO estiver configurado, não dá para exigir
   // login (não há backend de auth) → libera para não deixar o app inacessível.
   const allowed = !!user || !configured;
+
+  // Assinatura (RevenueCat): inicializa quando o usuário LOGA — a assinatura fica
+  // amarrada à conta (appUserID = id do Supabase), não ao aparelho. No-op no Expo Go
+  // ou sem a chave em app.json (extra.revenueCat*Key).
+  useEffect(() => {
+    if (user) void initPurchases();
+  }, [user]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
