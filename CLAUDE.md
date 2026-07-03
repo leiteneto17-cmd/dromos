@@ -4,6 +4,12 @@
 > é aberta nesta pasta. Ele guarda a visão, as decisões de arquitetura e as regras
 > que NÃO podem ser esquecidas entre uma conversa e outra.
 > Idioma do projeto: **Português (PT-BR)**. Falar e comentar código em PT-BR.
+>
+> **📂 Estado por módulo:** antes de trabalhar numa área (SOCIAL, LEITOR, TTS, IA, PDF,
+> ACERVO, ESTUDO, MONETIZACAO, PERFORMANCE), ler o `docs/FEATURES/<MÓDULO>/STATUS.md`
+> — é a camada de contexto que as skills consultam em vez de depender da memória da
+> conversa. Quem mexe no módulo **atualiza o STATUS no fim da sessão**.
+> Índice: `docs/FEATURES/README.md` · Convenções técnicas: `docs/PADROES-ENGENHARIA.md`.
 
 ---
 
