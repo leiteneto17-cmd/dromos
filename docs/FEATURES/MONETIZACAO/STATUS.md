@@ -19,11 +19,12 @@
 - AdMob real POR ÚLTIMO (depende da conta Play).
 
 ## Roadmap / próximos passos (ORDEM OFICIAL de retomada)
-1. **⚠️ URGENTE — chave RevenueCat:** o usuário colou a chave SECRETA `sk_...` por engano
-   (já removida do app.json, mas foi exposta em bundle/logs). **REVOGAR a sk_ no painel**
-   e colar a chave PÚBLICA `goog_...` em `extra.revenueCatAndroidKey` + reiniciar expo.
+1. ✅ **FEITO (2026-07-03): chave secreta `sk_` REVOGADA** pelo usuário no painel do
+   RevenueCat. Conferir se a chave pública `goog_...` já foi colada em
+   `extra.revenueCatAndroidKey` no app.json (só terá efeito real com a conta Play).
 2. **Conta Google Play (US$25)** — destrava produtos `premium_mensal`/`premium_anual` +
    Offering default + internal testing (RevenueCat) E os IDs reais do AdMob.
+   **BLOQUEADO por ora (2026-07-03): usuário sem verba** — retomar quando pagar a conta.
 3. Confirmar deploy completo do `supabase/schema.sql` (cotas ai/tts dependem dele).
 4. AdMob IDs reais (após conta Play): App ID + 3 Ad Units → `src/services/ads/config.ts`
    (`REAL_UNITS`, `USE_TEST_IDS=false`) + app.json. NÃO clicar nos próprios anúncios.

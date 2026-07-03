@@ -20,8 +20,9 @@
   documentadas em [[proximos-passos]] item 5b.
 
 ## Roadmap / próximos passos
-1. **Deploy pendente:** teto de saída do ai-proxy 1024→2048 tokens
-   (`supabase functions deploy ai-proxy`) → depois subir `BATCH_CHARS` da tradução (hoje 1400).
+1. ✅ **FEITO (2026-07-03):** ai-proxy re-deployado com teto de saída 2048 tokens
+   (`min(max(payload.maxTokens || 700, 16), 2048)`). Próximo: subir `BATCH_CHARS` da
+   tradução no hook (hoje 1400, conservador p/ caber em 1024) e testar.
 2. Avaliar `AI_DAILY_LIMIT=150` (chave Gemini free ≈ 1500/dia no total — cuidado).
 3. Limite por usuário DENTRO da Edge Function (TODO do CLAUDE.md §5).
 4. Fase 6 (backlog `docs/IDEIAS-FUTURAS.md`): busca semântica, guia de personagens sem

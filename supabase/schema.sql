@@ -759,19 +759,19 @@ values
    'https://www.gutenberg.org/cache/epub/69187/pg69187.cover.medium.jpg', 90)
 on conflict (file_url) do nothing;
 
--- ---------- MODELO p/ AS SUAS TRADUÇÕES (rodar DEPOIS de subir o arquivo no bucket `acervo`):
--- 1) Storage → bucket `acervo` (público) → upload do PDF/EPUB.
--- 2) Copie a "URL pública" do arquivo e cole em file_url abaixo. Descomente e rode.
---
--- insert into public.curated_books
---   (title, author, language, is_translated, source_language, format, file_url, cover_url, sort_order)
--- values
---   ('A Arte da Guerra', 'Sun Tzu', 'pt', true, 'en', 'pdf',
---    'https://SEU-PROJETO.supabase.co/storage/v1/object/public/acervo/arte-da-guerra-pt.pdf',
---    null, 80),
---   ('Alice no País das Maravilhas', 'Lewis Carroll', 'pt', true, 'en', 'pdf',
---    'https://SEU-PROJETO.supabase.co/storage/v1/object/public/acervo/alice-pt.pdf', null, 70),
---   ('Peter Pan e Wendy', 'J. M. Barrie', 'pt', true, 'en', 'pdf',
---    'https://SEU-PROJETO.supabase.co/storage/v1/object/public/acervo/peter-pan-pt.pdf', null, 60),
---   ('Romeu e Julieta', 'William Shakespeare', 'pt', true, 'en', 'pdf',
---    'https://SEU-PROJETO.supabase.co/storage/v1/object/public/acervo/romeu-julieta-pt.pdf', null, 50);
+-- ---------- TRADUÇÕES PRÓPRIAS no bucket `acervo` (arquivos SUBIDOS em 2026-07-03).
+-- URLs reais do projeto (tffpsfjrqgayrosgmsxy); nomes conferidos no Storage.
+-- Obs.: A Arte da Guerra subiu como EPUB (não PDF). `on conflict` mantém idempotente.
+insert into public.curated_books
+  (title, author, language, is_translated, source_language, format, file_url, cover_url, sort_order)
+values
+  ('A Arte da Guerra', 'Sun Tzu', 'pt', true, 'en', 'epub',
+   'https://tffpsfjrqgayrosgmsxy.supabase.co/storage/v1/object/public/acervo/arte-da-guerra.epub',
+   null, 80),
+  ('Alice no País das Maravilhas', 'Lewis Carroll', 'pt', true, 'en', 'pdf',
+   'https://tffpsfjrqgayrosgmsxy.supabase.co/storage/v1/object/public/acervo/alice-pt.pdf', null, 70),
+  ('Peter Pan e Wendy', 'J. M. Barrie', 'pt', true, 'en', 'pdf',
+   'https://tffpsfjrqgayrosgmsxy.supabase.co/storage/v1/object/public/acervo/peter-pan-pt.pdf', null, 60),
+  ('Romeu e Julieta', 'William Shakespeare', 'pt', true, 'en', 'pdf',
+   'https://tffpsfjrqgayrosgmsxy.supabase.co/storage/v1/object/public/acervo/romeu-julieta-pt.pdf', null, 50)
+on conflict (file_url) do nothing;
