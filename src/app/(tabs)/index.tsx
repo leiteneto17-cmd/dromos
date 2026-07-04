@@ -243,77 +243,11 @@ export default function HubScreen() {
             </View>
           </Pressable>
 
-          {/* Atividade recente (dados reais da última sessão) — card branco */}
-          {lastSession ? (
-            <Pressable onPress={() => router.navigate('/estatisticas')}>
-              <View style={styles.feedCard}>
-                <Text style={styles.feedKicker}>Atividade recente</Text>
-                <Text style={styles.feedText}>
-                  Você leu <Text style={styles.feedStrong}>{lastSession.bookTitle}</Text>
-                </Text>
-                <View style={styles.feedFooter}>
-                  <View style={styles.feedWho}>
-                    <View style={styles.feedAvatar}>
-                      <Text style={styles.feedAvatarText}>{avatar || firstName.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.feedMeta}>
-                      {fmtMin(lastSession.seconds)} min · {fmtDay(lastSession.startedAt)}
-                    </Text>
-                  </View>
-                  <Pressable onPress={() => router.navigate('/compartilhar')} hitSlop={8}>
-                    <Text style={styles.feedShare}>Compartilhar ›</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </Pressable>
-          ) : null}
+          {/* "Atividade recente" REMOVIDA (2026-07-04) — era redundante com o hero "Lendo
+              agora". O compartilhar de sessão vive no card semanal e em /estatisticas. */}
 
-          {/* Gráfico semanal estilo Strava — card branco, barras verdes. Toque → /estatisticas. */}
-          <Pressable onPress={() => router.navigate('/estatisticas')}>
-            <View style={styles.feedCard}>
-              <View style={styles.weekHead}>
-                <Text style={styles.feedKicker}>Leitura na semana</Text>
-                <Text style={styles.weekTotal}>{weekMinutes} min</Text>
-              </View>
-              <WeekBars data={derived.last7} />
-              {/* Recap semanal ("Wrapped") → carrossel do card compartilhável */}
-              <Pressable
-                onPress={() => router.navigate({ pathname: '/compartilhar', params: { recap: '1' } })}
-                hitSlop={6}
-                style={styles.recapRow}>
-                <Text style={styles.feedShare}>📤 Compartilhar minha semana ›</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-
-          {/* Desafios (estilo Strava Challenges) — destaca o mais perto de completar. */}
-          {topDesafio ? (
-            <Pressable onPress={() => router.navigate('/desafios')}>
-              <View style={styles.feedCard}>
-                <View style={styles.weekHead}>
-                  <Text style={styles.feedKicker}>🏆 Desafios</Text>
-                  <Text style={styles.feedShare}>Ver todos ›</Text>
-                </View>
-                <Text style={styles.desafioTitle}>
-                  {topDesafio.icon} {topDesafio.title}
-                </Text>
-                <View style={styles.desafioTrack}>
-                  <View style={[styles.desafioFill, { width: `${Math.round(topDesafio.pct * 100)}%` }]} />
-                </View>
-                <Text style={styles.desafioMeta}>
-                  {topDesafio.done
-                    ? 'Concluído! 🎉'
-                    : `${topDesafio.current.toLocaleString('pt-BR')} / ${topDesafio.target.toLocaleString('pt-BR')} ${topDesafio.unit}`}
-                </Text>
-              </View>
-            </Pressable>
-          ) : null}
-
-          {/* Banner do tier grátis — no meio do feed (visível, fora do leitor §2.5).
-              No-op p/ plano pago / Expo Go. */}
-          <AdBanner style={styles.ad} />
-
-          {/* Biblioteca atual */}
+          {/* Biblioteca atual — PROMOVIDA para perto do "Lendo agora" (2026-07-04): é a
+              continuação natural do que ler a seguir, não pode ficar perdida no rodapé. */}
           <View style={styles.sectionHeadRow}>
             <Text style={styles.sectionTitle}>📚 Biblioteca atual</Text>
             <Pressable onPress={() => router.navigate('/biblioteca')} hitSlop={8}>
@@ -372,6 +306,51 @@ export default function HubScreen() {
               </View>
             </ScrollView>
           )}
+
+          {/* Gráfico semanal estilo Strava — card branco, barras verdes. Toque → /estatisticas. */}
+          <Pressable onPress={() => router.navigate('/estatisticas')}>
+            <View style={styles.feedCard}>
+              <View style={styles.weekHead}>
+                <Text style={styles.feedKicker}>Leitura na semana</Text>
+                <Text style={styles.weekTotal}>{weekMinutes} min</Text>
+              </View>
+              <WeekBars data={derived.last7} />
+              {/* Recap semanal ("Wrapped") → carrossel do card compartilhável */}
+              <Pressable
+                onPress={() => router.navigate({ pathname: '/compartilhar', params: { recap: '1' } })}
+                hitSlop={6}
+                style={styles.recapRow}>
+                <Text style={styles.feedShare}>📤 Compartilhar minha semana ›</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+
+          {/* Desafios (estilo Strava Challenges) — destaca o mais perto de completar. */}
+          {topDesafio ? (
+            <Pressable onPress={() => router.navigate('/desafios')}>
+              <View style={styles.feedCard}>
+                <View style={styles.weekHead}>
+                  <Text style={styles.feedKicker}>🏆 Desafios</Text>
+                  <Text style={styles.feedShare}>Ver todos ›</Text>
+                </View>
+                <Text style={styles.desafioTitle}>
+                  {topDesafio.icon} {topDesafio.title}
+                </Text>
+                <View style={styles.desafioTrack}>
+                  <View style={[styles.desafioFill, { width: `${Math.round(topDesafio.pct * 100)}%` }]} />
+                </View>
+                <Text style={styles.desafioMeta}>
+                  {topDesafio.done
+                    ? 'Concluído! 🎉'
+                    : `${topDesafio.current.toLocaleString('pt-BR')} / ${topDesafio.target.toLocaleString('pt-BR')} ${topDesafio.unit}`}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
+
+          {/* Banner do tier grátis — no meio do feed (visível, fora do leitor §2.5).
+              No-op p/ plano pago / Expo Go. */}
+          <AdBanner style={styles.ad} />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -439,7 +418,9 @@ const styles = StyleSheet.create({
   bigTitle: { color: HUB.onBg, fontSize: 30, fontFamily: BrandFont.extrabold, marginTop: 14, marginBottom: 14 },
 
   // Hero "Lendo agora" (roxo)
-  hero: { flexDirection: 'row', gap: 14, borderRadius: 24, padding: 16, alignItems: 'center', backgroundColor: HUB.hero, ...cardShadow },
+  // Hero "Lendo agora" = CTA principal. Borda verde da marca p/ destacar sobre o fundo roxo
+  // (antes o card roxo sumia no fundo roxo) + respiro em cima/baixo.
+  hero: { flexDirection: 'row', gap: 14, borderRadius: 24, padding: 16, marginTop: 16, marginBottom: 2, alignItems: 'center', backgroundColor: HUB.hero, borderWidth: 1.5, borderColor: HUB.green, ...cardShadow },
   heroCover: { width: 60, height: 84, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.22)', alignItems: 'center', justifyContent: 'center', gap: 4 },
   heroCoverText: { color: 'rgba(255,255,255,0.9)', fontSize: 10, fontWeight: '800' },
   heroCoverIcon: { fontSize: 24 },
