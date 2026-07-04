@@ -28,7 +28,7 @@ export type CardVariant = 'escuro' | 'transparente' | 'compacto' | 'capa' | 'fot
 
 export const CARD_VARIANTS: { id: CardVariant; label: string }[] = [
   { id: 'escuro', label: 'Escuro' },
-  { id: 'transparente', label: 'Transparente' },
+  { id: 'transparente', label: 'Translúcido' },
   { id: 'compacto', label: 'Compacto' },
   { id: 'capa', label: 'Sobre a capa' },
   { id: 'foto', label: 'Sobre sua foto' },
@@ -256,12 +256,12 @@ export function ShareableCard({
     variant === 'citacao' ? quoteContent : recapContent ?? sessionContent ?? generalContent;
 
   if (variant === 'transparente') {
-    // Fundo transparente → o PNG capturado fica sem fundo (sticker p/ Story). SEM
-    // overflow:hidden/borderRadius aqui: no Android o clipping de cantos arredondados
-    // força um buffer offscreen que o view-shot compõe sobre PRETO (era a causa do
-    // "fundo preto" no sticker). Um sticker flutua livre, não precisa de cantos.
+    // Modo TRANSLÚCIDO (2026-07-04): o view-shot no Android não preserva alpha de fundo
+    // totalmente transparente (sai preto no sticker — limitação do device, não do código).
+    // Solução Strava-friendly: fundo escuro SEMITRANSPARENTE — o card flutua sobre a foto
+    // do Story deixando a imagem vazar por trás, e a captura é confiável (opaca).
     return (
-      <View style={[s.card, s.transparent, sealPad, s.noClip]}>
+      <View style={[s.card, s.translucent, sealPad]}>
         {seal}
         {content}
       </View>
@@ -306,9 +306,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  transparent: { backgroundColor: 'transparent' },
-  /** Desliga o clipping de cantos só no modelo transparente (evita o preto do view-shot no Android). */
-  noClip: { overflow: 'visible', borderRadius: 0 },
+  /** Sticker translúcido: escuro semitransparente (a foto do Story aparece por trás). */
+  translucent: { backgroundColor: 'rgba(14,11,22,0.68)' },
   /** Espaço extra no topo quando o selo de fundador está presente (não cobre o título). */
   withSeal: { paddingTop: 52 },
   // Selo de fundador (canto superior direito do card compartilhável).
