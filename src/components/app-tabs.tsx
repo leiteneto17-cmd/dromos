@@ -11,17 +11,19 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { Social } from '@/theme/social';
 import { useLibrary } from '@/store/library';
 
-// Paleta da nav — OLED dark-first (vidro escuro + verde-neon). Independe do tema do app.
+// Paleta da nav — OLED dark-first (vidro escuro + verde da MARCA). Independe do tema do app.
+// Verde = Social.green (#5EF0A0), não mais o #00FF66 puro (fora da marca — GUIA-DE-MARCA §3).
 const NAV = {
   pill: 'rgba(20, 20, 25, 0.55)', // fundo escuro ultra-translúcido (vidro)
   border: 'rgba(255, 255, 255, 0.12)', // linha de brilho reflexivo (border gloss)
-  inactive: '#8A968F', // ícones inativos
-  active: '#00FF66', // verde-neon brilhante (aba ativa)
-  centerBg: '#052E16', // botão central (verde escuro profundo)
-  centerGlow: '#00FF66', // halo verde-neon intenso (glow)
-  centerIcon: '#00FF66', // ícone central neon combinando
+  inactive: Social.muted, // ícones inativos (cinza roxo da marca)
+  active: Social.green, // verde-menta da marca (aba ativa)
+  centerBg: '#052E16', // botão central (verde escuro profundo — surface do FAB)
+  centerGlow: Social.green, // halo verde da marca
+  centerIcon: Social.green, // ícone central combinando
   pillFallback: 'rgba(15, 15, 15, 0.85)', // fallback OLED escuro se o blur falhar
 };
 

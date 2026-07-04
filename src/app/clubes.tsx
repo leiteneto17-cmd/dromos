@@ -20,6 +20,7 @@ import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import { criarClube, entrarPorCodigo, meusClubes, type Clube } from '@/services/clube';
+import { Social } from '@/theme/social';
 import { useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
 
@@ -214,7 +215,7 @@ export default function ClubesScreen() {
                   disabled={!bookId || busy}
                   style={[styles.cta, { backgroundColor: bookId && !busy ? c.green : c.border }]}>
                   {busy ? (
-                    <ActivityIndicator color="#14121C" />
+                    <ActivityIndicator color={Social.dark} />
                   ) : (
                     <Text style={styles.ctaText}>Criar clube</Text>
                   )}
@@ -300,7 +301,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   cta: { borderRadius: 12, paddingHorizontal: 18, paddingVertical: 10 },
-  ctaText: { fontSize: 14.5, fontWeight: '800', color: '#14121C' },
+  ctaText: { fontSize: 14.5, fontWeight: '800', color: Social.dark },
   joinRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   input: {
     flex: 1,

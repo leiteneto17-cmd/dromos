@@ -20,6 +20,7 @@ import {
 
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
+import { Social } from '@/theme/social';
 import {
   apagarClube,
   apagarPost,
@@ -271,7 +272,7 @@ export default function ClubeScreen() {
                       borderColor: on ? c.green : c.border,
                     },
                   ]}>
-                  <Text style={[styles.stageNo, { color: on ? '#14121C' : c.textDim }]}>
+                  <Text style={[styles.stageNo, { color: on ? Social.dark : c.textDim }]}>
                     {e.stage_no}
                   </Text>
                 </View>
@@ -485,7 +486,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   sendBtn: { alignSelf: 'flex-end', borderRadius: 12, paddingHorizontal: 18, paddingVertical: 9 },
-  sendText: { fontSize: 14, fontWeight: '800', color: '#14121C' },
+  sendText: { fontSize: 14, fontWeight: '800', color: Social.dark },
   post: { gap: 4 },
   postTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   postAuthor: { fontSize: 13.5, fontWeight: '800', flex: 1 },

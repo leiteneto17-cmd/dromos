@@ -44,8 +44,10 @@ const CARD_W = Math.min(SCREEN * 0.72, 300);
 const FB_APP_ID = (Constants.expoConfig?.extra as { fbAppId?: string } | undefined)?.fbAppId ?? '';
 // Cores do fundo do Story (gradiente da identidade social §2.7) — o card vai como
 // STICKER por cima, então o modelo "Transparente" flutua sobre este fundo/na foto do usuário.
+// Gradiente do Story = marca (Social.purpleTop → Social.dark). Hex literal porque o nome
+// `Social` aqui é o do react-native-share; valores batem com src/theme/social.ts.
 const STORY_TOP = '#3B2A63';
-const STORY_BOTTOM = '#14121C';
+const STORY_BOTTOM = '#0E0B16';
 
 // No Expo Go o módulo nativo do expo-media-library não existe → nem tentamos
 // importá-lo (o import dinâmico ainda "resolve" com funções undefined e quebraria).

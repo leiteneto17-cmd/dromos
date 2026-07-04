@@ -25,6 +25,7 @@ import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, T
 import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
+import { Social } from '@/theme/social';
 import { featuredBooks, searchBooks, type CatalogBook, type LangFilter } from '@/services/book-catalog';
 import {
   bookKeyOf,
@@ -671,6 +672,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 7,
   },
-  clubeCtaText: { fontSize: 13, fontWeight: '900', color: '#14121C' },
+  clubeCtaText: { fontSize: 13, fontWeight: '900', color: Social.dark },
   moreText: { fontSize: 14, fontWeight: '700' },
 });

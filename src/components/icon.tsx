@@ -36,9 +36,10 @@ export type IconName =
   | 'sparkles'
   | 'logout';
 
-/** Cores fixas da marca (PagePace 2026) — usadas só no gradiente de destaque. */
-const BRAND_PURPLE = '#7C3AED';
-const BRAND_NEON = '#00FF66';
+/** Cores da marca (Dromos) — usadas só no gradiente de destaque dos ícones.
+ *  Alinhadas ao GUIA-DE-MARCA §3 (era #7C3AED/#00FF66, fora da paleta). */
+const BRAND_PURPLE = '#6E4FB0';
+const BRAND_NEON = '#5EF0A0';
 
 type ShapeOpts = {
   stroke: string;

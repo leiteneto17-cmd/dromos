@@ -6,6 +6,11 @@ O app está **meio-marcado**: a paleta certa existe em `src/theme`, mas o CHROME
 usa cores fora dela, e a fonte de marca (Poppins) só chegou a 2 lugares. Resultado: não parece
 "feito pela mesma mão". Não achei neon vazando para dentro do leitor (regra das duas peles OK).
 
+> **✅ P1 + P2 CONCLUÍDOS (2026-07-04):** nav e ícones agora usam `Social.green` (#5EF0A0);
+> `icon.tsx` BRAND_* alinhados (#6E4FB0/#5EF0A0); link azul → roxo da marca; near-black
+> `#14121C` unificado em `Social.dark` (#0E0B16). Nenhum `#00FF66`/`#3c87f7`/`#7C3AED`/`#14121C`
+> restou no código. Falta: P3 (token danger) e P4 (rollout da fonte de marca).
+
 ## P1 — Cores OFF-BRAND no chrome mais visível (gritante — corrigir já)
 1. **Barra de navegação** (`src/components/app-tabs.tsx`): usa `#00FF66` (verde PURO berrante) na
    aba ativa, no glow e no ícone central. **A marca é verde-menta `#3EE89A`/`#5EF0A0`**, não neon
