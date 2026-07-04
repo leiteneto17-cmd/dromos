@@ -43,7 +43,12 @@
    e `/clube` (trilha de etapas, discussão da etapa, publicar/apagar resposta, compartilhar
    código via Share) + faixa "📖 Clube do Livro" na aba Comunidade. Rotas novas exigiram
    patch manual do `.expo/types/router.d.ts` (regenera no próximo `expo start`).
-   **🔶 G3 CONSTRUÍDA (2026-07-03, aguardando teste a dois):** consentimento explícito no
+   **✅ G3 TESTADA — M3 BATIDO, MVP DO CLUBE COMPLETO (2026-07-03, testado na APK de
+   release: Logos ok, código de convite ok, moderação ok).** Ajustes pós-teste (aguardando
+   verificação): feed "Seguindo" agora só mostra os ÚLTIMOS 7 DIAS (quem segue muita gente
+   acumulava velharia) e o Clube ganhou CARD DE DESTAQUE na Comunidade (gradiente roxo +
+   CTA verde neon, cores fixas §2.7). v3 do clube (descoberta/ranking) = pós-rede.
+   Conteúdo original da G3: consentimento explícito no
    join (R2); seção "Lendo junto" com páginas por membro no livro do clube (respeita
    visibility — sem dado = "—"); Logos 📜 em post (NOVA tabela `club_post_logos` no
    schema.sql — ⚠️ REAPLICAR a seção do clube no SQL Editor); ⋯ do post = denunciar

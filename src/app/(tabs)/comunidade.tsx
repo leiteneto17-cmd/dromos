@@ -17,6 +17,7 @@
  * (vertical), descoberta depois (horizontal, explorar é opcional).
  */
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -116,7 +117,10 @@ export default function CommunityScreen() {
     const [sh, pop, fd] = await Promise.all([getMyShelf(), getPopularBooks(), getFeed()]);
     setShelf(sh);
     setPopular(pop);
-    setFeed(fd);
+    // Janela de 7 dias: quem segue muita gente acumulava atividade VELHA no feed —
+    // mesmo retrátil, virava poluição. Feed social é sobre o AGORA (estilo Strava).
+    const corte = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    setFeed(fd.filter((f) => new Date(f.created_at).getTime() >= corte));
   }, [user, lang]);
 
   useFocusEffect(
@@ -443,26 +447,27 @@ export default function CommunityScreen() {
           ) : (
             /* ---- Tela inicial (livros): Seguindo + Em alta + Populares ---- */
             <>
-              {/* Clube do Livro guiado (G2) — atalho discreto, mesmo padrão da faixa ENEM */}
-              <Pressable
-                onPress={() => router.push({ pathname: '/clubes' })}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: c.card,
-                  borderColor: c.border,
-                  borderWidth: 1,
-                  borderRadius: 12,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  marginBottom: 12,
-                }}>
-                <Text style={{ fontSize: 13.5, color: c.textDim }} numberOfLines={1}>
-                  📖 <Text style={{ fontWeight: '800', color: c.text }}>Clube do Livro</Text>
-                  {'  '}leia junto, semana a semana
-                </Text>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: c.purple }}>›</Text>
+              {/* Clube do Livro guiado — card de destaque (gradiente roxo da identidade
+                  social §2.7 + borda/acento verde neon). É a feature-vitrine da aba. */}
+              <Pressable onPress={() => router.push({ pathname: '/clubes' })}>
+                <LinearGradient
+                  colors={['#3B2A63', '#221A38']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.clubeCard}>
+                  <View style={styles.clubeIconWrap}>
+                    <Text style={styles.clubeIcon}>📖</Text>
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.clubeTitle}>Clube do Livro</Text>
+                    <Text style={styles.clubeSub} numberOfLines={1}>
+                      Leia junto: cronograma semanal + discussão guiada
+                    </Text>
+                  </View>
+                  <View style={styles.clubeCta}>
+                    <Text style={styles.clubeCtaText}>Entrar ›</Text>
+                  </View>
+                </LinearGradient>
               </Pressable>
 
               {/* Feed "Seguindo" — leituras de quem você segue (§2.6, veio da ex-aba Atividades) */}
@@ -471,8 +476,8 @@ export default function CommunityScreen() {
                   <SectionTitle name="users">Seguindo</SectionTitle>
                   {feed.length === 0 ? (
                     <Text style={[styles.hint, { color: c.textFaint, marginBottom: 6 }]}>
-                      Siga leitores (busque em 👥 Pessoas ou toque no nome de quem escreve resenhas) — as
-                      leituras deles aparecem aqui.
+                      Nenhuma leitura de quem você segue nos últimos 7 dias. Siga mais leitores
+                      (busque em 👥 Pessoas) — as leituras recentes deles aparecem aqui.
                     </Text>
                   ) : (
                     <>
@@ -655,5 +660,36 @@ const styles = StyleSheet.create({
   kudoIcon: { fontSize: 22 },
   kudoCount: { fontSize: 12, fontWeight: '800', marginTop: 2 },
   moreBtn: { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
+  // Card de destaque do Clube do Livro — cores FIXAS da identidade social (§2.7):
+  // gradiente roxo profundo + verde neon, independente do tema do leitor.
+  clubeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(62,232,154,0.35)',
+  },
+  clubeIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(62,232,154,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clubeIcon: { fontSize: 22 },
+  clubeTitle: { fontSize: 16, fontWeight: '900', color: '#EDEAF5' },
+  clubeSub: { fontSize: 12.5, color: '#B9A6E8', marginTop: 1 },
+  clubeCta: {
+    backgroundColor: '#3EE89A',
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+  },
+  clubeCtaText: { fontSize: 13, fontWeight: '900', color: '#14121C' },
   moreText: { fontSize: 14, fontWeight: '700' },
 });
