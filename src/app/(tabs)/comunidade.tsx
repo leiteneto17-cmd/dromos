@@ -443,6 +443,28 @@ export default function CommunityScreen() {
           ) : (
             /* ---- Tela inicial (livros): Seguindo + Em alta + Populares ---- */
             <>
+              {/* Clube do Livro guiado (G2) — atalho discreto, mesmo padrão da faixa ENEM */}
+              <Pressable
+                onPress={() => router.push({ pathname: '/clubes' })}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: c.card,
+                  borderColor: c.border,
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  marginBottom: 12,
+                }}>
+                <Text style={{ fontSize: 13.5, color: c.textDim }} numberOfLines={1}>
+                  📖 <Text style={{ fontWeight: '800', color: c.text }}>Clube do Livro</Text>
+                  {'  '}leia junto, semana a semana
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: c.purple }}>›</Text>
+              </Pressable>
+
               {/* Feed "Seguindo" — leituras de quem você segue (§2.6, veio da ex-aba Atividades) */}
               {user ? (
                 <>

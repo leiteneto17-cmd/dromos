@@ -35,8 +35,16 @@
    `is_club_member` security definer + RPCs `club_create`/`club_join`/
    `club_stage_set_questions`). Os 4 blocos de `supabase/teste-clube-g1.sql` passaram:
    criação com etapas, invisibilidade pré-join, entrada por código, post, bloqueio
-   escondendo post, dono removendo membro. **Próximo: Feature G2** (clube guiado N=1 no
-   app — criar clube de um livro, trilha de etapas roxo+verde, perguntas por IA).
+   escondendo post, dono removendo membro.
+   **🔶 G2 CONSTRUÍDA (2026-07-03, aguardando teste no aparelho):** `services/clube.ts`
+   (cronograma determinístico semanas→etapas; perguntas por IA BYOK→gerida com anti-spoiler
+   no prompt e cache via `club_stage_set_questions`; posts com nomes de perfil) + telas
+   `/clubes` (meus clubes, criar de livro da biblioteca, entrar por código — G3.1 antecipado)
+   e `/clube` (trilha de etapas, discussão da etapa, publicar/apagar resposta, compartilhar
+   código via Share) + faixa "📖 Clube do Livro" na aba Comunidade. Rotas novas exigiram
+   patch manual do `.expo/types/router.d.ts` (regenera no próximo `expo start`).
+   **Falta da G3:** progresso dos membros na trilha, Logos em post, denunciar/bloquear na
+   UI do clube (moderation.ts), aviso de consentimento no join.
 2. Ranking de desafios entre amigos.
 3. Notificação de domingo do recap (opcional; expo-notifications via require preguiçoso).
 4. Checklist de boas-vindas na Home (junto do paywall).
