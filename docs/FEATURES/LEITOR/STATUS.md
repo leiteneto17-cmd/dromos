@@ -18,6 +18,13 @@
 - Zero notificações/anúncios POR CIMA do texto durante a leitura (CLAUDE.md §2.5).
 - Bionic em texto grande = memoizado, conteúdo virtualizado/paginado (§4.6).
 
+## 🔀 Decisão em aberto (2026-07-04): tradução on-device vs pré-traduzir acervo
+Usuário quer **remover a tradução 🌐 sob demanda** e **pré-traduzir o acervo no PC + hospedar**
+(acervo pequeno, custo ~zero, qualidade melhor, offline instantâneo). Prós: destrava o bug do
+áudio em inglês (acervo já vem PT), mata a cota de IA da tradução, remove código frágil. Contra:
+EPUBs que o USUÁRIO importa em inglês perderiam o 🌐 PT (avaliar manter só p/ importados, ou
+oferecer só o acervo pré-traduzido). Decidir antes de mexer no áudio+tradução. Ver [[proximos-passos]].
+
 ## Roadmap / próximos passos
 1. Testar auto-traduzir (`pt=1`) no aparelho.
 2. Evoluir tradução v1 (se valer): "Ouvir" em PT; seleção/grifo no modo PT; blocos maiores

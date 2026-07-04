@@ -120,3 +120,10 @@ opção"). Reusar `user_blocks`/`content_reports`/`moderation.ts` do C3.
 - **Privacidade:** o que a pessoa lê é íntimo (§4.8) — metas e histórico nascem privados.
 - **Sem spoiler:** itens que "resumem" a obra (personagens/linha do tempo) devem respeitar a
   **posição de leitura** e nunca usar o texto ainda não lido.
+
+## Catálogo infantil PT-BR + voz do pai (ideia 2026-07-04)
+Substituir o catálogo inglês por um **acervo infantil/educativo em PT-BR**. Diferencial de alto
+impacto emocional: o **pai/mãe clona a própria voz** (Chatterbox, ~15s de áudio, sem GPU) e o
+filho ouve o livro na voz do responsável. Encaixa no motor de voz pré-renderizado (voz-tts-estrategia)
+e no público família. Validar: qualidade pt-BR do clone, consentimento/LGPD de voz de menor, UX do
+upload de voz. Ver docs/FEATURES/TTS/PARECER-CPO-AUDIO-2026-07-04.md.

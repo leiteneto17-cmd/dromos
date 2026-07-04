@@ -36,10 +36,10 @@ import {
 import { filterCurated, loadCurated } from '@/services/curated-catalog';
 import { useLibrary, type ImportedBook } from '@/store/library';
 
+// Acervo só em PT-BR (decisão do usuário 2026-07-04): sem catálogo inglês. Mantido como
+// lista p/ o seletor voltar fácil se um dia houver outro idioma; hoje 1 item = row escondida.
 const LANGS: { id: CatalogLang; label: string }[] = [
   { id: 'pt', label: '🇧🇷 Português' },
-  { id: 'en', label: '🇺🇸 Inglês' },
-  { id: 'all', label: '🌐 Todos' },
 ];
 
 export default function ExplorarScreen() {
@@ -255,23 +255,26 @@ export default function ExplorarScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.langRow}>
-        {LANGS.map((l) => {
-          const active = l.id === lang;
-          return (
-            <Pressable
-              key={l.id}
-              onPress={() => setLang(l.id)}
-              style={[
-                styles.langChip,
-                { borderColor: active ? c.green : c.border },
-                active && { borderWidth: 2 },
-              ]}>
-              <Text style={[styles.langText, { color: active ? c.green : c.textDim }]}>{l.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {/* Seletor de idioma só aparece se houver mais de um idioma (hoje: só PT-BR). */}
+      {LANGS.length > 1 ? (
+        <View style={styles.langRow}>
+          {LANGS.map((l) => {
+            const active = l.id === lang;
+            return (
+              <Pressable
+                key={l.id}
+                onPress={() => setLang(l.id)}
+                style={[
+                  styles.langChip,
+                  { borderColor: active ? c.green : c.border },
+                  active && { borderWidth: 2 },
+                ]}>
+                <Text style={[styles.langText, { color: active ? c.green : c.textDim }]}>{l.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
 
       {/* Atalhos de descoberta */}
       <View style={styles.quickRow}>

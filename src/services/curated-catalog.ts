@@ -48,40 +48,9 @@ const MANIFEST_URL = SUPABASE_URL
  * catalog.json com "language": "pt".
  */
 const SEED: CuratedEntry[] = [
-  // --- Clássicos universais (edições em domínio público; em INGLÊS via Gutenberg).
-  // Aparecem em "Todos"/"Inglês". Para mostrá-los em "Português", hospede a tradução
-  // PT no catalog.json com "language": "pt". Títulos verificados em 2026-06-28. ---
-  { title: 'A Arte da Guerra (The Art of War)', author: 'Sun Tzu', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/132.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/132/pg132.cover.medium.jpg' },
-  { title: 'A Divina Comédia (The Divine Comedy)', author: 'Dante Alighieri', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1004.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1004/pg1004.cover.medium.jpg' },
-  { title: 'O Príncipe (The Prince)', author: 'Maquiavel', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1232.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1232/pg1232.cover.medium.jpg' },
-  { title: 'Meditações (Meditations)', author: 'Marco Aurélio', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/2680.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/2680/pg2680.cover.medium.jpg' },
-  { title: 'Assim Falou Zaratustra', author: 'Friedrich Nietzsche', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1998.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1998/pg1998.cover.medium.jpg' },
-  { title: 'A República (The Republic)', author: 'Platão', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1497.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1497/pg1497.cover.medium.jpg' },
-  { title: 'Crime e Castigo (Crime and Punishment)', author: 'Dostoiévski', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/2554.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/2554/pg2554.cover.medium.jpg' },
-  { title: 'Os Irmãos Karamázov', author: 'Dostoiévski', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/28054.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/28054/pg28054.cover.medium.jpg' },
-  { title: 'Guerra e Paz (War and Peace)', author: 'Liev Tolstói', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/2600.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/2600/pg2600.cover.medium.jpg' },
-  { title: 'Anna Kariênina (Anna Karenina)', author: 'Liev Tolstói', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1399.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1399/pg1399.cover.medium.jpg' },
-  { title: 'Orgulho e Preconceito (Pride and Prejudice)', author: 'Jane Austen', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1342.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg' },
-  { title: 'Frankenstein', author: 'Mary Shelley', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/84.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/84/pg84.cover.medium.jpg' },
-  { title: 'Drácula (Dracula)', author: 'Bram Stoker', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/345.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/345/pg345.cover.medium.jpg' },
-  { title: 'As Aventuras de Sherlock Holmes', author: 'Arthur Conan Doyle', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1661.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1661/pg1661.cover.medium.jpg' },
-  { title: 'Moby Dick', author: 'Herman Melville', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/2701.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/2701/pg2701.cover.medium.jpg' },
-  { title: 'O Conde de Monte Cristo (Monte Cristo)', author: 'Alexandre Dumas', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1184.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1184/pg1184.cover.medium.jpg' },
-  { title: 'Os Miseráveis (Les Misérables)', author: 'Victor Hugo', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/135.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/135/pg135.cover.medium.jpg' },
-  { title: 'Dom Quixote (Don Quixote)', author: 'Miguel de Cervantes', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/996.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/996/pg996.cover.medium.jpg' },
-  { title: 'A Ilíada (The Iliad)', author: 'Homero', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/6130.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/6130/pg6130.cover.medium.jpg' },
-  { title: 'A Odisseia (The Odyssey)', author: 'Homero', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1727.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1727/pg1727.cover.medium.jpg' },
-  { title: 'Hamlet', author: 'William Shakespeare', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/27761.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/27761/pg27761.cover.medium.jpg' },
-  { title: 'Romeu e Julieta (Romeo and Juliet)', author: 'William Shakespeare', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/1513.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/1513/pg1513.cover.medium.jpg' },
-  { title: 'O Retrato de Dorian Gray', author: 'Oscar Wilde', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/174.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/174/pg174.cover.medium.jpg' },
-  { title: 'Alice no País das Maravilhas', author: 'Lewis Carroll', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/11.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/11/pg11.cover.medium.jpg' },
-  { title: 'A Máquina do Tempo (The Time Machine)', author: 'H. G. Wells', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/35.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/35/pg35.cover.medium.jpg' },
-  { title: 'A Guerra dos Mundos (War of the Worlds)', author: 'H. G. Wells', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/36.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/36/pg36.cover.medium.jpg' },
-  { title: 'A Metamorfose (Metamorphosis)', author: 'Franz Kafka', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/5200.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/5200/pg5200.cover.medium.jpg' },
-  { title: 'O Coração das Trevas (Heart of Darkness)', author: 'Joseph Conrad', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/219.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/219/pg219.cover.medium.jpg' },
-  { title: 'Contos de Grimm', author: 'Irmãos Grimm', language: 'en', epubUrl: 'https://www.gutenberg.org/ebooks/2591.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/2591/pg2591.cover.medium.jpg' },
-
-  // --- Clássicos brasileiros/portugueses (em PT via Gutenberg). Aparecem em "Português". ---
+  // --- Catálogo PT-BR (decisão do usuário 2026-07-04: acervo só em português). Os clássicos
+  // universais em inglês foram REMOVIDOS; entram como TRADUÇÕES PT hospedadas no nosso acervo
+  // (curated_books/Storage) quando prontas. Clássicos brasileiros/portugueses via Gutenberg: ---
   { title: 'Dom Casmurro', author: 'Machado de Assis', language: 'pt', epubUrl: 'https://www.gutenberg.org/ebooks/55752.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/55752/pg55752.cover.medium.jpg' },
   { title: 'Quincas Borba', author: 'Machado de Assis', language: 'pt', epubUrl: 'https://www.gutenberg.org/ebooks/55682.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/55682/pg55682.cover.medium.jpg' },
   { title: 'O Cortiço', author: 'Aluísio Azevedo', language: 'pt', epubUrl: 'https://www.gutenberg.org/ebooks/69187.epub3.images', coverUrl: 'https://www.gutenberg.org/cache/epub/69187/pg69187.cover.medium.jpg' },

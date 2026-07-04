@@ -95,7 +95,7 @@ export default function CommunityScreen() {
   const [people, setPeople] = useState<PublicProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [lang, setLang] = useState<LangFilter>('pt');
+  const lang: LangFilter = 'pt'; // acervo só PT-BR (2026-07-04)
   // Busca "aberta" = mostra os chips Livros/Pessoas + idioma (contextuais). Abre ao focar
   // o campo e só fecha no "Fechar"/"‹ Voltar" (blur não fecha — senão tocar num chip fecharia).
   const [searchOpen, setSearchOpen] = useState(false);
@@ -305,26 +305,7 @@ export default function CommunityScreen() {
                 })}
               </View>
 
-              {/* Idioma (regionalização) — só faz sentido na busca de livros */}
-              {mode === 'books' ? (
-                <View style={styles.langRow}>
-                  {([
-                    ['pt', '🇧🇷 Português'],
-                    ['en', '🇺🇸 Inglês'],
-                    ['all', '🌐 Todos'],
-                  ] as const).map(([l, label]) => {
-                    const active = lang === l;
-                    return (
-                      <Pressable
-                        key={l}
-                        onPress={() => setLang(l)}
-                        style={[styles.langChip, { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' }]}>
-                        <Text style={[styles.langText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
+              {/* Idioma: acervo só PT-BR (2026-07-04) → seletor removido. `lang` fica fixo 'pt'. */}
 
               {/* Sugestões — atalhos de busca pronta (praticidade: 1 toque já busca) */}
               {mode === 'books' && query.trim().length < 2 ? (
