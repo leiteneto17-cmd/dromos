@@ -30,7 +30,13 @@
    após parecer CPO): ver `ROADMAP-CLUBE.md` (v2) — MVP funciona com N=1 (cronograma por
    capítulos + discussão por IA anti-spoiler) e N=2 (convite por link/código); descoberta
    pública/ranking adiados p/ v3 pós-rede. Parecer: `PARECER-CPO-2026-07-03.md`.
-   Próximo passo de código: **Feature G1** (schema clubs/members/stages/posts + RLS).
+   **✅ G1 CONCLUÍDA — M1 BATIDO (2026-07-03, testado em produção com 2 contas):** seção
+   "CLUBE DO LIVRO GUIADO" no `supabase/schema.sql` (clubs/members/stages/posts + RLS via
+   `is_club_member` security definer + RPCs `club_create`/`club_join`/
+   `club_stage_set_questions`). Os 4 blocos de `supabase/teste-clube-g1.sql` passaram:
+   criação com etapas, invisibilidade pré-join, entrada por código, post, bloqueio
+   escondendo post, dono removendo membro. **Próximo: Feature G2** (clube guiado N=1 no
+   app — criar clube de um livro, trilha de etapas roxo+verde, perguntas por IA).
 2. Ranking de desafios entre amigos.
 3. Notificação de domingo do recap (opcional; expo-notifications via require preguiçoso).
 4. Checklist de boas-vindas na Home (junto do paywall).

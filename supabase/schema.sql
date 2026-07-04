@@ -255,7 +255,7 @@ create policy "dono remove bloqueio"
 create table if not exists public.content_reports (
   id uuid primary key default gen_random_uuid(),
   reporter_id uuid not null references auth.users (id) on delete cascade,
-  target_type text not null,                 -- 'review'
+  target_type text not null,                 -- 'review' | 'club_post' | 'club' | ...
   target_id uuid,                            -- id do conteúdo denunciado
   target_user_id uuid,                       -- autor denunciado (ajuda a moderação)
   reason text,
@@ -775,3 +775,209 @@ values
   ('Romeu e Julieta', 'William Shakespeare', 'pt', true, 'en', 'pdf',
    'https://tffpsfjrqgayrosgmsxy.supabase.co/storage/v1/object/public/acervo/romeu-julieta-pt.pdf', null, 50)
 on conflict (file_url) do nothing;
+
+-- =====================================================================
+-- CLUBE DO LIVRO GUIADO (social v2 — docs/FEATURES/SOCIAL/ROADMAP-CLUBE.md, Feature G1)
+-- Clube em torno de UM livro, com cronograma por etapas e discussão guiada.
+-- Desenho do MVP: funciona com N=1 (dono sozinho) e N=2+ (convite por CÓDIGO —
+-- clubes NÃO são descobríveis publicamente nesta fase; descoberta = v3 pós-rede).
+-- Escrita de clube/membros passa por RPCs `security definer` (club_create/club_join):
+-- menos policies de insert = menos chance de furo de RLS (risco R5 do plano).
+-- =====================================================================
+create table if not exists public.clubs (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  description text,
+  book_title text not null,
+  book_author text,
+  book_cover_url text,
+  book_file_url text,                              -- opcional: link p/ o acervo curado
+  invite_code text not null unique,                -- convite por código digitável (G3.1)
+  weeks int not null default 4 check (weeks between 1 and 52),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.club_members (
+  club_id uuid not null references public.clubs (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  role text not null default 'member' check (role in ('owner', 'member')),
+  joined_at timestamptz not null default now(),
+  primary key (club_id, user_id)
+);
+create index if not exists club_members_user_idx on public.club_members (user_id);
+
+-- Etapas do cronograma (a "trilha"). perguntas_json = cache das perguntas de discussão
+-- geradas por IA (1× por etapa — §5: nunca regerar). Cálculo do cronograma é do app.
+create table if not exists public.club_stages (
+  club_id uuid not null references public.clubs (id) on delete cascade,
+  stage_no int not null check (stage_no >= 1),
+  title text not null,                             -- ex.: "Semana 1 · caps. 1–5"
+  chapters text,
+  target_date date,
+  perguntas_json jsonb,
+  primary key (club_id, stage_no)
+);
+
+-- Posts da discussão (UGC → moderação §4.8; denúncia via content_reports
+-- target_type 'club_post', bloqueio filtrado no select).
+create table if not exists public.club_posts (
+  id uuid primary key default gen_random_uuid(),
+  club_id uuid not null references public.clubs (id) on delete cascade,
+  stage_no int,                                    -- null = mural geral do clube
+  author_id uuid not null references auth.users (id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists club_posts_club_idx on public.club_posts (club_id, created_at desc);
+
+alter table public.clubs        enable row level security;
+alter table public.club_members enable row level security;
+alter table public.club_stages  enable row level security;
+alter table public.club_posts   enable row level security;
+
+-- "Sou membro?" como função SECURITY DEFINER: policy de club_members que consulta
+-- club_members entraria em recursão infinita de RLS; a função roda fora do RLS.
+create or replace function public.is_club_member(p_club uuid)
+returns boolean language sql security definer set search_path = public stable as $$
+  select exists (
+    select 1 from public.club_members m
+    where m.club_id = p_club and m.user_id = auth.uid()
+  );
+$$;
+
+-- LER: só membros (sem descoberta pública no MVP; convite não vaza clube p/ fora).
+drop policy if exists "membro vê clube" on public.clubs;
+create policy "membro vê clube" on public.clubs
+  for select to authenticated using (public.is_club_member(id));
+
+drop policy if exists "dono edita clube" on public.clubs;
+create policy "dono edita clube" on public.clubs
+  for update to authenticated using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+drop policy if exists "dono apaga clube" on public.clubs;
+create policy "dono apaga clube" on public.clubs
+  for delete to authenticated using (auth.uid() = owner_id);
+
+drop policy if exists "membro vê membros" on public.club_members;
+create policy "membro vê membros" on public.club_members
+  for select to authenticated using (public.is_club_member(club_id));
+
+-- Sair: eu mesmo; OU o dono remove (moderação G3.3). Dono não sai — apaga o clube.
+drop policy if exists "sair ou ser removido" on public.club_members;
+create policy "sair ou ser removido" on public.club_members
+  for delete to authenticated
+  using (
+    (auth.uid() = user_id and role <> 'owner')
+    or exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())
+  );
+
+drop policy if exists "membro vê etapas" on public.club_stages;
+create policy "membro vê etapas" on public.club_stages
+  for select to authenticated using (public.is_club_member(club_id));
+
+-- Ver posts: membro E sem bloqueio entre mim e o autor (mesmo padrão dos scraps).
+drop policy if exists "membro vê posts" on public.club_posts;
+create policy "membro vê posts" on public.club_posts
+  for select to authenticated
+  using (
+    public.is_club_member(club_id)
+    and not exists (
+      select 1 from public.user_blocks b
+      where (b.blocker_id = auth.uid() and b.blocked_id = author_id)
+         or (b.blocker_id = author_id and b.blocked_id = auth.uid())
+    )
+  );
+
+drop policy if exists "membro posta" on public.club_posts;
+create policy "membro posta" on public.club_posts
+  for insert to authenticated
+  with check (auth.uid() = author_id and public.is_club_member(club_id));
+
+-- Apagar post: o autor OU o dono do clube (moderação G3.3).
+drop policy if exists "apagar post do clube" on public.club_posts;
+create policy "apagar post do clube" on public.club_posts
+  for delete to authenticated
+  using (
+    auth.uid() = author_id
+    or exists (select 1 from public.clubs c where c.id = club_id and c.owner_id = auth.uid())
+  );
+
+-- ---------- RPC: criar clube (clube + dono como membro + etapas, numa transação).
+-- p_stages = jsonb array: [{"stage_no":1,"title":"Semana 1 · caps. 1–5",
+--                           "chapters":"1-5","target_date":"2026-07-12"}, ...]
+create or replace function public.club_create(
+  p_name text, p_book_title text, p_book_author text default null,
+  p_book_cover_url text default null, p_book_file_url text default null,
+  p_description text default null, p_weeks int default 4, p_stages jsonb default '[]'
+) returns public.clubs
+language plpgsql security definer set search_path = public as $$
+declare
+  v_club public.clubs;
+  v_code text;
+  s jsonb;
+begin
+  if auth.uid() is null then raise exception 'não autenticado'; end if;
+  if coalesce(trim(p_name), '') = '' or coalesce(trim(p_book_title), '') = '' then
+    raise exception 'nome e livro são obrigatórios';
+  end if;
+  -- Código de convite de 8 chars sem ambíguos (0/O/1/I); colisão é ~impossível, mas trata.
+  loop
+    v_code := upper(translate(substr(md5(random()::text || clock_timestamp()::text), 1, 8),
+                              '01oil', '89xyz'));
+    exit when not exists (select 1 from public.clubs c where c.invite_code = v_code);
+  end loop;
+
+  insert into public.clubs (owner_id, name, description, book_title, book_author,
+                            book_cover_url, book_file_url, invite_code, weeks)
+  values (auth.uid(), trim(p_name), p_description, trim(p_book_title), p_book_author,
+          p_book_cover_url, p_book_file_url, v_code, coalesce(p_weeks, 4))
+  returning * into v_club;
+
+  insert into public.club_members (club_id, user_id, role) values (v_club.id, auth.uid(), 'owner');
+
+  for s in select * from jsonb_array_elements(coalesce(p_stages, '[]'::jsonb)) loop
+    insert into public.club_stages (club_id, stage_no, title, chapters, target_date)
+    values (v_club.id, (s->>'stage_no')::int, coalesce(s->>'title', 'Etapa ' || (s->>'stage_no')),
+            s->>'chapters', nullif(s->>'target_date', '')::date);
+  end loop;
+
+  return v_club;
+end; $$;
+
+-- ---------- RPC: entrar por código de convite. Devolve o clube (o SELECT direto por
+-- código não existe — clube só é legível DEPOIS de virar membro). Bloqueio entre o
+-- convidado e o DONO impede o join (moderação).
+create or replace function public.club_join(p_code text)
+returns public.clubs
+language plpgsql security definer set search_path = public as $$
+declare
+  v_club public.clubs;
+begin
+  if auth.uid() is null then raise exception 'não autenticado'; end if;
+  select * into v_club from public.clubs where invite_code = upper(trim(p_code));
+  if v_club.id is null then raise exception 'código de convite inválido'; end if;
+  if exists (
+    select 1 from public.user_blocks b
+    where (b.blocker_id = v_club.owner_id and b.blocked_id = auth.uid())
+       or (b.blocker_id = auth.uid() and b.blocked_id = v_club.owner_id)
+  ) then raise exception 'código de convite inválido'; end if;  -- não revela bloqueio
+  insert into public.club_members (club_id, user_id, role)
+  values (v_club.id, auth.uid(), 'member')
+  on conflict (club_id, user_id) do nothing;
+  return v_club;
+end; $$;
+
+-- ---------- RPC: cachear as perguntas de discussão de uma etapa (1× — só grava se
+-- ainda NULL; qualquer membro pode preencher, quem chegar primeiro paga a geração).
+create or replace function public.club_stage_set_questions(
+  p_club uuid, p_stage int, p_questions jsonb
+) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_club_member(p_club) then raise exception 'não é membro'; end if;
+  update public.club_stages
+     set perguntas_json = p_questions
+   where club_id = p_club and stage_no = p_stage and perguntas_json is null;
+  return found;
+end; $$;
