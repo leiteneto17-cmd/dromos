@@ -18,6 +18,14 @@
   Free = voz do sistema (expo-speech).
 - Cache sempre: nunca regerar TTS do mesmo trecho (CLAUDE.md §5).
 
+## 🐛 Bugs abertos (teste APK 2026-07-04)
+- **P1 — Áudio DUPLO:** dá p/ apertar play em Francisca E Antonio e tocam sobrepostos. Guard
+  atual (`pausedRef`/`genLoadingRef` em `use-read-aloud.ts`) não cobre 2 vozes/motores
+  simultâneos. Provável: cada disparo cria uma corrente sem parar a anterior de forma global.
+- **P2 — Áudio ignora a tradução:** com 🌐 PT ligado, o áudio sai em INGLÊS. Raiz: o hook lê
+  `paragraphs` (original), não o `ptMap` traduzido. Ligado à decisão de tirar tradução on-device
+  e pré-traduzir o acervo (ver LEITOR/STATUS + [[proximos-passos]]).
+
 ## Roadmap / próximos passos
 1. Confirmar que o schema com `tts_quota_consume` foi aplicado por inteiro (há indício de
    que sim — o RPC respondeu bloqueando anônimo — mas o usuário não confirmou).

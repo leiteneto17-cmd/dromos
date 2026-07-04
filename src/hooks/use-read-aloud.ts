@@ -21,6 +21,7 @@ import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { setActiveAudioPlayer, stopAllAudio } from '@/services/ai/audio-session';
 import { synthesize } from '@/services/ai/tts';
 import { hashKey, loadCachedAudio, saveCachedAudio, type CachedAudio } from '@/services/ai/tts-cache';
 import { managedTtsAvailable, synthesizeManaged } from '@/services/ai/tts-managed';
@@ -204,6 +205,7 @@ export function useReadAloud(paragraphs: string[]) {
           // detectar o fim do parágrafo — não precisa de poll fino (mais leve).
           const player = createAudioPlayer({ uri: audio.uri }, { updateInterval: 250 });
           playerRef.current = player;
+          setActiveAudioPlayer(player); // registra: cala qualquer prévia/voz que estivesse tocando
           try {
             player.shouldCorrectPitch = true;
             player.playbackRate = rateRef.current;
@@ -257,7 +259,7 @@ export function useReadAloud(paragraphs: string[]) {
     (from = 0, charOffset = 0) => {
       sessionRef.current++; // nova sessão: invalida qualquer trabalho premium pendente
       pausedRef.current = false;
-      Speech.stop();
+      stopAllAudio(); // cala QUALQUER áudio do app (inclui prévias de voz de Integrações)
       cleanupPlayer();
       // Preferência do seletor de voz: 'device' força a voz do aparelho. Senão,
       // nuvem (BYOK ou gerida) quando disponível; em último caso, aparelho.

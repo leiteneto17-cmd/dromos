@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUI } from '@/hooks/use-ui';
 import { useRewardedAd } from '@/hooks/use-rewarded';
 import { adsUnsupported } from '@/services/ads';
+import { setActiveAudioPlayer, stopAllAudio } from '@/services/ai/audio-session';
 import { PROVIDERS, validateKey, type AIProvider } from '@/services/ai/providers';
 import { getUsage, listVoices, synthesize, type ElevenVoice, type TtsUsage } from '@/services/ai/tts';
 import { listDeviceVoices, previewDeviceVoice, type DeviceVoice } from '@/services/ai/tts-device';
@@ -118,16 +119,13 @@ export default function IntegracoesScreen() {
     carregarUso();
     carregarVozesAparelho();
     return () => {
-      try {
-        playerRef.current?.remove();
-      } catch {
-        // já liberado
-      }
+      stopAllAudio(); // sair de Integrações não deixa prévia tocando em background
     };
   }, [carregarUso, carregarVozesAparelho]);
 
   async function escolherVozAparelho(v: DeviceVoice) {
     await saveDeviceVoice({ voice: v.identifier, name: v.name });
+    stopAllAudio(); // cala prévia neural/premium antes de tocar a do aparelho
     previewDeviceVoice(v.identifier); // prévia imediata
   }
 
@@ -236,9 +234,10 @@ export default function IntegracoesScreen() {
       await FileSystem.writeAsStringAsync(uri, out.audioBase64, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      playerRef.current?.remove();
+      stopAllAudio(); // cala leitura/prévia anterior — não sobrepõe vozes
       const player = createAudioPlayer({ uri });
       playerRef.current = player;
+      setActiveAudioPlayer(player);
       player.play();
       setTtsOk('Tocando a voz de exemplo… 🔊');
       carregarUso(); // o teste consumiu alguns caracteres
@@ -269,9 +268,10 @@ export default function IntegracoesScreen() {
       await FileSystem.writeAsStringAsync(uri, audio, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      playerRef.current?.remove();
+      stopAllAudio(); // cala leitura/prévia anterior — Francisca e Antonio não tocam juntas
       const player = createAudioPlayer({ uri });
       playerRef.current = player;
+      setActiveAudioPlayer(player);
       player.play();
       setManagedOk('Tocando a voz neural… 🔊');
     } catch (e) {
