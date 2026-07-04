@@ -61,7 +61,8 @@
           "userTrackingUsageDescription": "Usamos isto para mostrar anúncios mais relevantes no plano grátis. Você pode recusar e continuar usando o app normalmente."
         }
       ],
-      "./plugins/withKotlinMetadataSkip"
+      "./plugins/withKotlinMetadataSkip",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

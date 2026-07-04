@@ -9,7 +9,7 @@ import { ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/icon';
-import { BottomTabInset } from '@/constants/theme';
+import { BottomTabInset, BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import { HUB } from '@/theme/hub';
 
@@ -142,7 +142,7 @@ const s = StyleSheet.create({
   cardHubGlow: { shadowColor: HUB.greenInk, shadowOpacity: 0.3, shadowRadius: 14 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22, marginBottom: 10 },
   sectionIcon: { fontSize: 18 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
+  sectionTitle: { fontSize: 18, fontFamily: BrandFont.semibold, letterSpacing: 0.3 },
   pill: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' },
   pillText: { fontSize: 12, fontWeight: '700' },
 });

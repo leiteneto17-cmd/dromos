@@ -51,6 +51,20 @@ export const Fonts = Platform.select({
   },
 });
 
+/**
+ * Fonte de MARCA (Poppins, empacotada via @expo-google-fonts — carregada no _layout).
+ * Em RN cada peso é uma família própria (não usar `fontWeight` junto). Use estes nomes
+ * no wordmark, títulos e números-herói. Corpo de UI segue `Fonts.sans`; leitura, `Fonts.serif`.
+ * Guia: docs/FEATURES/BRAND/GUIA-DE-MARCA.md §4.
+ */
+export const BrandFont = {
+  regular: 'Poppins_400Regular',
+  medium: 'Poppins_500Medium',
+  semibold: 'Poppins_600SemiBold',
+  bold: 'Poppins_700Bold',
+  extrabold: 'Poppins_800ExtraBold',
+} as const;
+
 export const Spacing = {
   half: 2,
   one: 4,

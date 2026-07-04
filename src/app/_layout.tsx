@@ -1,3 +1,11 @@
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/poppins';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
@@ -54,6 +62,17 @@ export default function RootLayout() {
   const user = useAuth((s) => s.user);
   const configured = useAuth((s) => s.configured);
 
+  // Fonte de marca (Poppins — CLAUDE.md §4.5: empacotada, não do sistema). Se falhar,
+  // o app segue com o fallback (não travar a leitura por causa de fonte).
+  const [fontsLoaded, fontError] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    Poppins_800ExtraBold,
+  });
+  const fontsReady = fontsLoaded || !!fontError;
+
   // Liberado quando logado. Se o Supabase NÃO estiver configurado, não dá para exigir
   // login (não há backend de auth) → libera para não deixar o app inacessível.
   const allowed = !!user || !configured;
@@ -89,7 +108,7 @@ export default function RootLayout() {
       </Stack>
       <CelebrationOverlay />
       <OnboardingOverlay />
-      {initializing ? <BootGate /> : null}
+      {initializing || !fontsReady ? <BootGate /> : null}
     </ThemeProvider>
   );
 }

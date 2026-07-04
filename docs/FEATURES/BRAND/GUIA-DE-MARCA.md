@@ -58,13 +58,14 @@ O texto corrido usa sépia/claro/escuro de `src/theme/reading.ts`. **Neon nunca 
 ---
 
 ## 4. Tipografia
-- **Marca / display (wordmark, números grandes, títulos de card):** sans **geométrico e pesado**,
-  como o "Dromos" da logo. Peso 800–900, tracking levemente negativo nos títulos.
+- **Marca / display (wordmark, números grandes, títulos):** **Poppins** — geométrica arredondada,
+  EMPACOTADA via `@expo-google-fonts/poppins` (§4.5 resolvido). Tokens em `BrandFont`
+  (`src/constants/theme.ts`): `extrabold`/`bold` no wordmark e números-herói, `semibold` em
+  títulos de seção. ⚠️ Em RN cada peso é uma família — usar o token, NÃO `fontWeight` junto.
 - **Interface (UI):** sans do sistema (`Fonts.sans`) — legível e nativo em iOS/Android.
 - **Leitura (corpo do livro):** **serifada** (`Fonts.serif`) — conforto em leitura longa (§4.5).
+  Ainda do SISTEMA (`ui-serif`) — empacotar uma serifada de e-reading (ex.: Literata) é o próximo TODO.
 - **Rótulos de seção:** caixa-alta, tracking positivo (+0.6), na cor lavanda/roxo.
-- **TODO (§4.5):** empacotar as fontes com `expo-font` — hoje são do sistema (`assets/fonts`
-  vazio), o que varia entre plataformas. Escolher 1 display + 1 serifada e embarcar.
 
 ---
 

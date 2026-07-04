@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { BookTrail } from '@/components/book-trail';
+import { BrandFont } from '@/constants/theme';
 import { deriveStats, fmtHMS } from '@/services/progress';
 import type { WeekRecap } from '@/services/recap';
 import { cleanSnippet } from '@/services/text-utils';
@@ -364,7 +365,7 @@ const s = StyleSheet.create({
   logo: {
     color: Social.green,
     fontSize: 26,
-    fontWeight: '900',
+    fontFamily: BrandFont.extrabold, // wordmark na fonte de marca (Poppins)
     marginTop: 18,
     textShadowColor: Social.green,
     textShadowRadius: 12,
