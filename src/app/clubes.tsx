@@ -68,8 +68,21 @@ export default function ClubesScreen() {
     router.push({ pathname: '/clube', params: { id: r.clube.id } });
   }
 
-  async function entrar() {
+  function entrar() {
     if (codigo.trim().length < 4) return;
+    // Consentimento explícito (R2 do plano — lição Strava, privacidade por padrão):
+    // entrar no clube = concordar em mostrar o progresso NESTE livro aos membros.
+    Alert.alert(
+      'Entrar no clube',
+      'Ao entrar, seu progresso de leitura neste livro fica visível para os membros do clube (atividades privadas continuam privadas). Tudo bem?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Entrar', onPress: () => void confirmarEntrada() },
+      ],
+    );
+  }
+
+  async function confirmarEntrada() {
     setBusy(true);
     const r = await entrarPorCodigo(codigo);
     setBusy(false);

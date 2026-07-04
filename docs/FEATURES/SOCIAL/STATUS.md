@@ -43,8 +43,14 @@
    e `/clube` (trilha de etapas, discussão da etapa, publicar/apagar resposta, compartilhar
    código via Share) + faixa "📖 Clube do Livro" na aba Comunidade. Rotas novas exigiram
    patch manual do `.expo/types/router.d.ts` (regenera no próximo `expo start`).
-   **Falta da G3:** progresso dos membros na trilha, Logos em post, denunciar/bloquear na
-   UI do clube (moderation.ts), aviso de consentimento no join.
+   **🔶 G3 CONSTRUÍDA (2026-07-03, aguardando teste a dois):** consentimento explícito no
+   join (R2); seção "Lendo junto" com páginas por membro no livro do clube (respeita
+   visibility — sem dado = "—"); Logos 📜 em post (NOVA tabela `club_post_logos` no
+   schema.sql — ⚠️ REAPLICAR a seção do clube no SQL Editor); ⋯ do post = denunciar
+   (`content_reports` 'club_post') + bloquear autor; dono remove membro (⋯ em "Lendo
+   junto"), apaga clube; membro sai. **Teste M3:** 2 aparelhos na mesma etapa, post some
+   ao bloquear, denúncia grava, remoção funciona. Depois do M3: v3 fica pós-rede
+   (descoberta/ranking) — voltar ao fluxo normal (Kokoro é a próxima pauta do usuário).
 2. Ranking de desafios entre amigos.
 3. Notificação de domingo do recap (opcional; expo-notifications via require preguiçoso).
 4. Checklist de boas-vindas na Home (junto do paywall).

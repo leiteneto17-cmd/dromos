@@ -21,16 +21,24 @@ import {
 import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import {
+  apagarClube,
   apagarPost,
+  denunciarPost,
   gerarPerguntasEtapa,
   getClube,
+  getLogos,
   getPosts,
   postar,
+  progressoMembros,
+  removerMembro,
+  sairDoClube,
+  toggleLogo,
   type Clube,
   type ClubeMember,
   type ClubePost,
   type ClubeStage,
 } from '@/services/clube';
+import { blockUser } from '@/services/community';
 import { useAuth } from '@/store/auth';
 
 export default function ClubeScreen() {
@@ -46,6 +54,11 @@ export default function ClubeScreen() {
   const [gerando, setGerando] = useState(false);
   const [texto, setTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [logos, setLogos] = useState<{ counts: Map<string, number>; meus: Set<string> }>({
+    counts: new Map(),
+    meus: new Set(),
+  });
+  const [progresso, setProgresso] = useState<Map<string, number>>(new Map());
 
   const recarregar = useCallback(async () => {
     if (!id) return;
@@ -57,6 +70,8 @@ export default function ClubeScreen() {
     setEtapas(es);
     setMembros(ms);
     setPosts(ps);
+    getLogos(ps.map((p) => p.id)).then(setLogos);
+    if (cl) progressoMembros(cl.book_title, ms.map((m) => m.user_id)).then(setProgresso);
     // Etapa "atual" = primeira com data-alvo no futuro (ou a última).
     if (es.length) {
       const hoje = new Date().toISOString().slice(0, 10);
@@ -115,6 +130,91 @@ export default function ClubeScreen() {
     const err = await apagarPost(p.id);
     if (err) Alert.alert('Não deu para apagar', err);
     else setPosts((prev) => prev.filter((x) => x.id !== p.id));
+  }
+
+  async function darLogo(p: ClubePost) {
+    const on = !logos.meus.has(p.id);
+    // Otimista: atualiza a UI antes do servidor responder.
+    setLogos((prev) => {
+      const counts = new Map(prev.counts);
+      const meus = new Set(prev.meus);
+      counts.set(p.id, Math.max(0, (counts.get(p.id) ?? 0) + (on ? 1 : -1)));
+      if (on) meus.add(p.id);
+      else meus.delete(p.id);
+      return { counts, meus };
+    });
+    const err = await toggleLogo(p.id, on);
+    if (err) getLogos(posts.map((x) => x.id)).then(setLogos); // desfaz se falhou
+  }
+
+  /** ⋯ do post: denunciar / bloquear autor (Apple 1.2 — §4.8). */
+  function acoesPost(p: ClubePost) {
+    Alert.alert(p.author_name, undefined, [
+      {
+        text: '🚩 Denunciar post',
+        onPress: async () => {
+          const err = await denunciarPost(p.id, p.author_id, 'Conteúdo impróprio no clube');
+          Alert.alert(err ? 'Não deu' : 'Denúncia enviada', err ?? 'Obrigado — vamos analisar.');
+        },
+      },
+      {
+        text: '🚫 Bloquear autor',
+        style: 'destructive',
+        onPress: async () => {
+          const err = await blockUser(p.author_id);
+          if (err) Alert.alert('Não deu', err);
+          else recarregar(); // posts do bloqueado somem (RLS)
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  /** ⋯ do membro (só o dono vê p/ os outros): remover do clube. */
+  function acoesMembro(m: ClubeMember) {
+    Alert.alert(m.name, undefined, [
+      {
+        text: 'Remover do clube',
+        style: 'destructive',
+        onPress: async () => {
+          const err = await removerMembro(clube!.id, m.user_id);
+          if (err) Alert.alert('Não deu', err);
+          else recarregar();
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  function sairOuApagar() {
+    if (!clube) return;
+    if (souDono) {
+      Alert.alert('Apagar o clube?', 'Isso apaga o cronograma e toda a discussão. Não dá para desfazer.', [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Apagar clube',
+          style: 'destructive',
+          onPress: async () => {
+            const err = await apagarClube(clube.id);
+            if (err) Alert.alert('Não deu', err);
+            else router.back();
+          },
+        },
+      ]);
+    } else {
+      Alert.alert('Sair do clube?', 'Você pode voltar depois com o código do convite.', [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            const err = await sairDoClube(clube.id);
+            if (err) Alert.alert('Não deu', err);
+            else router.back();
+          },
+        },
+      ]);
+    }
   }
 
   if (!clube) {
@@ -191,6 +291,32 @@ export default function ClubeScreen() {
           );
         })}
 
+        {/* ---- Membros + progresso no livro (visibility respeitada: sem dado = sem número) ---- */}
+        <Text style={[styles.section, { color: c.purple, marginTop: 10 }]}>
+          LENDO JUNTO ({membros.length})
+        </Text>
+        <Card style={styles.membros}>
+          {membros.map((m) => {
+            const pags = progresso.get(m.user_id) ?? 0;
+            return (
+              <View key={m.user_id} style={styles.membroRow}>
+                <Text style={[styles.membroNome, { color: c.text }]} numberOfLines={1}>
+                  {m.role === 'owner' ? '👑 ' : ''}
+                  {m.user_id === uid ? 'Você' : m.name}
+                </Text>
+                <Text style={[styles.membroPags, { color: pags > 0 ? c.green : c.textFaint }]}>
+                  {pags > 0 ? `${pags.toLocaleString('pt-BR')} págs` : '—'}
+                </Text>
+                {souDono && m.user_id !== uid ? (
+                  <Pressable onPress={() => acoesMembro(m)} hitSlop={8}>
+                    <Text style={[styles.dots, { color: c.textFaint }]}>⋯</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+          })}
+        </Card>
+
         {/* ---- Discussão da etapa selecionada ---- */}
         {etapa ? (
           <>
@@ -260,11 +386,29 @@ export default function ClubeScreen() {
                   </Text>
                 </View>
                 <Text style={[styles.postBody, { color: c.textDim }]}>{p.body}</Text>
-                {p.author_id === uid || souDono ? (
-                  <Pressable onPress={() => apagar(p)} hitSlop={6}>
-                    <Text style={[styles.postDelete, { color: c.textFaint }]}>apagar</Text>
+                <View style={styles.postActions}>
+                  <Pressable onPress={() => darLogo(p)} hitSlop={6} style={styles.logoBtn}>
+                    <Text
+                      style={[
+                        styles.logoText,
+                        { color: logos.meus.has(p.id) ? c.green : c.textFaint },
+                      ]}>
+                      📜 {logos.counts.get(p.id) ?? 0}
+                    </Text>
                   </Pressable>
-                ) : null}
+                  <View style={styles.postActionsRight}>
+                    {p.author_id !== uid ? (
+                      <Pressable onPress={() => acoesPost(p)} hitSlop={8}>
+                        <Text style={[styles.dots, { color: c.textFaint }]}>⋯</Text>
+                      </Pressable>
+                    ) : null}
+                    {p.author_id === uid || souDono ? (
+                      <Pressable onPress={() => apagar(p)} hitSlop={6}>
+                        <Text style={[styles.postDelete, { color: c.textFaint }]}>apagar</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
               </Card>
             ))}
             {postsDaEtapa.length === 0 ? (
@@ -274,6 +418,12 @@ export default function ClubeScreen() {
             ) : null}
           </>
         ) : null}
+
+        <Pressable onPress={sairOuApagar} style={styles.leave}>
+          <Text style={[styles.leaveText, { color: c.textFaint }]}>
+            {souDono ? 'Apagar clube' : 'Sair do clube'}
+          </Text>
+        </Pressable>
       </ScrollView>
     </ScreenBG>
   );
@@ -341,6 +491,22 @@ const styles = StyleSheet.create({
   postAuthor: { fontSize: 13.5, fontWeight: '800', flex: 1 },
   postWhen: { fontSize: 12 },
   postBody: { fontSize: 14, lineHeight: 20 },
-  postDelete: { fontSize: 12, fontWeight: '700', alignSelf: 'flex-end', paddingTop: 2 },
+  postDelete: { fontSize: 12, fontWeight: '700', paddingTop: 2 },
   empty: { fontSize: 13, textAlign: 'center', marginTop: 4 },
+  membros: { gap: 8 },
+  membroRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  membroNome: { flex: 1, fontSize: 14, fontWeight: '700' },
+  membroPags: { fontSize: 13, fontWeight: '800' },
+  dots: { fontSize: 18, fontWeight: '900', paddingHorizontal: 4 },
+  postActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  postActionsRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  logoBtn: { paddingVertical: 2 },
+  logoText: { fontSize: 13.5, fontWeight: '800' },
+  leave: { alignItems: 'center', paddingVertical: 10 },
+  leaveText: { fontSize: 13, fontWeight: '700' },
 });

@@ -968,6 +968,34 @@ begin
   return v_club;
 end; $$;
 
+-- ---------- LOGOS em post do clube (📜 — o "curtir" da casa; padrão do activity_kudos).
+create table if not exists public.club_post_logos (
+  post_id uuid not null references public.club_posts (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+
+alter table public.club_post_logos enable row level security;
+
+-- Ver/contar: membros do clube do post. Dar/tirar: só o próprio, sendo membro.
+drop policy if exists "membro vê logos" on public.club_post_logos;
+create policy "membro vê logos" on public.club_post_logos
+  for select to authenticated
+  using (exists (select 1 from public.club_posts p
+                 where p.id = post_id and public.is_club_member(p.club_id)));
+
+drop policy if exists "membro dá logo" on public.club_post_logos;
+create policy "membro dá logo" on public.club_post_logos
+  for insert to authenticated
+  with check (auth.uid() = user_id
+              and exists (select 1 from public.club_posts p
+                          where p.id = post_id and public.is_club_member(p.club_id)));
+
+drop policy if exists "dono tira logo" on public.club_post_logos;
+create policy "dono tira logo" on public.club_post_logos
+  for delete to authenticated using (auth.uid() = user_id);
+
 -- ---------- RPC: cachear as perguntas de discussão de uma etapa (1× — só grava se
 -- ainda NULL; qualquer membro pode preencher, quem chegar primeiro paga a geração).
 create or replace function public.club_stage_set_questions(

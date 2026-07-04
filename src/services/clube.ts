@@ -162,6 +162,111 @@ export async function apagarPost(id: string): Promise<string | null> {
   return error ? error.message : null;
 }
 
+// ---------------------------------------------------------------------------
+// G3 — Logos (📜), moderação e progresso dos membros.
+// ---------------------------------------------------------------------------
+
+/** Logos dos posts do clube: contagem por post + quais EU dei. */
+export async function getLogos(
+  postIds: string[],
+): Promise<{ counts: Map<string, number>; meus: Set<string> }> {
+  const counts = new Map<string, number>();
+  const meus = new Set<string>();
+  if (!supabase || postIds.length === 0) return { counts, meus };
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  const { data } = await supabase
+    .from('club_post_logos')
+    .select('post_id, user_id')
+    .in('post_id', postIds);
+  for (const l of (data as { post_id: string; user_id: string }[] | null) ?? []) {
+    counts.set(l.post_id, (counts.get(l.post_id) ?? 0) + 1);
+    if (l.user_id === uid) meus.add(l.post_id);
+  }
+  return { counts, meus };
+}
+
+export async function toggleLogo(postId: string, on: boolean): Promise<string | null> {
+  if (!supabase) return 'Entre na sua conta.';
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (!uid) return 'Entre na sua conta.';
+  const { error } = on
+    ? await supabase.from('club_post_logos').upsert({ post_id: postId, user_id: uid })
+    : await supabase.from('club_post_logos').delete().eq('post_id', postId).eq('user_id', uid);
+  return error ? error.message : null;
+}
+
+/** Denúncia de post do clube (content_reports — §4.8, mesmo padrão das resenhas). */
+export async function denunciarPost(
+  postId: string,
+  authorId: string,
+  reason: string,
+): Promise<string | null> {
+  if (!supabase) return 'Entre na sua conta.';
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (!uid) return 'Entre na sua conta.';
+  const { error } = await supabase.from('content_reports').insert({
+    reporter_id: uid,
+    target_type: 'club_post',
+    target_id: postId,
+    target_user_id: authorId,
+    reason,
+  });
+  return error ? error.message : null;
+}
+
+/** Dono remove um membro (RLS já garante que só o dono consegue). */
+export async function removerMembro(clubId: string, userId: string): Promise<string | null> {
+  if (!supabase) return 'Entre na sua conta.';
+  const { error } = await supabase
+    .from('club_members')
+    .delete()
+    .eq('club_id', clubId)
+    .eq('user_id', userId);
+  return error ? error.message : null;
+}
+
+/** Sair do clube (membro comum; o dono apaga o clube em vez de sair). */
+export async function sairDoClube(clubId: string): Promise<string | null> {
+  if (!supabase) return 'Entre na sua conta.';
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (!uid) return 'Entre na sua conta.';
+  const { error } = await supabase
+    .from('club_members')
+    .delete()
+    .eq('club_id', clubId)
+    .eq('user_id', uid);
+  return error ? error.message : null;
+}
+
+export async function apagarClube(clubId: string): Promise<string | null> {
+  if (!supabase) return 'Entre na sua conta.';
+  const { error } = await supabase.from('clubs').delete().eq('id', clubId);
+  return error ? error.message : null;
+}
+
+/**
+ * Páginas lidas no LIVRO DO CLUBE por membro (soma de reading_activities).
+ * Respeita o RLS/visibility (R2 do plano): atividade 'private' ou de quem não é
+ * "amigo" simplesmente não vem — o membro aparece sem número, nunca vazamos nada.
+ */
+export async function progressoMembros(
+  bookTitle: string,
+  userIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (!supabase || userIds.length === 0) return map;
+  const { data } = await supabase
+    .from('reading_activities')
+    .select('user_id, pages')
+    .eq('book_title', bookTitle)
+    .in('user_id', userIds)
+    .limit(500);
+  for (const a of (data as { user_id: string; pages: number | null }[] | null) ?? []) {
+    map.set(a.user_id, (map.get(a.user_id) ?? 0) + (a.pages ?? 0));
+  }
+  return map;
+}
+
 /** Nomes de perfil (RLS de profiles pode esconder alguns → fallback no chamador). */
 async function nomesDe(ids: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
