@@ -25,6 +25,21 @@
 - Feed social exige moderação/denúncia/bloqueio (Apple 1.2 — CLAUDE.md §4.8) antes de
   qualquer expansão de UGC.
 
+## Card compartilhável — Instagram Stories sticker (2026-07-04)
+- **Bug corrigido:** o botão "Instagram Story" abria o Story EM BRANCO (deep link
+  `instagram-stories://share` sem payload). Agora usa `react-native-share`
+  (`Social.InstagramStories`) enviando o card como **stickerImage** (PNG base64) sobre
+  gradiente da marca — o modelo "Transparente" flutua de verdade sobre a foto do usuário.
+  Fallback: share sheet nativo. `src/app/compartilhar.tsx`.
+- **⚠️ Config:** `app.json → extra.fbAppId` está VAZIO. Android é lenient (funciona no
+  teste), mas p/ produção/iOS registrar 1 App ID grátis em developers.facebook.com.
+- **Reforço:** fundo transparente explícito nos wrappers do view-shot (Problema A — alpha
+  no Android). **❌ TESTADO 2026-07-04: NÃO bastou — card ainda sai com FUNDO PRETO.**
+  **Direção do usuário (estilo Strava, P3):** salvar PNG SEM fundo na galeria + postar direto
+  no Instagram (lá não há preto). Fix real da captura alpha: subir react-native-view-shot OU
+  trocar o método de captura. Sticker já plugado, mas depende do PNG sair transparente.
+- **Dependência nova:** react-native-share 12.3.1 (autolinkada no build; exige APK nova).
+
 ## Roadmap / próximos passos
 1. **Clube do livro GUIADO (social v2)** — REFORMULADO (2026-07-03, decisão do usuário
    após parecer CPO): ver `ROADMAP-CLUBE.md` (v2) — MVP funciona com N=1 (cronograma por

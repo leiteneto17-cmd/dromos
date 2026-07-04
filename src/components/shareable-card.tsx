@@ -255,9 +255,12 @@ export function ShareableCard({
     variant === 'citacao' ? quoteContent : recapContent ?? sessionContent ?? generalContent;
 
   if (variant === 'transparente') {
-    // Fundo transparente → o PNG capturado fica sem fundo (sticker p/ Story).
+    // Fundo transparente → o PNG capturado fica sem fundo (sticker p/ Story). SEM
+    // overflow:hidden/borderRadius aqui: no Android o clipping de cantos arredondados
+    // força um buffer offscreen que o view-shot compõe sobre PRETO (era a causa do
+    // "fundo preto" no sticker). Um sticker flutua livre, não precisa de cantos.
     return (
-      <View style={[s.card, s.transparent, sealPad]}>
+      <View style={[s.card, s.transparent, sealPad, s.noClip]}>
         {seal}
         {content}
       </View>
@@ -303,6 +306,8 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   transparent: { backgroundColor: 'transparent' },
+  /** Desliga o clipping de cantos só no modelo transparente (evita o preto do view-shot no Android). */
+  noClip: { overflow: 'visible', borderRadius: 0 },
   /** Espaço extra no topo quando o selo de fundador está presente (não cobre o título). */
   withSeal: { paddingTop: 52 },
   // Selo de fundador (canto superior direito do card compartilhável).

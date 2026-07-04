@@ -73,7 +73,8 @@
       "aiProxyFunction": "hyper-task",
       "ttsProxyFunction": "tts-proxy-",
       "revenueCatAndroidKey": "",
-      "revenueCatIosKey": ""
+      "revenueCatIosKey": "",
+      "fbAppId": ""
     }
   }
 }

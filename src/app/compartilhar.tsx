@@ -19,7 +19,6 @@ import {
   Alert,
   Dimensions,
   FlatList,
-  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -38,6 +37,15 @@ import { useLibrary } from '@/store/library';
 
 const SCREEN = Dimensions.get('window').width;
 const CARD_W = Math.min(SCREEN * 0.72, 300);
+
+/** App ID do Facebook (Instagram exige p/ o Stories sticker). Vazio = tenta mesmo assim
+ * no Android (é lenient) e cai no share sheet se falhar. Registrar 1 grátis em
+ * developers.facebook.com para produção/iOS e colar em app.json → extra.fbAppId. */
+const FB_APP_ID = (Constants.expoConfig?.extra as { fbAppId?: string } | undefined)?.fbAppId ?? '';
+// Cores do fundo do Story (gradiente da identidade social §2.7) — o card vai como
+// STICKER por cima, então o modelo "Transparente" flutua sobre este fundo/na foto do usuário.
+const STORY_TOP = '#3B2A63';
+const STORY_BOTTOM = '#14121C';
 
 // No Expo Go o módulo nativo do expo-media-library não existe → nem tentamos
 // importá-lo (o import dinâmico ainda "resolve" com funções undefined e quebraria).
@@ -225,19 +233,28 @@ export default function ShareScreen() {
 
   const onInstagram = () =>
     withBusy(async () => {
+      // O card vai como STICKER do Instagram Stories (assim o modelo "Transparente"
+      // flutua de verdade sobre a foto/Story do usuário — antes o deep link abria o
+      // Story em branco, descartando a imagem). react-native-share monta o intent no
+      // Android e o pasteboard no iOS. Fundo = gradiente da marca (o usuário troca por
+      // foto dentro do Instagram); a foto do próprio card vem embutida no sticker.
+      const b64 = await capture('base64');
+      if (!b64) return;
+      try {
+        const { default: Share, Social } = await import('react-native-share');
+        await Share.shareSingle({
+          social: Social.InstagramStories,
+          appId: FB_APP_ID,
+          stickerImage: `data:image/png;base64,${b64}`,
+          backgroundTopColor: STORY_TOP,
+          backgroundBottomColor: STORY_BOTTOM,
+        });
+        return;
+      } catch (e) {
+        // Instagram ausente / recusou (ex.: appId vazio no iOS) → share sheet nativo.
+      }
       const uri = await capture('tmpfile');
       if (!uri) return;
-      // Tenta o Story do Instagram; sem dev build/sticker, cai no share sheet.
-      const igUrl = 'instagram-stories://share';
-      const can = await Linking.canOpenURL(igUrl).catch(() => false);
-      if (can) {
-        try {
-          await Linking.openURL(igUrl);
-          return;
-        } catch {
-          // segue para o share sheet
-        }
-      }
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Compartilhar no Instagram' });
       } else {
@@ -277,7 +294,9 @@ export default function ShareScreen() {
                   ref={(r) => {
                     shotRefs.current[i] = r;
                   }}
-                  style={styles.shot}>
+                  // Transparente: sem clipping arredondado no wrapper capturado (o mesmo
+                  // offscreen buffer do Android compunha o sticker sobre preto).
+                  style={item.id === 'transparente' ? styles.shotNoClip : styles.shot}>
                   <ShareableCard variant={item.id} session={session} recap={recap} photoUri={photoUri} />
                 </ViewShot>
               </View>
@@ -342,8 +361,13 @@ const styles = StyleSheet.create({
   back: { fontSize: 16, fontWeight: '600', width: 60 },
   title: { fontSize: 18, fontWeight: '800' },
   page: { width: SCREEN, alignItems: 'center', justifyContent: 'center' },
-  cardSlot: { borderRadius: 28, overflow: 'hidden' },
-  shot: { borderRadius: 28, overflow: 'hidden' },
+  // backgroundColor transparente EXPLÍCITO nos wrappers: sem isso, o react-native-view-shot
+  // no Android às vezes pinta o fundo do modelo "Transparente" de preto ao capturar (perde o
+  // canal alpha do PNG). Reforça a transparência de toda a árvore capturada.
+  cardSlot: { borderRadius: 28, overflow: 'hidden', backgroundColor: 'transparent' },
+  shot: { borderRadius: 28, overflow: 'hidden', backgroundColor: 'transparent' },
+  // Sem clipping p/ o modelo transparente — evita o fundo preto do view-shot no Android.
+  shotNoClip: { backgroundColor: 'transparent' },
   variantName: { textAlign: 'center', fontSize: 15, fontWeight: '800', marginTop: 4 },
   pickPhoto: {
     alignSelf: 'center',
