@@ -16,7 +16,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { AdBanner } from '@/components/ad-banner';
 import { importBookFlow } from '@/app/(tabs)/biblioteca';
-import { BottomTabInset } from '@/constants/theme';
+import { BottomTabInset, BrandFont } from '@/constants/theme';
 import { restoreActivities } from '@/services/activity-sync';
 import { backfillCovers } from '@/services/cover-backfill';
 import { computeDesafios } from '@/services/desafios';
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 18, color: HUB.onBg, fontWeight: '700' },
-  appName: { color: HUB.onBg, fontSize: 17, fontWeight: '700' },
+  appName: { color: HUB.onBg, fontSize: 17, fontFamily: BrandFont.bold },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   // Sino + bolinha de não lidas (vermelha p/ saltar sobre o verde do hub).
   bellWrap: { position: 'relative' },
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
-  bigTitle: { color: HUB.onBg, fontSize: 30, fontWeight: '800', marginTop: 14, marginBottom: 14 },
+  bigTitle: { color: HUB.onBg, fontSize: 30, fontFamily: BrandFont.extrabold, marginTop: 14, marginBottom: 14 },
 
   // Hero "Lendo agora" (roxo)
   hero: { flexDirection: 'row', gap: 14, borderRadius: 24, padding: 16, alignItems: 'center', backgroundColor: HUB.hero, ...cardShadow },

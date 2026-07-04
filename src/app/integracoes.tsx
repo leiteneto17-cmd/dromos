@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import { useRewardedAd } from '@/hooks/use-rewarded';
 import { adsUnsupported } from '@/services/ads';
@@ -755,7 +756,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingVertical: 8 },
   back: { fontSize: 16, fontWeight: '700' },
   body: { paddingHorizontal: 20, paddingBottom: 40 },
-  title: { fontSize: 28, fontWeight: '800', marginTop: 4 },
+  title: { fontSize: 28, fontFamily: BrandFont.extrabold, marginTop: 4 },
   subtitle: { fontSize: 14, lineHeight: 20, marginTop: 6, marginBottom: 18 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 8 },
   statusDot: { fontSize: 12 },

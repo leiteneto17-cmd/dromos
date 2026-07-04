@@ -9,21 +9,23 @@
 import type { UIPalette } from './ui';
 
 export const HUB = {
-  grad: ['#2C7E5E', '#1F6147', '#1B4F3D'] as const, // verde vibrante → mais fechado
-  base: '#1F6147', // verde sólido (fallback do gradiente)
+  // Fundo = gradiente da MARCA (roxo→preto), não mais verde (GUIA-DE-MARCA §3: verde é ACENTO,
+  // não fundo). Bate com Social.purpleTop→purpleMid→dark. Repintura 2026-07-04.
+  grad: ['#3B2A63', '#241B3D', '#0E0B16'] as const, // roxo profundo → quase preto
+  base: '#241B3D', // fallback do gradiente (roxo médio)
   hero: '#5B4FA6', // roxo do card de leitura
   cardBg: '#FFFFFF',
   cardText: '#1A1A1A',
   cardMuted: '#6B7280',
   purple: '#6E4FB0',
   greenInk: '#0FA968', // verde para texto/acento sobre branco
-  onBg: '#FFFFFF', // texto sobre o fundo verde
-  onBgDim: '#CFEFDD', // texto secundário sobre o verde
+  onBg: '#FFFFFF', // texto sobre o fundo escuro
+  onBgDim: '#B9A6E8', // texto secundário sobre o fundo (lavanda da marca)
   green: '#5EF0A0', // verde-menta (barra do hero)
-  neon: '#3DFF85', // verde-NEON p/ ação/barra ativa (com glow) — design system 2026
-  onGreen: '#0E2A1E',
-  // Barras do gráfico semanal: gradiente ROXO na base → VERDE-NEON no topo (guia 2026).
-  barTop: '#3DFF85',
+  neon: '#5EF0A0', // verde da MARCA p/ ação/barra ativa (era #3DFF85 puro, fora da paleta)
+  onGreen: '#0E0B16',
+  // Barras do gráfico semanal: gradiente ROXO na base → VERDE-MENTA no topo (da marca).
+  barTop: '#5EF0A0',
   barBottom: '#6E4FB0',
 };
 

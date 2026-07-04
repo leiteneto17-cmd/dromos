@@ -9,6 +9,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, ScreenBG } from '@/components/social-ui';
+import { BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import { getNotifications, markNotificationsSeen, type Notif } from '@/services/notifications';
 
@@ -95,7 +96,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   backRow: { marginBottom: 6 },
   back: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 28, fontWeight: '800', marginBottom: 6 },
+  title: { fontSize: 28, fontFamily: BrandFont.extrabold, marginBottom: 6 },
   emptyTitle: { fontSize: 16, fontWeight: '700' },
   emptySub: { fontSize: 13, marginTop: 4, lineHeight: 19 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },

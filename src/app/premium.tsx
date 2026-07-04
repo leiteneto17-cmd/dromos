@@ -26,6 +26,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useUI } from '@/hooks/use-ui';
+import { BrandFont } from '@/constants/theme';
 import {
   getPremiumPackages,
   purchasePremium,
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
   back: { fontSize: 16, fontWeight: '700' },
   body: { paddingHorizontal: 20, paddingBottom: 48 },
   kicker: { fontSize: 13, fontWeight: '800', letterSpacing: 1.5, marginTop: 6 },
-  title: { fontSize: 28, fontWeight: '800', marginTop: 6 },
+  title: { fontSize: 28, fontFamily: BrandFont.extrabold, marginTop: 6 },
   cycleRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   cycleCard: {
     flex: 1,

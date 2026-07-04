@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 
 import { Card, ScreenBG } from '@/components/social-ui';
+import { BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import { Social } from '@/theme/social';
 import {
@@ -435,7 +436,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   back: { paddingVertical: 4, paddingRight: 8 },
   backText: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 24, fontWeight: '800' },
+  title: { fontSize: 24, fontFamily: BrandFont.extrabold },
   subtitle: { fontSize: 13.5, marginTop: 2 },
   inviteRow: {
     flexDirection: 'row',

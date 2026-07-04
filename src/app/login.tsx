@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useUI } from '@/hooks/use-ui';
+import { BrandFont } from '@/constants/theme';
 import { signIn, signUp } from '@/store/auth';
 
 type Mode = 'entrar' | 'criar';
@@ -165,7 +166,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   body: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
   brand: { fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
-  title: { fontSize: 30, fontWeight: '800', marginTop: 6 },
+  title: { fontSize: 30, fontFamily: BrandFont.extrabold, marginTop: 6 },
   subtitle: { fontSize: 15, marginTop: 6, marginBottom: 24 },
   field: { marginBottom: 14 },
   label: { fontSize: 13, fontWeight: '700', marginBottom: 6 },

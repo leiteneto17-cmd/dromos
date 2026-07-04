@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { PressableScale } from '@/components/pressable-scale';
+import { BrandFont } from '@/constants/theme';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { medalImage } from '@/theme/medals';
 import { useUI } from '@/hooks/use-ui';
@@ -652,7 +653,7 @@ const styles = StyleSheet.create({
   backRow: { marginBottom: 6 },
   back: { fontSize: 16, fontWeight: '600' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 28, fontWeight: '800' },
+  title: { fontSize: 28, fontFamily: BrandFont.extrabold },
   newBtn: { borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
   newBtnText: { fontSize: 14, fontWeight: '800' },
   // Coach de Metas (objetivo → plano)
