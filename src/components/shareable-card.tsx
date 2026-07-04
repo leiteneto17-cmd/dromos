@@ -329,7 +329,7 @@ const s = StyleSheet.create({
   bigTitle: {
     color: Social.green,
     fontSize: 38,
-    fontWeight: '900',
+    fontFamily: BrandFont.extrabold,
     textShadowColor: Social.green,
     textShadowRadius: 16,
     marginTop: 2,
@@ -337,7 +337,7 @@ const s = StyleSheet.create({
   bookTitle: {
     color: Social.green,
     fontSize: 25,
-    fontWeight: '900',
+    fontFamily: BrandFont.extrabold,
     textAlign: 'center',
     textShadowColor: Social.green,
     textShadowRadius: 14,
@@ -353,7 +353,7 @@ const s = StyleSheet.create({
   value: {
     color: Social.green,
     fontSize: 32,
-    fontWeight: '800',
+    fontFamily: BrandFont.extrabold,
     marginTop: 2,
     textShadowColor: Social.green,
     textShadowRadius: 12,

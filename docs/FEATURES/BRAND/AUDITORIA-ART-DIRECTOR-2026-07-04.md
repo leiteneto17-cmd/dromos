@@ -11,6 +11,15 @@ usa cores fora dela, e a fonte de marca (Poppins) só chegou a 2 lugares. Result
 > `#14121C` unificado em `Social.dark` (#0E0B16). Nenhum `#00FF66`/`#3c87f7`/`#7C3AED`/`#14121C`
 > restou no código. Falta: P3 (token danger) e P4 (rollout da fonte de marca).
 
+## 🔴 P0 — ACHADOS DO TESTE NO APARELHO (2026-07-04, prints)
+- **Home/hub é VERDE-DOMINANTE** (`hub.ts` `grad: #2C7E5E→#1B4F3D` + `neon #3DFF85`). Contradiz a
+  marca (roxo→preto, verde de ACENTO). É o MAIOR motivo de o app "não sentir Dromos" — a tela mais
+  vista tem fundo verde. **Decisão do usuário:** repintar a Home para roxo→preto (recomendado) ou
+  manter o hub verde aprovado antes. Bloqueia o P4 na Home.
+- **Card transparente AINDA sai PRETO** no export (print confirma). O fix de clipping (P3) NÃO
+  resolveu — é o view-shot Android perdendo alpha de verdade. Precisa de OUTRA abordagem de captura
+  (não é ajuste de estilo). Item à parte, reaberto.
+
 ## P1 — Cores OFF-BRAND no chrome mais visível (gritante — corrigir já)
 1. **Barra de navegação** (`src/components/app-tabs.tsx`): usa `#00FF66` (verde PURO berrante) na
    aba ativa, no glow e no ícone central. **A marca é verde-menta `#3EE89A`/`#5EF0A0`**, não neon

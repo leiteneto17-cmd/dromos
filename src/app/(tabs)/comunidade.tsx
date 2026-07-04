@@ -25,6 +25,7 @@ import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, T
 import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
+import { BrandFont } from '@/constants/theme';
 import { Social } from '@/theme/social';
 import { featuredBooks, searchBooks, type CatalogBook, type LangFilter } from '@/services/book-catalog';
 import {
@@ -591,7 +592,7 @@ export default function CommunityScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  title: { fontSize: 28, fontWeight: '800' },
+  title: { fontSize: 28, fontFamily: BrandFont.extrabold },
   subtitle: { fontSize: 14, marginTop: 4 },
   note: { marginTop: 16 },
   noteTitle: { fontSize: 16, fontWeight: '700' },

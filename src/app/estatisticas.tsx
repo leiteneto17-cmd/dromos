@@ -12,6 +12,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { restoreActivities, syncActivities } from '@/services/activity-sync';
+import { BrandFont } from '@/constants/theme';
 import { deriveStats, fmtHMS } from '@/services/progress';
 import { useAuth } from '@/store/auth';
 import { useLibrary } from '@/store/library';
@@ -223,7 +224,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   back: { paddingVertical: 4, paddingRight: 8 },
   backText: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 28, fontWeight: '800' },
+  title: { fontSize: 28, fontFamily: BrandFont.extrabold },
   shareChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   shareChipText: { fontSize: 13, fontWeight: '700' },
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },

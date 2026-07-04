@@ -22,6 +22,7 @@ import {
 
 import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG } from '@/components/social-ui';
+import { BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import {
   featuredBrazilian,
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   back: { paddingVertical: 4, paddingRight: 8 },
   backText: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 28, fontWeight: '800' },
+  title: { fontSize: 28, fontFamily: BrandFont.extrabold },
   subtitle: { fontSize: 14, lineHeight: 20, marginTop: 2, marginBottom: 12 },
   enemRow: {
     flexDirection: 'row',

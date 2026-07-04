@@ -12,6 +12,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native
 import { AdBanner } from '@/components/ad-banner';
 import { BookCover } from '@/components/book-cover';
 import { Card, ScreenBG } from '@/components/social-ui';
+import { BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import { deleteCoverFile, deletePreparedCache, openEpub, saveEpubCover } from '@/services/epub-parser';
 import { deleteTranslationCache } from '@/hooks/use-book-translation';
@@ -265,7 +266,7 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   importBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 7 },
   importText: { fontWeight: '700', fontSize: 14 },
-  title: { fontSize: 28, fontWeight: '800', marginBottom: 4 },
+  title: { fontSize: 28, fontFamily: BrandFont.extrabold, marginBottom: 4 },
   hint: { fontSize: 13, marginBottom: 12 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { textAlign: 'center', fontSize: 15, lineHeight: 22 },
