@@ -17,7 +17,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { BionicParagraph } from '@/components/bionic-text';
@@ -529,6 +529,10 @@ export default function ReaderScreen() {
     if (toc[i].start <= topIndex) currentTocIndex = i;
     else break;
   }
+
+  // Espaço real da navegação/gestos do sistema embaixo (varia por aparelho — Xiaomi
+  // e afins têm barra alta). Sem isso, a barra de áudio colava nos botões do sistema.
+  const insets = useSafeAreaInsets();
 
   // Audiobook assistido. Lê o livro a partir do parágrafo no topo da tela.
   const read = useReadAloud(paragraphs);
@@ -1119,7 +1123,16 @@ export default function ReaderScreen() {
       />
 
       {read.state.active ? (
-        <View style={[styles.audioBar, { backgroundColor: t.surface, borderTopColor: t.border }]}>
+        <View
+          style={[
+            styles.audioBar,
+            {
+              backgroundColor: t.surface,
+              borderTopColor: t.border,
+              // Empurra os controles acima da barra de navegação/gestos do sistema.
+              paddingBottom: Math.max(22, insets.bottom + 10),
+            },
+          ]}>
           <Text style={[styles.audioLabel, { color: t.textSecondary }]} numberOfLines={1}>
             {read.state.loading
               ? '⏳ Gerando áudio…'
