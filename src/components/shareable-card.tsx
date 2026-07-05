@@ -28,7 +28,7 @@ export type CardVariant = 'escuro' | 'transparente' | 'compacto' | 'capa' | 'fot
 
 export const CARD_VARIANTS: { id: CardVariant; label: string }[] = [
   { id: 'escuro', label: 'Escuro' },
-  { id: 'transparente', label: 'Sólido escuro' },
+  { id: 'transparente', label: 'Transparente' },
   { id: 'compacto', label: 'Compacto' },
   { id: 'capa', label: 'Sobre a capa' },
   { id: 'foto', label: 'Sobre sua foto' },
