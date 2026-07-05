@@ -49,11 +49,28 @@ substituem — decisão do usuário). Preview do card transparente ganhou o QUAD
 Strava. **Falta S2/S3:** auto-avançar entre pessoas, "visto" (anel apagado), reações
 (Logos/responder) no story; limpar o dead code do feed antigo (onKudo/feed state).
 
-## Card compartilhável — TRANSPARENTE via Skia (2026-07-04)
-O modelo "Transparente" agora usa **@shopify/react-native-skia** (motor do Flutter) →
-`makeImageSnapshot` exporta PNG com **alpha real** no Android (view-shot achatava em preto).
-`src/components/skia-share-card.tsx`. Layout por coordenadas (ajuste fino no aparelho).
-Rótulo voltou a "Transparente" (tinha virado "Sólido escuro" por engano).
+## Card compartilhável TRANSPARENTE — ❌ AINDA NÃO FUNCIONA NO INSTAGRAM (2026-07-05)
+Estado após várias tentativas:
+- ✅ **Skia RENDERIZA transparente** — usuário CONFIRMOU ver o xadrez no preview do modelo
+  "Transparente" (`src/components/skia-share-card.tsx`, `makeImageSnapshot` → PNG base64).
+- ✅ Manifest declara `com.instagram.android` em `<queries>` (config plugin
+  `plugins/withInstagramQuery.js`) — Android 11+ enxerga o Instagram.
+- ✅ `onInstagram` (compartilhar.tsx) usa `react-native-share` `shareSingle(INSTAGRAM_STORIES)`
+  com `stickerImage` (= interactive_asset_uri).
+- ❌ **MESMO ASSIM o card sai PRETO no Story** (testado no aparelho 2026-07-05).
+
+### Hipóteses p/ a PRÓXIMA sessão atacar (em ordem de probabilidade):
+1. **`fbAppId` VAZIO** (`app.json` extra.fbAppId). O Instagram Stories sticker EXIGE um
+   `source_application` (Facebook App ID) válido — sem ele, o IG pode recusar o sticker e cair
+   no fundo. **Registrar 1 App ID grátis em developers.facebook.com e testar.** É a suspeita nº 1.
+2. **Verificar se o PNG do Skia tem ALPHA de verdade** — salvar o card e INSPECIONAR o arquivo
+   (não a galeria, que mostra preto). Se `makeImageSnapshot().encodeToBase64()` no Android exporta
+   opaco, o problema é a exportação Skia, não o IG. Testar: abrir o PNG salvo num visualizador que
+   mostre transparência, ou checar o header do PNG (color type 6 = RGBA).
+3. **Formato do `stickerImage`** no react-native-share: hoje passo `data:image/png;base64,...`;
+   talvez precise ser um CAMINHO de arquivo (uri) em vez de data-uri no Android.
+4. Se nada resolver: a real limitação pode ser do próprio device/IG; alternativa = usar o modelo
+   "Foto" (embute a foto do usuário, opaco, funciona) como o caminho oficial de "stats sobre foto".
 
 ## Roadmap / próximos passos
 1. **Clube do livro GUIADO (social v2)** — REFORMULADO (2026-07-03, decisão do usuário
