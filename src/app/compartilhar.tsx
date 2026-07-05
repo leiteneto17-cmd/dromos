@@ -28,6 +28,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, Pattern, Rect } from 'react-native-svg';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 
 import { CARD_VARIANTS, ShareableCard, type CardVariant } from '@/components/shareable-card';
@@ -43,6 +44,22 @@ import { useLibrary } from '@/store/library';
 
 const SCREEN = Dimensions.get('window').width;
 const CARD_W = Math.min(SCREEN * 0.72, 300);
+
+/** Quadriculado (estilo Photoshop/Strava) — sinaliza o fundo transparente no preview. */
+function Checkerboard() {
+  return (
+    <Svg style={StyleSheet.absoluteFill}>
+      <Defs>
+        <Pattern id="checker" width="28" height="28" patternUnits="userSpaceOnUse">
+          <Rect width="28" height="28" fill="#211B33" />
+          <Rect width="14" height="14" fill="#2C2542" />
+          <Rect x="14" y="14" width="14" height="14" fill="#2C2542" />
+        </Pattern>
+      </Defs>
+      <Rect width="100%" height="100%" fill="url(#checker)" />
+    </Svg>
+  );
+}
 
 /** App ID do Facebook (Instagram exige p/ o Stories sticker). Vazio = tenta mesmo assim
  * no Android (é lenient) e cai no share sheet se falhar. Registrar 1 grátis em
@@ -315,7 +332,10 @@ export default function ShareScreen() {
                 {item.id === 'transparente' ? (
                   // Skia em resolução cheia (460×640), escalado só para caber no slot.
                   // O makeImageSnapshot exporta o tamanho REAL da canvas, não o exibido.
-                  <View style={{ width: CARD_W, height: (CARD_W / SKIA_W) * SKIA_H, alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ width: CARD_W, height: (CARD_W / SKIA_W) * SKIA_H, borderRadius: 24, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                    {/* Quadriculado atrás (estilo Strava) — sinaliza a transparência do PNG.
+                        NÃO é capturado: o export vem do Skia (makeImageSnapshot), não desta View. */}
+                    <Checkerboard />
                     <View style={{ transform: [{ scale: CARD_W / SKIA_W }] }}>
                       <SkiaShareCard ref={skiaRef} />
                     </View>

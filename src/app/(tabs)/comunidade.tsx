@@ -121,13 +121,9 @@ export default function CommunityScreen() {
       return;
     }
     getStories().then(setStories);
-    const [sh, pop, fd] = await Promise.all([getMyShelf(), getPopularBooks(), getFeed()]);
+    const [sh, pop] = await Promise.all([getMyShelf(), getPopularBooks()]);
     setShelf(sh);
     setPopular(pop);
-    // Janela de 7 dias: quem segue muita gente acumulava atividade VELHA no feed —
-    // mesmo retrátil, virava poluição. Feed social é sobre o AGORA (estilo Strava).
-    const corte = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    setFeed(fd.filter((f) => new Date(f.created_at).getTime() >= corte));
   }, [user, lang]);
 
   useFocusEffect(
@@ -534,74 +530,14 @@ export default function CommunityScreen() {
                 </ScrollView>
               ) : null}
 
-              {/* Feed "Seguindo" — leituras de quem você segue (§2.6, veio da ex-aba Atividades) */}
-              {user ? (
-                <>
-                  <SectionTitle name="users">Seguindo</SectionTitle>
-                  {feed.length === 0 ? (
-                    <Text style={[styles.hint, { color: c.textFaint, marginBottom: 6 }]}>
-                      Nenhuma leitura de quem você segue nos últimos 7 dias. Siga mais leitores
-                      (busque em 👥 Pessoas) — as leituras recentes deles aparecem aqui.
-                    </Text>
-                  ) : (
-                    <>
-                      {(feedExpanded ? feed : feed.slice(0, FEED_PREVIEW)).map((f) => (
-                        <Card key={f.id} style={styles.feedRow}>
-                          <Pressable
-                            onPress={() =>
-                              router.push({ pathname: '/usuario', params: { id: f.user_id, name: f.author_name } })
-                            }>
-                            <Text style={styles.feedAvatar}>{f.author_avatar || '🦉'}</Text>
-                          </Pressable>
-                          <View style={styles.flex}>
-                            <Text style={[styles.feedWho, { color: c.text }]} numberOfLines={1}>
-                              <Text style={{ fontWeight: '800', color: f.author_founder ? c.green : c.text }}>
-                                {f.author_name}
-                                {f.author_founder ? ' 👑' : ''}
-                              </Text>{' '}
-                              leu
-                            </Text>
-                            <Text style={[styles.feedBook, { color: c.textDim }]} numberOfLines={1}>
-                              {f.book_title}
-                            </Text>
-                            <Text style={[styles.feedMeta, { color: c.textFaint }]}>
-                              {fmtFeedDate(new Date(f.created_at).getTime())} ·{' '}
-                              {Math.max(1, Math.round(f.seconds / 60))} min
-                              {f.pages ? ` · ${f.pages} ${f.pages === 1 ? 'pág' : 'págs'}` : ''}
-                            </Text>
-                          </View>
-                          <Pressable
-                            onPress={() => onKudo(f)}
-                            hitSlop={8}
-                            style={styles.kudoBtn}
-                            accessibilityRole="button"
-                            accessibilityLabel={
-                              f.iKudoed
-                                ? `Tirar seu Logos (${f.kudos})`
-                                : f.kudos > 0
-                                  ? `Dar um Logos — ${f.kudos} Logos`
-                                  : 'Dar um Logos'
-                            }>
-                            {/* "Logos" 📜 = a interação social (antigo "kudo" do Strava) */}
-                            <Text style={[styles.kudoIcon, { opacity: f.iKudoed ? 1 : 0.4 }]}>📜</Text>
-                            {f.kudos > 0 ? (
-                              <Text style={[styles.kudoCount, { color: f.iKudoed ? c.green : c.textFaint }]}>
-                                {f.kudos}
-                              </Text>
-                            ) : null}
-                          </Pressable>
-                        </Card>
-                      ))}
-                      {feed.length > FEED_PREVIEW ? (
-                        <Pressable onPress={() => setFeedExpanded((v) => !v)} style={styles.moreBtn}>
-                          <Text style={[styles.moreText, { color: c.purple }]}>
-                            {feedExpanded ? 'Ver menos ▴' : `Ver mais (${feed.length}) ▾`}
-                          </Text>
-                        </Pressable>
-                      ) : null}
-                    </>
-                  )}
-                </>
+              {/* Feed vertical "Seguindo" APOSENTADO (2026-07-04) — as bolhas de story acima o
+                  substituem (DESIGN-STORIES.md): menos poluição, o autor escolhe o que publicar.
+                  Dica p/ o estado vazio das bolhas: quando só houver a "Você". */}
+              {user && stories.length === 0 ? (
+                <Text style={[styles.hint, { color: c.textFaint, marginBottom: 6 }]}>
+                  Toque em <Text style={{ fontWeight: '800', color: c.green }}>Publicar</Text> para
+                  compartilhar sua leitura de hoje como story (24h) — e siga leitores para ver os deles aqui.
+                </Text>
               ) : null}
 
               {featured.length > 0 ? (

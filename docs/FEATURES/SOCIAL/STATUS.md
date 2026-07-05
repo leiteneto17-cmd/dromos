@@ -44,9 +44,10 @@
 Design em `DESIGN-STORIES.md`. **S1 pronta:** coluna `shared_as_story_at` no schema
 (⚠️ REAPLICAR schema.sql), `src/services/stories.ts` (publicar minha última leitura + ler
 stories de 24h), faixa de **bolhas** no topo da Comunidade (1ª = Você: publica/vê), tela
-`/story` em tela cheia (toque fecha). Feed "Seguindo" MANTIDO abaixo por ora (aposentar na S2
-se as bolhas agradarem). **Falta S2/S3:** auto-avançar entre pessoas, "visto" (anel apagado),
-reações (Logos/responder) no story, aposentar o feed antigo.
+`/story` em tela cheia (toque fecha). **Feed vertical "Seguindo" APOSENTADO** (as bolhas o
+substituem — decisão do usuário). Preview do card transparente ganhou o QUADRICULADO estilo
+Strava. **Falta S2/S3:** auto-avançar entre pessoas, "visto" (anel apagado), reações
+(Logos/responder) no story; limpar o dead code do feed antigo (onKudo/feed state).
 
 ## Card compartilhável — TRANSPARENTE via Skia (2026-07-04)
 O modelo "Transparente" agora usa **@shopify/react-native-skia** (motor do Flutter) →
