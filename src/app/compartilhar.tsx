@@ -10,6 +10,7 @@
  * tenta o deep link e, se não der, cai no share sheet.
  */
 import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Image } from 'expo-image';
 import * as Sharing from 'expo-sharing';
 import Constants from 'expo-constants';
@@ -30,6 +31,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 
 import { CARD_VARIANTS, ShareableCard, type CardVariant } from '@/components/shareable-card';
+import {
+  CARD_H as SKIA_H,
+  CARD_W as SKIA_W,
+  SkiaShareCard,
+  type SkiaCardHandle,
+} from '@/components/skia-share-card';
 import { useUI } from '@/hooks/use-ui';
 import { computeWeekRecap } from '@/services/recap';
 import { useLibrary } from '@/store/library';
@@ -63,6 +70,7 @@ export default function ShareScreen() {
   const [busy, setBusy] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
   const shotRefs = useRef<(ElementRef<typeof ViewShot> | null)[]>([]);
+  const skiaRef = useRef<SkiaCardHandle>(null);
 
   // Se veio um sessionId (compartilhar UMA atividade), o card mostra aquela sessão.
   const session = useLibrary((s) => s.sessions.find((x) => x.id === params.sessionId));
@@ -91,6 +99,23 @@ export default function ShareScreen() {
   }
 
   async function capture(result: 'tmpfile' | 'base64'): Promise<string | null> {
+    // Modelo transparente → renderer SKIA (PNG com alpha REAL no Android; view-shot achata preto).
+    if (variant === 'transparente') {
+      const b64 = skiaRef.current?.exportBase64() ?? null;
+      if (!b64) {
+        Alert.alert('Ops', 'Não consegui gerar o card transparente.');
+        return null;
+      }
+      if (result === 'base64') return b64;
+      try {
+        const uri = `${FileSystem.cacheDirectory}dromos-card-${Date.now()}.png`;
+        await FileSystem.writeAsStringAsync(uri, b64, { encoding: FileSystem.EncodingType.Base64 });
+        return uri;
+      } catch {
+        Alert.alert('Ops', 'Não consegui salvar a imagem do card.');
+        return null;
+      }
+    }
     const ref = shotRefs.current[index];
     if (!ref) return null;
     try {
@@ -146,13 +171,25 @@ export default function ShareScreen() {
         }
         return;
       }
-      const perm = await ML.requestPermissionsAsync();
+      // Salvar precisa só de permissão de ESCRITA (writeOnly=true) — no Android 13+ isso
+      // evita pedir acesso total à galeria (que o usuário costuma negar → "não salvava").
+      const perm = await ML.requestPermissionsAsync(true);
       if (!perm.granted) {
-        Alert.alert('Permissão necessária', 'Autorize o acesso à galeria para salvar a imagem.');
+        Alert.alert('Permissão necessária', 'Autorize salvar fotos para guardar o card na galeria.');
         return;
       }
-      await ML.saveToLibraryAsync(uri);
-      Alert.alert('Salvo ✅', 'O card foi salvo na sua galeria.');
+      try {
+        await ML.saveToLibraryAsync(uri);
+        Alert.alert('Salvo ✅', 'O card foi salvo na sua galeria.');
+      } catch (e) {
+        // Se o saveToLibrary falhar (algumas ROMs/Android), cai no share sheet (o usuário
+        // escolhe "Salvar em Fotos"), em vez de falhar silencioso.
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Salvar imagem' });
+        } else {
+          Alert.alert('Não deu para salvar', e instanceof Error ? e.message : 'Tente compartilhar e salvar por lá.');
+        }
+      }
     });
 
   const onMore = () =>
@@ -275,13 +312,23 @@ export default function ShareScreen() {
           renderItem={({ item, index: i }) => (
             <View style={styles.page}>
               <View style={[styles.cardSlot, { width: CARD_W }]}>
-                <ViewShot
-                  ref={(r) => {
-                    shotRefs.current[i] = r;
-                  }}
-                  style={styles.shot}>
-                  <ShareableCard variant={item.id} session={session} recap={recap} photoUri={photoUri} />
-                </ViewShot>
+                {item.id === 'transparente' ? (
+                  // Skia em resolução cheia (460×640), escalado só para caber no slot.
+                  // O makeImageSnapshot exporta o tamanho REAL da canvas, não o exibido.
+                  <View style={{ width: CARD_W, height: (CARD_W / SKIA_W) * SKIA_H, alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ transform: [{ scale: CARD_W / SKIA_W }] }}>
+                      <SkiaShareCard ref={skiaRef} />
+                    </View>
+                  </View>
+                ) : (
+                  <ViewShot
+                    ref={(r) => {
+                      shotRefs.current[i] = r;
+                    }}
+                    style={styles.shot}>
+                    <ShareableCard variant={item.id} session={session} recap={recap} photoUri={photoUri} />
+                  </ViewShot>
+                )}
               </View>
             </View>
           )}
