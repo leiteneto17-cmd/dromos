@@ -62,6 +62,7 @@
         }
       ],
       "./plugins/withKotlinMetadataSkip",
+      "./plugins/withInstagramQuery",
       "expo-font"
     ],
     "experiments": {
