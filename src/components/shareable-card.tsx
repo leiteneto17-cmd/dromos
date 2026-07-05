@@ -28,7 +28,7 @@ export type CardVariant = 'escuro' | 'transparente' | 'compacto' | 'capa' | 'fot
 
 export const CARD_VARIANTS: { id: CardVariant; label: string }[] = [
   { id: 'escuro', label: 'Escuro' },
-  { id: 'transparente', label: 'Translúcido' },
+  { id: 'transparente', label: 'Sólido escuro' },
   { id: 'compacto', label: 'Compacto' },
   { id: 'capa', label: 'Sobre a capa' },
   { id: 'foto', label: 'Sobre sua foto' },
@@ -256,12 +256,11 @@ export function ShareableCard({
     variant === 'citacao' ? quoteContent : recapContent ?? sessionContent ?? generalContent;
 
   if (variant === 'transparente') {
-    // Modo TRANSLÚCIDO (2026-07-04): o view-shot no Android não preserva alpha de fundo
-    // totalmente transparente (sai preto no sticker — limitação do device, não do código).
-    // Solução Strava-friendly: fundo escuro SEMITRANSPARENTE — o card flutua sobre a foto
-    // do Story deixando a imagem vazar por trás, e a captura é confiável (opaca).
+    // Sticker SÓLIDO escuro (2026-07-04): a transparência/translucidez real é impossível no
+    // view-shot do Android (achata alpha em PRETO). Fundo OPACO garante captura e "Salvar"
+    // confiáveis. Para "stats SOBRE a minha foto", use o modelo "Foto" (embute a imagem).
     return (
-      <View style={[s.card, s.translucent, sealPad]}>
+      <View style={[s.card, s.solidDark, sealPad]}>
         {seal}
         {content}
       </View>
@@ -306,8 +305,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  /** Sticker translúcido: escuro semitransparente (a foto do Story aparece por trás). */
-  translucent: { backgroundColor: 'rgba(14,11,22,0.68)' },
+  /** Sticker sólido escuro (opaco → captura/salvar confiáveis no Android). */
+  solidDark: { backgroundColor: Social.dark },
   /** Espaço extra no topo quando o selo de fundador está presente (não cobre o título). */
   withSeal: { paddingTop: 52 },
   // Selo de fundador (canto superior direito do card compartilhável).
