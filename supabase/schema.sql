@@ -475,6 +475,15 @@ create policy "ver atividade de quem sigo (aceito)" on public.reading_activities
             where f.follower_id = auth.uid() and f.followee_id = user_id and f.status = 'accepted')
   );
 
+-- ---------- STORIES (docs/FEATURES/SOCIAL/DESIGN-STORIES.md) ----------
+-- Publicar uma leitura como STORY (opt-in, efêmero 24h). Só marca a atividade; quem vê é
+-- filtrado por `shared_as_story_at` nas últimas 24h (a policy de SELECT acima já cobre o acesso).
+-- Publicar = o dono atualiza a PRÓPRIA linha (policy "dono atualiza atividade" já existe).
+alter table public.reading_activities add column if not exists shared_as_story_at timestamptz;
+create index if not exists reading_activities_story_idx
+  on public.reading_activities (shared_as_story_at desc)
+  where shared_as_story_at is not null;
+
 -- Contagem de seguidores/seguindo (só ACEITOS).
 create or replace function public.follow_counts(p_user uuid)
 returns table (followers bigint, following bigint)

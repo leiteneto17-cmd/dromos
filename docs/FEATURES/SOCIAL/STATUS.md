@@ -40,6 +40,20 @@
   trocar o método de captura. Sticker já plugado, mas depende do PNG sair transparente.
 - **Dependência nova:** react-native-share 12.3.1 (autolinkada no build; exige APK nova).
 
+## Comunidade Stories (2026-07-04) — S1 construída, aguardando teste
+Design em `DESIGN-STORIES.md`. **S1 pronta:** coluna `shared_as_story_at` no schema
+(⚠️ REAPLICAR schema.sql), `src/services/stories.ts` (publicar minha última leitura + ler
+stories de 24h), faixa de **bolhas** no topo da Comunidade (1ª = Você: publica/vê), tela
+`/story` em tela cheia (toque fecha). Feed "Seguindo" MANTIDO abaixo por ora (aposentar na S2
+se as bolhas agradarem). **Falta S2/S3:** auto-avançar entre pessoas, "visto" (anel apagado),
+reações (Logos/responder) no story, aposentar o feed antigo.
+
+## Card compartilhável — TRANSPARENTE via Skia (2026-07-04)
+O modelo "Transparente" agora usa **@shopify/react-native-skia** (motor do Flutter) →
+`makeImageSnapshot` exporta PNG com **alpha real** no Android (view-shot achatava em preto).
+`src/components/skia-share-card.tsx`. Layout por coordenadas (ajuste fino no aparelho).
+Rótulo voltou a "Transparente" (tinha virado "Sólido escuro" por engano).
+
 ## Roadmap / próximos passos
 1. **Clube do livro GUIADO (social v2)** — REFORMULADO (2026-07-03, decisão do usuário
    após parecer CPO): ver `ROADMAP-CLUBE.md` (v2) — MVP funciona com N=1 (cronograma por

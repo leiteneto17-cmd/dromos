@@ -101,6 +101,7 @@ export default function RootLayout() {
           <Stack.Screen name="seguidores" />
           <Stack.Screen name="notificacoes" />
           <Stack.Screen name="integracoes" />
+          <Stack.Screen name="story" options={{ animation: 'fade' }} />
         </Stack.Protected>
         <Stack.Protected guard={!allowed}>
           <Stack.Screen name="login" />

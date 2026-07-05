@@ -20,7 +20,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AdBanner } from '@/components/ad-banner';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
@@ -37,6 +37,7 @@ import {
   type ShelfItem,
 } from '@/services/community';
 import { getFeed, searchUsers, toggleKudo, type FeedItem, type PublicProfile } from '@/services/social';
+import { getStories, publishLatestAsStory, type Story } from '@/services/stories';
 import { useAuth } from '@/store/auth';
 
 /** Quantos itens do feed "Seguindo" mostrar antes do "Ver mais" (não vira lista infinita). */
@@ -107,6 +108,8 @@ export default function CommunityScreen() {
   const [popular, setPopular] = useState<PopularBook[]>([]);
   const [feed, setFeed] = useState<FeedItem[]>([]); // "Seguindo" — leituras de quem sigo
   const [feedExpanded, setFeedExpanded] = useState(false); // mostra poucas e expande
+  const [stories, setStories] = useState<Story[]>([]); // bolhas de story (24h, opt-in)
+  const [publishing, setPublishing] = useState(false);
 
   const load = useCallback(async () => {
     featuredBooks(lang).then(setFeatured);
@@ -114,8 +117,10 @@ export default function CommunityScreen() {
       setShelf([]);
       setPopular([]);
       setFeed([]);
+      setStories([]);
       return;
     }
+    getStories().then(setStories);
     const [sh, pop, fd] = await Promise.all([getMyShelf(), getPopularBooks(), getFeed()]);
     setShelf(sh);
     setPopular(pop);
@@ -211,6 +216,36 @@ export default function CommunityScreen() {
         prev.map((f) => (f.id === item.id ? { ...f, iKudoed: !on, kudos: f.kudos + (on ? -1 : 1) } : f)),
       );
     }
+  }, []);
+
+  const meHasStory = stories.some((s) => s.isMine);
+
+  // Publicar minha leitura de hoje como story (opt-in — DESIGN-STORIES.md).
+  const onPublishStory = useCallback(async () => {
+    if (publishing) return;
+    setPublishing(true);
+    const r = await publishLatestAsStory();
+    setPublishing(false);
+    if (!r.ok) {
+      Alert.alert('Story', r.error ?? 'Não deu para publicar.');
+      return;
+    }
+    getStories().then(setStories);
+    Alert.alert('Publicado 📣', 'Sua leitura está no topo da Comunidade por 24h.');
+  }, [publishing]);
+
+  const openStory = useCallback((s: Story) => {
+    router.push({
+      pathname: '/story',
+      params: {
+        name: s.isMine ? 'Você' : s.name,
+        avatar: s.avatar ?? '',
+        book: s.book_title,
+        seconds: String(s.seconds),
+        pages: String(s.pages ?? 0),
+        founder: s.founder ? '1' : '',
+      },
+    });
   }, []);
 
   // Abre a página do livro. Da busca/Em alta passa o livro inteiro (JSON) p/ não re-buscar.
@@ -453,6 +488,52 @@ export default function CommunityScreen() {
                 </LinearGradient>
               </Pressable>
 
+              {/* Stories — bolhas no topo (DESIGN-STORIES.md): quem publicou nas últimas 24h.
+                  A 1ª é sempre "Você" (publica/vê a sua). Substitui a poluição do feed vertical. */}
+              {user ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.storiesRow}>
+                  {/* Sua bolha: publicar OU ver a sua */}
+                  <Pressable
+                    onPress={() => {
+                      const mine = stories.find((s) => s.isMine);
+                      if (mine) openStory(mine);
+                      else onPublishStory();
+                    }}
+                    style={styles.storyItem}>
+                    <View style={[styles.storyRing, { borderColor: meHasStory ? c.green : c.border }]}>
+                      <View style={[styles.storyAvatar, { backgroundColor: c.cardElevated }]}>
+                        {publishing ? (
+                          <ActivityIndicator color={c.green} />
+                        ) : (
+                          <Text style={styles.storyAvatarText}>{meHasStory ? '📖' : '＋'}</Text>
+                        )}
+                      </View>
+                    </View>
+                    <Text style={[styles.storyName, { color: c.textDim }]} numberOfLines={1}>
+                      {meHasStory ? 'Sua leitura' : 'Publicar'}
+                    </Text>
+                  </Pressable>
+
+                  {stories
+                    .filter((s) => !s.isMine)
+                    .map((s) => (
+                      <Pressable key={s.activity_id} onPress={() => openStory(s)} style={styles.storyItem}>
+                        <View style={[styles.storyRing, { borderColor: c.green }]}>
+                          <View style={[styles.storyAvatar, { backgroundColor: c.cardElevated }]}>
+                            <Text style={styles.storyAvatarText}>{s.avatar || '🦉'}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.storyName, { color: c.textDim }]} numberOfLines={1}>
+                          {s.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                </ScrollView>
+              ) : null}
+
               {/* Feed "Seguindo" — leituras de quem você segue (§2.6, veio da ex-aba Atividades) */}
               {user ? (
                 <>
@@ -643,6 +724,13 @@ const styles = StyleSheet.create({
   kudoIcon: { fontSize: 22 },
   kudoCount: { fontSize: 12, fontWeight: '800', marginTop: 2 },
   moreBtn: { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
+  // Bolhas de story
+  storiesRow: { flexDirection: 'row', gap: 14, paddingVertical: 4, paddingRight: 8, marginBottom: 8 },
+  storyItem: { alignItems: 'center', width: 68 },
+  storyRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  storyAvatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  storyAvatarText: { fontSize: 26 },
+  storyName: { fontSize: 11.5, fontWeight: '600', marginTop: 4, maxWidth: 66, textAlign: 'center' },
   // Card de destaque do Clube do Livro — cores FIXAS da identidade social (§2.7):
   // gradiente roxo profundo + verde neon, independente do tema do leitor.
   clubeCard: {
