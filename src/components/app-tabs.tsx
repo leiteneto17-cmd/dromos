@@ -11,21 +11,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { Social } from '@/theme/social';
+import { useUI } from '@/hooks/use-ui';
 import { useLibrary } from '@/store/library';
-
-// Paleta da nav — OLED dark-first (vidro escuro + verde da MARCA). Independe do tema do app.
-// Verde = Social.green (#5EF0A0), não mais o #00FF66 puro (fora da marca — GUIA-DE-MARCA §3).
-const NAV = {
-  pill: 'rgba(20, 20, 25, 0.55)', // fundo escuro ultra-translúcido (vidro)
-  border: 'rgba(255, 255, 255, 0.12)', // linha de brilho reflexivo (border gloss)
-  inactive: Social.muted, // ícones inativos (cinza roxo da marca)
-  active: Social.green, // verde-menta da marca (aba ativa)
-  centerBg: '#052E16', // botão central (verde escuro profundo — surface do FAB)
-  centerGlow: Social.green, // halo verde da marca
-  centerIcon: Social.green, // ícone central combinando
-  pillFallback: 'rgba(15, 15, 15, 0.85)', // fallback OLED escuro se o blur falhar
-};
+import { shadow } from '@/theme/tokens';
 
 type IconProps = { color: string; size?: number };
 
@@ -108,6 +96,17 @@ function openCurrentReading() {
 
 function FloatingTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
+  const c = useUI();
+  // Nav segue o tema (rebrand claro+azul): pílula clara, azul ativo/central, cinza inativo.
+  const dark = c.mode === 'dark';
+  const nav = {
+    active: c.accent,
+    inactive: c.textFaint,
+    centerBg: c.accent,
+    centerIcon: c.onAccent,
+    centerGlow: c.accent,
+    veil: dark ? 'rgba(10,10,12,0.35)' : 'rgba(255,255,255,0.55)',
+  };
 
   function tabButton(route: TabRoute, focused: boolean) {
     const meta = META[route.name];
@@ -125,8 +124,8 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
         accessibilityState={focused ? { selected: true } : {}}
         accessibilityLabel={meta.label}
         style={styles.item}>
-        <Icon color={focused ? NAV.active : NAV.inactive} />
-        <View style={[styles.dot, focused && { backgroundColor: NAV.active }]} />
+        <Icon color={focused ? nav.active : nav.inactive} />
+        <View style={[styles.dot, focused && { backgroundColor: nav.active }]} />
       </Pressable>
     );
   }
@@ -142,8 +141,8 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
           onPress={openCurrentReading}
           accessibilityRole="button"
           accessibilityLabel="Continuar lendo"
-          style={[styles.center, { backgroundColor: NAV.centerBg }]}>
-          <BookOpenIcon color={NAV.centerIcon} />
+          style={[styles.center, { backgroundColor: nav.centerBg, borderColor: c.surface, shadowColor: nav.centerGlow }]}>
+          <BookOpenIcon color={nav.centerIcon} />
         </Pressable>,
       );
     }
@@ -151,10 +150,10 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
 
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]} pointerEvents="box-none">
-      <View style={[styles.bar, { borderColor: NAV.border, backgroundColor: NAV.pillFallback }]}>
-        {/* iOS: desfoque nativo real. Android: frost escuro translúcido (o blur real exigiria
-            blurTarget + snapshot que não atualiza ao rolar e pesa — não vale p/ a nav). */}
-        <BlurView intensity={64} tint="dark" style={styles.barBlur} />
+      <View style={[styles.bar, { borderColor: c.border, backgroundColor: c.surface }, !dark ? shadow(2) : null]}>
+        {/* iOS: desfoque nativo real. Android: frost translúcido (o blur real exigiria blurTarget
+            + snapshot que não atualiza ao rolar e pesa — não vale p/ a nav). */}
+        <BlurView intensity={dark ? 64 : 24} tint={dark ? 'dark' : 'light'} style={[styles.barBlur, { backgroundColor: nav.veil }]} />
         {slots}
       </View>
     </View>
@@ -188,13 +187,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 10,
     paddingHorizontal: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 12,
   },
-  // Vidro (Liquid Glass): desfoque + véu ESCURO sutil, recortado ao formato da pílula.
+  // Vidro: desfoque + véu translúcido (cor definida inline por tema), recortado à pílula.
   // Fica ATRÁS dos ícones; o botão central (que sobe) NÃO é recortado (overflow só aqui).
   barBlur: {
     position: 'absolute',
@@ -204,7 +198,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderRadius: 34,
     overflow: 'hidden',
-    backgroundColor: 'rgba(10, 10, 12, 0.35)', // véu escuro sutil (legibilidade dos ícones)
   },
   item: { alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 6, paddingVertical: 2 },
   dot: { width: 16, height: 3, borderRadius: 2, backgroundColor: 'transparent' },
@@ -216,11 +209,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: -28,
     borderWidth: 2,
-    borderColor: NAV.border,
-    shadowColor: NAV.centerGlow, // halo verde-neon intenso (glow do design system)
-    shadowOpacity: 0.8,
+    // borderColor + shadowColor definidos inline (seguem o tema).
+    shadowOpacity: 0.5,
     shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
+    shadowOffset: { width: 0, height: 4 },
     elevation: 14,
   },
 });
