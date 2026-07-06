@@ -1,32 +1,29 @@
 /**
- * Paleta do HUB (verde clean + cards brancos), fiel à imagem aprovada
- * (image_75a1a1.jpg). É a "pele do feed" — fixa, NÃO segue claro/escuro.
+ * Paleta do HUB — REPINTADA no rebrand claro+azul (2026-07-06, ver [[rebrand-claro-azul-2026]]).
+ * Antes era roxo/verde escuro; agora fundo claro (papel), cards brancos e AZUL de acento, batendo
+ * com os tokens globais (src/theme/tokens.ts). É a "pele do feed" — fixa, mas agora clara.
  *
- * Usada pelo hub (src/app/(tabs)/index.tsx) e, via `hubUI`, pelas demais
- * abas sociais (Atividades, Comunidade, Perfil) para ficarem consistentes
- * com o hub em vez do tema neutro claro/escuro (CLAUDE.md §2.7).
+ * Usada pelo hub (src/app/(tabs)/index.tsx) e, via `hubUI`, por estatísticas e afins.
  */
 import type { UIPalette } from './ui';
 
 export const HUB = {
-  // Fundo = gradiente da MARCA (roxo→preto), não mais verde (GUIA-DE-MARCA §3: verde é ACENTO,
-  // não fundo). Bate com Social.purpleTop→purpleMid→dark. Repintura 2026-07-04.
-  grad: ['#3B2A63', '#241B3D', '#0E0B16'] as const, // roxo profundo → quase preto
-  base: '#241B3D', // fallback do gradiente (roxo médio)
-  hero: '#5B4FA6', // roxo do card de leitura
+  grad: ['#F6F7F2', '#F4F5F0'] as const, // fundo claro (papel/gelo)
+  base: '#F4F5F0',
+  hero: '#EAF2FB', // card "Lendo agora" — azul-clarinho
   cardBg: '#FFFFFF',
-  cardText: '#1A1A1A',
+  cardText: '#2A2C33',
   cardMuted: '#6B7280',
-  purple: '#6E4FB0',
-  greenInk: '#0FA968', // verde para texto/acento sobre branco
-  onBg: '#FFFFFF', // texto sobre o fundo escuro
-  onBgDim: '#B9A6E8', // texto secundário sobre o fundo (lavanda da marca)
-  green: '#5EF0A0', // verde-menta (barra do hero)
-  neon: '#5EF0A0', // verde da MARCA p/ ação/barra ativa (era #3DFF85 puro, fora da paleta)
-  onGreen: '#0E0B16',
-  // Barras do gráfico semanal: gradiente ROXO na base → VERDE-MENTA no topo (da marca).
-  barTop: '#5EF0A0',
-  barBottom: '#6E4FB0',
+  purple: '#3A9AD9', // acento (era roxo) → azul
+  greenInk: '#3A9AD9', // acento de ação (era verde) → azul
+  onBg: '#2A2C33', // texto sobre o fundo CLARO = tinta escura
+  onBgDim: '#6B7280', // texto secundário sobre o fundo claro
+  green: '#CFE4F6', // borda suave do hero (azul bem claro)
+  neon: '#3A9AD9', // barra de progresso do hero → azul
+  onGreen: '#FFFFFF',
+  // Barras do gráfico semanal: azul (topo) → azul claro (base).
+  barTop: '#3A9AD9',
+  barBottom: '#B9D7EE',
 };
 
 /**
@@ -50,7 +47,7 @@ export const hubUI: UIPalette = {
   accent: HUB.greenInk,
   accentHover: HUB.greenInk,
   accentPressed: HUB.greenInk,
-  accentSoft: 'rgba(15,169,104,0.12)',
+  accentSoft: 'rgba(58,154,217,0.12)',
   onAccent: '#FFFFFF',
   success: '#22C55E',
   warning: '#F59E0B',

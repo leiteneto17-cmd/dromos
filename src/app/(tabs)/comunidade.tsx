@@ -449,21 +449,21 @@ export default function CommunityScreen() {
                   social §2.7 + borda/acento verde neon). É a feature-vitrine da aba. */}
               <Pressable onPress={() => router.push({ pathname: '/clubes' })}>
                 <LinearGradient
-                  colors={['#3B2A63', '#221A38']}
+                  colors={[c.accentSoft, c.surface]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.clubeCard}>
-                  <View style={styles.clubeIconWrap}>
+                  style={[styles.clubeCard, { borderColor: c.border }]}>
+                  <View style={[styles.clubeIconWrap, { backgroundColor: c.accentSoft }]}>
                     <Text style={styles.clubeIcon}>📖</Text>
                   </View>
                   <View style={styles.flex}>
-                    <Text style={styles.clubeTitle}>Clube do Livro</Text>
-                    <Text style={styles.clubeSub} numberOfLines={1}>
+                    <Text style={[styles.clubeTitle, { color: c.text }]}>Clube do Livro</Text>
+                    <Text style={[styles.clubeSub, { color: c.textSecondary }]} numberOfLines={1}>
                       Leia junto: cronograma semanal + discussão guiada
                     </Text>
                   </View>
-                  <View style={styles.clubeCta}>
-                    <Text style={styles.clubeCtaText}>Entrar ›</Text>
+                  <View style={[styles.clubeCta, { backgroundColor: c.accent }]}>
+                    <Text style={[styles.clubeCtaText, { color: c.onAccent }]}>Entrar ›</Text>
                   </View>
                 </LinearGradient>
               </Pressable>

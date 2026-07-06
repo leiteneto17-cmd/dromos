@@ -6,8 +6,7 @@
  * importação (ImportedBook), então leitor/progresso/stats funcionam igual.
  */
 import { File, Paths } from 'expo-file-system';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -219,34 +218,7 @@ export default function ExplorarScreen() {
         explore os mais lidos.
       </Text>
 
-      {/* Grandes Jornadas — dois destinos temáticos lado a lado (identidade neon §2.7):
-          ENEM (capelo, verde) e Dromos Kids (estrelas, violeta mágico). */}
-      <View style={styles.journeyRow}>
-        <Pressable style={styles.journeyCell} onPress={() => router.push('/enem')}>
-          <LinearGradient
-            colors={['#2E2147', '#14121C']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.journeyCard, { borderColor: 'rgba(62,232,154,0.4)' }]}>
-            <Text style={styles.journeyIcon}>🎓</Text>
-            <Text style={styles.journeyTitle}>Clássicos de Prova</Text>
-            <Text style={[styles.journeySub, { color: '#8BFFC4' }]}>ENEM & vestibulares · IA</Text>
-          </LinearGradient>
-        </Pressable>
-
-        {/* '/infantil' é rota nova — o cast some quando o typegen do expo-router regenera. */}
-        <Pressable style={styles.journeyCell} onPress={() => router.push('/infantil' as Href)}>
-          <LinearGradient
-            colors={['#3A2168', '#160F2B']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.journeyCard, { borderColor: 'rgba(185,166,232,0.5)' }]}>
-            <Text style={styles.journeyIcon}>✨📖</Text>
-            <Text style={styles.journeyTitle}>Clássicos Infantis</Text>
-            <Text style={[styles.journeySub, { color: '#C9B8F5' }]}>Dromos Kids · histórias mágicas</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
+      {/* "Grandes Jornadas" (ENEM + Dromos Kids) MOVIDO p/ a Biblioteca (2026-07-06). */}
 
       {/* Fonte do acervo (só aparece quando há mais de uma) */}
       {SOURCES.length > 1 ? (
@@ -438,19 +410,6 @@ const styles = StyleSheet.create({
   backText: { fontSize: 16, fontWeight: '600' },
   title: { fontSize: 28, fontFamily: BrandFont.extrabold },
   subtitle: { fontSize: 14, lineHeight: 20, marginTop: 2, marginBottom: 12 },
-  journeyRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  journeyCell: { flex: 1 },
-  journeyCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    minHeight: 108,
-    justifyContent: 'center',
-  },
-  journeyIcon: { fontSize: 24 },
-  journeyTitle: { fontSize: 15, fontWeight: '900', color: '#EDEAF5', marginTop: 8 },
-  journeySub: { fontSize: 11.5, fontWeight: '700', marginTop: 3 },
   sourceRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   sourceChip: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   sourceText: { fontSize: 13, fontWeight: '700' },

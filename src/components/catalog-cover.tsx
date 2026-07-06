@@ -15,12 +15,13 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text } from 'react-native';
 
-/** Gradientes da capa tipográfica — variedade dentro da mesma família roxo (§2.7). */
+/** Gradientes da capa tipográfica — tons CLAROS (rebrand 2026-07-06): azul/neutro suave,
+ * variando um pouco por título. Antes eram roxos escuros (viravam "buracos" no tema claro). */
 const GRADIENTS: [string, string][] = [
-  ['#3B2A63', '#1B1530'],
-  ['#2E2147', '#14121C'],
-  ['#3A2558', '#191225'],
-  ['#2B2350', '#12101B'],
+  ['#EAF2FB', '#D7E6F5'],
+  ['#F1F2F4', '#E1E4E9'],
+  ['#EAF0F6', '#DCE4EE'],
+  ['#EFEDF7', '#DFDCEC'],
 ];
 
 /** Gradiente estável a partir do título (o mesmo livro sempre recebe a mesma cor). */
@@ -76,7 +77,7 @@ export function CatalogCover({
 }
 
 const styles = StyleSheet.create({
-  img: { backgroundColor: '#1B1530' },
+  img: { backgroundColor: '#E5E7EB' },
   fallback: {
     overflow: 'hidden',
     alignItems: 'center',
@@ -84,10 +85,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(185,166,232,0.22)', // lavanda translúcida (§2.7)
+    borderColor: 'rgba(42,44,51,0.10)', // borda neutra suave (tema claro)
   },
-  spine: { fontSize: 16, marginBottom: 6, opacity: 0.9 },
-  title: { color: '#EDEAF5', fontSize: 12, fontWeight: '800', textAlign: 'center', lineHeight: 15 },
-  author: { color: '#B9A6E8', fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 4 },
+  spine: { fontSize: 16, marginBottom: 6, opacity: 0.6 },
+  title: { color: '#2A2C33', fontSize: 12, fontWeight: '800', textAlign: 'center', lineHeight: 15 },
+  author: { color: '#6B7280', fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 4 },
   glyph: { fontSize: 22 },
 });

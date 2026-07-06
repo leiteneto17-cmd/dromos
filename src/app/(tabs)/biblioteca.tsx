@@ -11,6 +11,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native
 
 import { AdBanner } from '@/components/ad-banner';
 import { BookCover } from '@/components/book-cover';
+import { JourneysRow } from '@/components/journeys-row';
 import { Card, ScreenBG } from '@/components/social-ui';
 import { BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
@@ -207,6 +208,9 @@ export default function LibraryScreen() {
           Toque para abrir · 🗑 para remover
         </Text>
       ) : null}
+
+      {/* Grandes Jornadas — atalhos ENEM + Dromos Kids (movidos do Explorar). */}
+      <JourneysRow />
 
       {books.length === 0 ? (
         <View style={styles.empty}>

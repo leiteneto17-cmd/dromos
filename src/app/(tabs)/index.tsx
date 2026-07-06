@@ -164,6 +164,7 @@ export default function HubScreen() {
           </View>
 
           <Text style={styles.bigTitle}>Olá, {firstName}</Text>
+          <Text style={styles.bigSubtitle}>Que bom ver você de volta!</Text>
 
           {/* HÁBITO — streak-herói + semana em bolinhas + meta do dia (estilo Duolingo/Strava).
               Toque no card → estatísticas; na linha da meta → Metas. */}
@@ -390,13 +391,13 @@ const cardShadow = {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#1F6147' },
+  root: { flex: 1, backgroundColor: HUB.base },
   flex: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: BottomTabInset + 60 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 18, color: HUB.onBg, fontWeight: '700' },
   appName: { color: HUB.onBg, fontSize: 17, fontFamily: BrandFont.bold },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 18 },
@@ -415,22 +416,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
-  bigTitle: { color: HUB.onBg, fontSize: 30, fontFamily: BrandFont.extrabold, marginTop: 14, marginBottom: 14 },
+  bigTitle: { color: HUB.onBg, fontSize: 30, fontFamily: BrandFont.extrabold, marginTop: 14, marginBottom: 2 },
+  bigSubtitle: { color: HUB.onBgDim, fontSize: 15, marginBottom: 14 },
 
   // Hero "Lendo agora" (roxo)
   // Hero "Lendo agora" = CTA principal. Borda verde da marca p/ destacar sobre o fundo roxo
   // (antes o card roxo sumia no fundo roxo) + respiro em cima/baixo.
   hero: { flexDirection: 'row', gap: 14, borderRadius: 24, padding: 16, marginTop: 16, marginBottom: 2, alignItems: 'center', backgroundColor: HUB.hero, borderWidth: 1.5, borderColor: HUB.green, ...cardShadow },
-  heroCover: { width: 60, height: 84, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.22)', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  heroCoverText: { color: 'rgba(255,255,255,0.9)', fontSize: 10, fontWeight: '800' },
+  heroCover: { width: 60, height: 84, borderRadius: 10, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  heroCoverText: { color: HUB.cardMuted, fontSize: 10, fontWeight: '800' },
   heroCoverIcon: { fontSize: 24 },
   heroBody: { flex: 1, minWidth: 0 },
-  heroKicker: { color: '#E7E1FB', fontSize: 13, fontWeight: '600' },
-  heroTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', marginTop: 2 },
+  heroKicker: { color: HUB.greenInk, fontSize: 13, fontWeight: '700' },
+  heroTitle: { color: HUB.cardText, fontSize: 21, fontWeight: '800', marginTop: 2 },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 12 },
-  heroSub: { color: '#E7E1FB', fontSize: 13 },
-  heroPct: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  heroTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)', marginTop: 6 },
+  heroSub: { color: HUB.cardMuted, fontSize: 13 },
+  heroPct: { color: HUB.cardText, fontSize: 14, fontWeight: '800' },
+  heroTrack: { height: 7, borderRadius: 4, backgroundColor: '#DCE6EF', marginTop: 6 },
   heroFill: {
     height: '100%',
     borderRadius: 4,
@@ -441,7 +443,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 4,
   },
-  heroChapter: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginTop: 12 },
+  heroChapter: { color: HUB.greenInk, fontSize: 13, fontWeight: '700', marginTop: 12 },
 
   // Cards de feed BRANCOS
   feedCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, marginTop: 14, ...cardShadow },
@@ -511,7 +513,7 @@ const styles = StyleSheet.create({
   // Biblioteca (sobre o fundo verde)
   sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 12 },
   sectionTitle: { color: HUB.onBg, fontSize: 18, fontWeight: '800' },
-  link: { color: HUB.onBg, fontSize: 14, fontWeight: '700' },
+  link: { color: HUB.greenInk, fontSize: 14, fontWeight: '700' },
   emptyCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, ...cardShadow },
   emptyText: { color: HUB.cardMuted, fontSize: 14, lineHeight: 21 },
   cta: { marginTop: 16, borderRadius: 999, paddingVertical: 12, alignItems: 'center', backgroundColor: HUB.greenInk },
