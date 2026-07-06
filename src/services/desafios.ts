@@ -98,7 +98,11 @@ export function computeDesafios(stats: ReadingStats, sessions: ReadingSession[])
   const semana = semanaAtualKeys();
   const diasAtivosSemana = semana.filter((k) => (stats.perDay[k] ?? 0) > 0).length;
 
+  // Missão DIÁRIA (unificada com os desafios — decisão do usuário 2026-07-06): ler 15 min hoje.
+  const minHoje = (stats.perDay[utcDayKey(now)] ?? 0) / 60;
+
   return [
+    make('diaria', '🎯', 'Missão diária', 'Leia 15 minutos hoje e ganhe XP.', 'Hoje', minHoje, 15, 'min'),
     make(
       'semana-consistente',
       '🔥',

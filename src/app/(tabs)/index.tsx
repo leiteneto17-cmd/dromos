@@ -24,7 +24,7 @@ import { downloadCatalogBook } from '@/services/catalog-download';
 import { backfillCovers } from '@/services/cover-backfill';
 import { computeDesafios } from '@/services/desafios';
 import { getUnreadCount } from '@/services/notifications';
-import { computeBestStreak, deriveGoal, deriveLevel, deriveStats } from '@/services/progress';
+import { computeBestStreak, deriveLevel, deriveStats } from '@/services/progress';
 import { displayName, useAuth } from '@/store/auth';
 import { useLibrary, type ImportedBook } from '@/store/library';
 import { useProfile } from '@/store/profile';
@@ -62,33 +62,15 @@ export default function HubScreen() {
   const user = useAuth((s) => s.user);
   const profile = useProfile((s) => s.profile);
 
-  const goals = useLibrary((s) => s.goals);
-  const bookPages = useLibrary((s) => s.bookPages);
-
   const derived = deriveStats(stats);
   const lvl = deriveLevel(stats);
   const bestStreak = computeBestStreak(stats.perDay);
   const current = books.find((b) => b.id === currentBookId) ?? books[0] ?? null;
   const pct = current ? Math.round((progress[current.id] ?? 0) * 100) : 0;
   const weekMinutes = derived.last7.reduce((a, day) => a + day.minutes, 0);
-  // Missão diária: ler 15 min hoje (usa os minutos de hoje já derivados).
-  const MISSION_MIN = 15;
-  const todayMin = derived.last7[6]?.minutes ?? 0;
-  const missionPct = Math.min(1, todayMin / MISSION_MIN);
-  const missionDone = todayMin >= MISSION_MIN;
 
-  // --- Home do Hábito (alma do app = Strava social + bons hábitos, 2026-07-02) ---
-  // Tudo derivado do que já existe: streak/last7 (deriveStats), metas e desafios locais.
-  const activeGoal = goals.find((g) => !g.doneAt) ?? null;
-  const goalProg = activeGoal
-    ? deriveGoal(
-        activeGoal,
-        stats,
-        activeGoal.bookId
-          ? { progress: progress[activeGoal.bookId] ?? 0, pages: bookPages[activeGoal.bookId] ?? 0 }
-          : undefined,
-      )
-    : null;
+  // --- Desafios (alma do app = Strava social + bons hábitos). A "Missão diária" foi
+  // UNIFICADA aqui (2026-07-06): é o desafio 'diaria' de computeDesafios. ---
   const desafios = computeDesafios(stats, sessions);
   // Destaque: o desafio em aberto mais perto de completar (senão o primeiro concluído).
   const topDesafio = desafios.filter((d) => !d.done).sort((a, b) => b.pct - a.pct)[0] ?? desafios[0];
@@ -194,8 +176,12 @@ export default function HubScreen() {
                 </View>
                 <View style={styles.flex}>
                   <Text style={styles.statColLabel}>Nível atual</Text>
-                  <Text style={styles.levelTitle}>{lvl.title}</Text>
-                  <Text style={styles.levelNum}>Nível {lvl.level}</Text>
+                  <View style={styles.levelTitleRow}>
+                    <Text style={styles.levelTitle} numberOfLines={1}>
+                      {lvl.title}
+                    </Text>
+                    <Text style={styles.levelNum}>Nível {lvl.level}</Text>
+                  </View>
                   <View style={styles.xpTrack}>
                     <View style={[styles.xpFill, { width: `${Math.round(lvl.progress * 100)}%` }]} />
                   </View>
@@ -212,36 +198,39 @@ export default function HubScreen() {
             </View>
           </Pressable>
 
-          {/* Missão diária — ler alguns minutos hoje e ganhar XP. Toque → Metas. */}
-          <Pressable onPress={() => router.navigate('/conquistas')}>
-            <View style={styles.missionCard}>
-              <View style={styles.missionHead}>
-                <Text style={styles.missionIcon}>🎯</Text>
-                <Text style={styles.missionTitle}>Missão diária</Text>
-              </View>
-              <View style={styles.missionRow}>
-                <View style={styles.flex}>
-                  <Text style={styles.missionMain}>
-                    {missionDone ? 'Missão do dia concluída! 🎉' : `Leia por ${MISSION_MIN} minutos`}
-                  </Text>
-                  <Text style={styles.missionSub}>
-                    {activeGoal && goalProg && !goalProg.done
-                      ? `Meta: ${activeGoal.title} · ${goalProg.daysLeft}d`
-                      : 'Continue sua jornada e ganhe XP!'}
-                  </Text>
+          {/* DESAFIOS (unificado com a antiga "Missão diária" — inclui a missão de hoje).
+              Destaca o desafio mais perto de completar; toque → todos os desafios. */}
+          {topDesafio ? (
+            <Pressable onPress={() => router.navigate('/desafios')}>
+              <View style={styles.missionCard}>
+                <View style={styles.missionHead}>
+                  <Text style={styles.missionIcon}>🏆</Text>
+                  <Text style={styles.missionTitle}>Desafios</Text>
+                  <View style={styles.flex} />
+                  <Text style={styles.feedShare}>Ver todos ›</Text>
                 </View>
-                <View style={styles.xpBadge}>
-                  <Text style={styles.xpBadgeText}>+25 XP</Text>
+                <View style={styles.missionRow}>
+                  <View style={styles.flex}>
+                    <Text style={styles.missionMain}>
+                      {topDesafio.icon} {topDesafio.title}
+                    </Text>
+                    <Text style={styles.missionSub}>{topDesafio.desc}</Text>
+                  </View>
+                  <View style={styles.periodBadge}>
+                    <Text style={styles.periodBadgeText}>{topDesafio.period}</Text>
+                  </View>
                 </View>
+                <View style={styles.missionTrack}>
+                  <View style={[styles.missionFill, { width: `${Math.round(topDesafio.pct * 100)}%` }]} />
+                </View>
+                <Text style={styles.missionProg}>
+                  {topDesafio.done
+                    ? 'Concluído! 🎉'
+                    : `${topDesafio.current.toLocaleString('pt-BR')} / ${topDesafio.target.toLocaleString('pt-BR')} ${topDesafio.unit}`}
+                </Text>
               </View>
-              <View style={styles.missionTrack}>
-                <View style={[styles.missionFill, { width: `${Math.round(missionPct * 100)}%` }]} />
-              </View>
-              <Text style={styles.missionProg}>
-                {todayMin} / {MISSION_MIN} min
-              </Text>
-            </View>
-          </Pressable>
+            </Pressable>
+          ) : null}
 
           {/* Lendo agora — card hero roxo (progresso real) */}
           <Pressable onPress={continueReading}>
@@ -352,29 +341,6 @@ export default function HubScreen() {
               </Pressable>
             </View>
           </Pressable>
-
-          {/* Desafios (estilo Strava Challenges) — destaca o mais perto de completar. */}
-          {topDesafio ? (
-            <Pressable onPress={() => router.navigate('/desafios')}>
-              <View style={styles.feedCard}>
-                <View style={styles.weekHead}>
-                  <Text style={styles.feedKicker}>🏆 Desafios</Text>
-                  <Text style={styles.feedShare}>Ver todos ›</Text>
-                </View>
-                <Text style={styles.desafioTitle}>
-                  {topDesafio.icon} {topDesafio.title}
-                </Text>
-                <View style={styles.desafioTrack}>
-                  <View style={[styles.desafioFill, { width: `${Math.round(topDesafio.pct * 100)}%` }]} />
-                </View>
-                <Text style={styles.desafioMeta}>
-                  {topDesafio.done
-                    ? 'Concluído! 🎉'
-                    : `${topDesafio.current.toLocaleString('pt-BR')} / ${topDesafio.target.toLocaleString('pt-BR')} ${topDesafio.unit}`}
-                </Text>
-              </View>
-            </Pressable>
-          ) : null}
 
           {/* Recomendações para você — clássicos do acervo (carrossel). */}
           {recs.length > 0 ? (
@@ -539,16 +505,17 @@ const styles = StyleSheet.create({
   feedShare: { color: HUB.greenInk, fontSize: 13, fontWeight: '700' },
 
   // --- Card de STATS (Nível/XP + colunas) ---
-  statsCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, marginTop: 16, ...cardShadow },
-  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  levelBadge: { width: 54, height: 54, borderRadius: 15, backgroundColor: '#EAF2FB', borderWidth: 1, borderColor: '#CFE4F6', alignItems: 'center', justifyContent: 'center' },
-  levelBadgeIcon: { fontSize: 26 },
-  levelTitle: { color: HUB.cardText, fontSize: 18, fontWeight: '800', marginTop: 1 },
-  levelNum: { color: HUB.greenInk, fontSize: 13, fontWeight: '800', marginTop: 1 },
-  xpTrack: { height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', marginTop: 8, overflow: 'hidden' },
+  statsCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 14, marginTop: 16, ...cardShadow },
+  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  levelBadge: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#EAF2FB', borderWidth: 1, borderColor: '#CFE4F6', alignItems: 'center', justifyContent: 'center' },
+  levelBadgeIcon: { fontSize: 22 },
+  levelTitleRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
+  levelTitle: { color: HUB.cardText, fontSize: 17, fontWeight: '800', flexShrink: 1 },
+  levelNum: { color: HUB.greenInk, fontSize: 12.5, fontWeight: '800' },
+  xpTrack: { height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', marginTop: 7, overflow: 'hidden' },
   xpFill: { height: '100%', borderRadius: 3, backgroundColor: HUB.greenInk },
   xpLabel: { color: HUB.cardMuted, fontSize: 11, fontWeight: '700', marginTop: 4 },
-  statCols: { flexDirection: 'row', marginTop: 16, borderTopWidth: 1, borderTopColor: '#EFF1F0', paddingTop: 12 },
+  statCols: { flexDirection: 'row', marginTop: 12, borderTopWidth: 1, borderTopColor: '#EFF1F0', paddingTop: 10 },
   statCol: { flex: 1, alignItems: 'center' },
   statColDivider: { borderLeftWidth: 1, borderLeftColor: '#EFF1F0' },
   statColLabel: { color: HUB.cardMuted, fontSize: 11.5, fontWeight: '600' },
@@ -567,6 +534,8 @@ const styles = StyleSheet.create({
   missionSub: { color: HUB.cardMuted, fontSize: 12.5, marginTop: 2 },
   xpBadge: { backgroundColor: '#E7F6EC', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center' },
   xpBadgeText: { color: '#16A34A', fontSize: 13, fontWeight: '900' },
+  periodBadge: { backgroundColor: '#EAF2FB', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  periodBadgeText: { color: HUB.greenInk, fontSize: 12, fontWeight: '800' },
   missionTrack: { height: 7, borderRadius: 4, backgroundColor: '#E5E7EB', marginTop: 12, overflow: 'hidden' },
   missionFill: { height: '100%', borderRadius: 4, backgroundColor: '#22C55E' },
   missionProg: { color: HUB.cardMuted, fontSize: 11.5, fontWeight: '700', marginTop: 6, textAlign: 'right' },
