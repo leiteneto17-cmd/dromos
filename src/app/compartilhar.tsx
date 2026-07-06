@@ -61,10 +61,14 @@ function Checkerboard() {
   );
 }
 
-/** App ID do Facebook (Instagram exige p/ o Stories sticker). Vazio = tenta mesmo assim
- * no Android (é lenient) e cai no share sheet se falhar. Registrar 1 grátis em
- * developers.facebook.com para produção/iOS e colar em app.json → extra.fbAppId. */
-const FB_APP_ID = (Constants.expoConfig?.extra as { fbAppId?: string } | undefined)?.fbAppId ?? '';
+/** App ID do Facebook (Instagram exige p/ o Stories sticker).
+ * ⚠️ CAUSA-RAIZ do card preto (2026-07-05): com appId VAZIO o react-native-share lança
+ * exceção NO JS (lib/module/index.js:54) antes de montar o Intent nativo — o sticker nunca
+ * chegava ao IG e o fallback genérico achatava o PNG. O placeholder '123456789' é TEMPORÁRIO,
+ * só para validar o pipeline (Android não valida o source_application). Antes de produção/iOS:
+ * registrar App ID grátis em developers.facebook.com e colar em app.json → extra.fbAppId. */
+const FB_APP_ID =
+  (Constants.expoConfig?.extra as { fbAppId?: string } | undefined)?.fbAppId || '123456789';
 // Cores do fundo do Story (gradiente da identidade social §2.7) — o card vai como
 // STICKER por cima, então o modelo "Transparente" flutua sobre este fundo/na foto do usuário.
 // Gradiente do Story = marca (Social.purpleTop → Social.dark). Hex literal porque o nome
@@ -75,6 +79,23 @@ const STORY_BOTTOM = '#0E0B16';
 // No Expo Go o módulo nativo do expo-media-library não existe → nem tentamos
 // importá-lo (o import dinâmico ainda "resolve" com funções undefined e quebraria).
 const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
+
+/** Lê o COLOR TYPE do header PNG direto do base64 (byte 25 do arquivo).
+ * 6 = RGBA (tem canal alpha) · 2 = RGB (opaco → a exportação Skia achatou).
+ * Prova objetiva p/ o debug do card transparente — sem depender de visualizador. */
+function pngColorType(b64: string): number | null {
+  const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const bytes: number[] = [];
+  for (let i = 0; i + 3 < 44 && i + 3 < b64.length; i += 4) {
+    const n =
+      (ABC.indexOf(b64[i]) << 18) | (ABC.indexOf(b64[i + 1]) << 12) |
+      (ABC.indexOf(b64[i + 2]) << 6) | ABC.indexOf(b64[i + 3]);
+    bytes.push((n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff);
+  }
+  // Assinatura PNG = 137 80 78 71; sem ela, não é PNG (ex.: saiu JPEG).
+  if (bytes[0] !== 137 || bytes[1] !== 80) return null;
+  return bytes[25] ?? null;
+}
 
 
 export default function ShareScreen() {
@@ -123,6 +144,10 @@ export default function ShareScreen() {
         Alert.alert('Ops', 'Não consegui gerar o card transparente.');
         return null;
       }
+      // Diagnóstico do alpha: 6 = RGBA (transparência real), 2 = RGB (Skia achatou).
+      console.log(
+        `[Card transparente] PNG exportado: ${b64.length} chars base64 · color type = ${pngColorType(b64)} (6 = RGBA c/ alpha)`,
+      );
       if (result === 'base64') return b64;
       try {
         const uri = `${FileSystem.cacheDirectory}dromos-card-${Date.now()}.png`;
@@ -273,32 +298,29 @@ export default function ShareScreen() {
 
   const onInstagram = () =>
     withBusy(async () => {
-      // O card vai como STICKER do Instagram Stories (assim o modelo "Transparente"
-      // flutua de verdade sobre a foto/Story do usuário — antes o deep link abria o
-      // Story em branco, descartando a imagem). react-native-share monta o intent no
-      // Android e o pasteboard no iOS. Fundo = gradiente da marca (o usuário troca por
-      // foto dentro do Instagram); a foto do próprio card vem embutida no sticker.
+      // O card vai como STICKER do Instagram Stories (interactive_asset_uri no Intent
+      // com.instagram.share.ADD_TO_STORY — o modelo "Transparente" flutua sobre a foto).
+      // ⚠️ SEM fallback p/ share sheet durante o dev: o fallback silencioso mascarou por
+      // dias o erro real (appId vazio → exceção no JS da lib, Intent nunca montado, e o
+      // ACTION_SEND genérico achatava o PNG em fundo preto). Erro agora é LOGADO e ALERTADO.
       const b64 = await capture('base64');
       if (!b64) return;
+      console.log('[IG Stories] FB_APP_ID =', FB_APP_ID);
+      console.log('[IG Stories] sticker: PNG base64 de', b64.length, 'chars · color type =', pngColorType(b64));
       try {
         const { default: Share, Social } = await import('react-native-share');
-        await Share.shareSingle({
+        console.log('[IG Stories] chamando shareSingle(InstagramStories)…');
+        const res = await Share.shareSingle({
           social: Social.InstagramStories,
           appId: FB_APP_ID,
           stickerImage: `data:image/png;base64,${b64}`,
           backgroundTopColor: STORY_TOP,
           backgroundBottomColor: STORY_BOTTOM,
         });
-        return;
+        console.log('[IG Stories] shareSingle OK:', JSON.stringify(res));
       } catch (e) {
-        // Instagram ausente / recusou (ex.: appId vazio no iOS) → share sheet nativo.
-      }
-      const uri = await capture('tmpfile');
-      if (!uri) return;
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Compartilhar no Instagram' });
-      } else {
-        Alert.alert('Instagram', 'Abra com “Mais” e escolha o Instagram.');
+        console.error('[IG Stories] shareSingle FALHOU:', e);
+        Alert.alert('Instagram Stories — erro', String(e));
       }
     });
 

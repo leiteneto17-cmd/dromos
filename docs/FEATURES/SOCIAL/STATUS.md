@@ -49,28 +49,30 @@ substituem — decisão do usuário). Preview do card transparente ganhou o QUAD
 Strava. **Falta S2/S3:** auto-avançar entre pessoas, "visto" (anel apagado), reações
 (Logos/responder) no story; limpar o dead code do feed antigo (onKudo/feed state).
 
-## Card compartilhável TRANSPARENTE — ❌ AINDA NÃO FUNCIONA NO INSTAGRAM (2026-07-05)
-Estado após várias tentativas:
-- ✅ **Skia RENDERIZA transparente** — usuário CONFIRMOU ver o xadrez no preview do modelo
-  "Transparente" (`src/components/skia-share-card.tsx`, `makeImageSnapshot` → PNG base64).
-- ✅ Manifest declara `com.instagram.android` em `<queries>` (config plugin
-  `plugins/withInstagramQuery.js`) — Android 11+ enxerga o Instagram.
-- ✅ `onInstagram` (compartilhar.tsx) usa `react-native-share` `shareSingle(INSTAGRAM_STORIES)`
-  com `stickerImage` (= interactive_asset_uri).
-- ❌ **MESMO ASSIM o card sai PRETO no Story** (testado no aparelho 2026-07-05).
+## Card compartilhável TRANSPARENTE — 🔍 CAUSA-RAIZ ENCONTRADA (2026-07-05, auditoria)
+**O sticker NUNCA chegava ao Instagram.** Auditoria do react-native-share 12.3.1 instalado:
+- **Causa-raiz:** `appId` vazio → o **JS da lib lança exceção** ANTES do código nativo
+  (`lib/module/index.js:54`: "To share to Instagram Stories you need to provide appId").
+  O Intent `com.instagram.share.ADD_TO_STORY` nunca era montado. O `catch` silencioso do
+  `onInstagram` engolia o erro e caía no `Sharing.shareAsync` (ACTION_SEND genérico) → o IG
+  recebia o card como FOTO comum → achatava em fundo preto, imóvel. Confirma o teste do
+  usuário: sticker NÃO movia + transparência NÃO permanecia = não era sticker.
+- **Lado nativo da lib está CORRETO** (auditado): `stickerImage` → `interactive_asset_uri`
+  (`InstagramStoriesShare.java:121`), MIME `image/*` sticker-only, `grantUriPermission` c/
+  `FLAG_GRANT_READ_URI_PERMISSION`, base64 → arquivo → FileProvider `.rnshare.fileprovider`.
+  Sem fallback ACTION_SEND na lib quando o IG está instalado.
 
-### Hipóteses p/ a PRÓXIMA sessão atacar (em ordem de probabilidade):
-1. **`fbAppId` VAZIO** (`app.json` extra.fbAppId). O Instagram Stories sticker EXIGE um
-   `source_application` (Facebook App ID) válido — sem ele, o IG pode recusar o sticker e cair
-   no fundo. **Registrar 1 App ID grátis em developers.facebook.com e testar.** É a suspeita nº 1.
-2. **Verificar se o PNG do Skia tem ALPHA de verdade** — salvar o card e INSPECIONAR o arquivo
-   (não a galeria, que mostra preto). Se `makeImageSnapshot().encodeToBase64()` no Android exporta
-   opaco, o problema é a exportação Skia, não o IG. Testar: abrir o PNG salvo num visualizador que
-   mostre transparência, ou checar o header do PNG (color type 6 = RGBA).
-3. **Formato do `stickerImage`** no react-native-share: hoje passo `data:image/png;base64,...`;
-   talvez precise ser um CAMINHO de arquivo (uri) em vez de data-uri no Android.
-4. Se nada resolver: a real limitação pode ser do próprio device/IG; alternativa = usar o modelo
-   "Foto" (embute a foto do usuário, opaco, funciona) como o caminho oficial de "stats sobre foto".
+### O que foi feito (aguardando teste na APK nova):
+1. `FB_APP_ID` ganhou **placeholder temporário `'123456789'`** (compartilhar.tsx) — só p/
+   validar o pipeline; Android não valida o `source_application`. **Produção/iOS: registrar
+   App ID real grátis em developers.facebook.com → app.json `extra.fbAppId`.**
+2. **Fallback silencioso REMOVIDO** do `onInstagram` durante o dev — erro agora dá
+   `console.error` + `Alert` (o fallback mascarou o bug por dias).
+3. **Logs do fluxo inteiro** (`[IG Stories] …`): FB_APP_ID, tamanho do base64, **color type
+   do PNG lido do header** (6 = RGBA c/ alpha, 2 = RGB achatado — helper `pngColorType`),
+   chamada e resultado do `shareSingle`.
+4. Se o sticker chegar MÓVEL mas ainda preto → aí sim o suspeito vira a exportação Skia sem
+   alpha (o log do color type responde isso na hora).
 
 ## Roadmap / próximos passos
 1. **Clube do livro GUIADO (social v2)** — REFORMULADO (2026-07-03, decisão do usuário
