@@ -1,37 +1,50 @@
 /**
- * Publicar Story — em vez de publicar com 1 toque (story "vazio"), o autor monta o conteúdo:
- * legenda + sticker (emoji). Foto e áudio entram nas próximas fatias (Storage + moderação).
- * Publica a leitura mais recente como story de 24h (services/stories.publishLatestAsStory).
+ * Publicar Story — EDITOR imersivo estilo Instagram. O card 9:16 é o próprio story (espelho
+ * fiel via StoryCanvas). Toolbar translúcida no topo (Aa/sticker/efeito/trilha), camadas
+ * flutuantes arrastáveis (texto/sticker/música), botão flutuante no rodapé. A música toca em
+ * loop enquanto edita (Trilhas para Leitura — Jamendo/Ambientes). Publica a composição como JSON.
  */
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Card, ScreenBG } from '@/components/social-ui';
-import { Paginometro } from '@/components/paginometro';
-import { BrandFont } from '@/constants/theme';
-import { useUI } from '@/hooks/use-ui';
+import { MusicSheet } from '@/components/story-editor/MusicSheet';
+import { StickerSheet } from '@/components/story-editor/StickerSheet';
+import { StoryCanvas } from '@/components/story-editor/StoryCanvas';
+import { TextEditorOverlay } from '@/components/story-editor/TextEditorOverlay';
+import { useAudioPreview } from '@/hooks/use-audio-preview';
+import { trackToAudioMeta, type Track } from '@/services/music';
 import { getLatestActivityPreview, publishLatestAsStory } from '@/services/stories';
 import { Social } from '@/theme/social';
+import {
+  BG_PRESETS,
+  emptyComposition,
+  type LayerBg,
+  type StoryComposition,
+  type StoryTextLayer,
+} from '@/types/story-composition';
 
-const CAPTION_MAX = 140;
-
-/** Stickers de humor de leitura (1 emoji, opcional). */
-const STICKERS = ['📖', '🔥', '😍', '😭', '🤯', '☕', '🌙', '💡', '🥹', '✨', '👀', '📚'];
+const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 export default function PublicarStoryScreen() {
-  const c = useUI();
-  const [preview, setPreview] = useState<{ book_title: string; seconds: number; pages: number | null } | null>(null);
+  const [preview, setPreviewData] = useState<{ book_title: string; seconds: number; pages: number | null } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [caption, setCaption] = useState('');
-  const [sticker, setSticker] = useState<string | null>(null);
+  const [comp, setComp] = useState<StoryComposition>(emptyComposition());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showStickers, setShowStickers] = useState(false);
+  const [showMusic, setShowMusic] = useState(false);
+  const [textEditing, setTextEditing] = useState<{ id?: string } | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const audioPreview = useAudioPreview();
 
   useEffect(() => {
     let alive = true;
     getLatestActivityPreview().then((p) => {
       if (!alive) return;
-      setPreview(p);
+      setPreviewData(p);
       setLoading(false);
     });
     return () => {
@@ -39,136 +52,215 @@ export default function PublicarStoryScreen() {
     };
   }, []);
 
+  // Toca a trilha em loop enquanto edita (feedback em tempo real).
+  useEffect(() => {
+    const url = comp.audio?.preview_url;
+    if (url) audioPreview.play(url, true);
+    else audioPreview.stop();
+  }, [comp.audio?.preview_url, audioPreview]);
+
+  const selected = comp.layers.find((l) => l.id === selectedId) ?? null;
+
+  const addLayer = useCallback((layer: StoryComposition['layers'][number]) => {
+    setComp((c) => ({ ...c, layers: [...c.layers, layer] }));
+    setSelectedId(layer.id);
+  }, []);
+
+  const changeLayer = useCallback((id: string, u: { x: number; y: number; scale: number }) => {
+    setComp((c) => ({
+      ...c,
+      layers: c.layers.map((l) => (l.id === id ? { ...l, x: u.x, y: u.y, ...('scale' in l ? { scale: u.scale } : {}) } : l)),
+    }));
+  }, []);
+
+  const removeSelected = useCallback(() => {
+    if (!selected) return;
+    setComp((c) => {
+      const layers = c.layers.filter((l) => l.id !== selected.id);
+      // Removeu o sticker de música → tira também o áudio.
+      const audio = selected.type === 'music' ? null : c.audio;
+      return { ...c, layers, audio };
+    });
+    setSelectedId(null);
+  }, [selected]);
+
+  const onTextDone = useCallback(
+    (v: { text: string; color: string; bg: LayerBg }) => {
+      const editingId = textEditing?.id;
+      setComp((c) => {
+        if (editingId) {
+          return { ...c, layers: c.layers.map((l) => (l.id === editingId && l.type === 'text' ? { ...l, ...v } : l)) };
+        }
+        const layer: StoryTextLayer = { type: 'text', id: uid(), x: 0.5, y: 0.5, scale: 1, rotation: 0, ...v };
+        return { ...c, layers: [...c.layers, layer] };
+      });
+      setTextEditing(null);
+    },
+    [textEditing],
+  );
+
+  const pickSticker = useCallback(
+    (emoji: string) => addLayer({ type: 'sticker', id: uid(), emoji, x: 0.5, y: 0.5, scale: 1, rotation: 0 }),
+    [addLayer],
+  );
+
+  const pickTrack = useCallback(
+    (t: Track) => {
+      setComp((c) => {
+        const hasMusic = c.layers.some((l) => l.type === 'music');
+        const layers = hasMusic ? c.layers : [...c.layers, { type: 'music' as const, id: uid(), style: 'player' as const, x: 0.5, y: 0.32 }];
+        return { ...c, audio: trackToAudioMeta(t), layers };
+      });
+    },
+    [],
+  );
+
+  const cycleMusicStyle = useCallback(() => {
+    if (!selected || selected.type !== 'music') return;
+    setComp((c) => ({
+      ...c,
+      layers: c.layers.map((l) => (l.id === selected.id && l.type === 'music' ? { ...l, style: l.style === 'player' ? 'neon' : 'player' } : l)),
+    }));
+  }, [selected]);
+
+  const cycleBg = useCallback(() => {
+    setComp((c) => {
+      const i = BG_PRESETS.findIndex((b) => b.id === c.bg);
+      return { ...c, bg: BG_PRESETS[(i + 1) % BG_PRESETS.length].id };
+    });
+  }, []);
+
   async function publicar() {
     if (publishing) return;
     setPublishing(true);
-    const r = await publishLatestAsStory({ caption, sticker });
+    audioPreview.stop();
+    const r = await publishLatestAsStory({ composition: comp });
     setPublishing(false);
     if (!r.ok) {
       Alert.alert('Story', r.error ?? 'Não deu para publicar.');
       return;
     }
-    Alert.alert('Publicado 📣', 'Sua leitura está no topo da Comunidade por 24h.', [
-      { text: 'Boa!', onPress: () => router.back() },
-    ]);
+    Alert.alert('Publicado 📣', 'Sua leitura está no topo da Comunidade por 24h.', [{ text: 'Boa!', onPress: () => router.back() }]);
   }
 
   return (
-    <ScreenBG>
-      <Pressable onPress={() => router.back()} hitSlop={8} style={styles.back}>
-        <Text style={[styles.backText, { color: c.textDim }]}>‹ Voltar</Text>
-      </Pressable>
-
-      <Text style={[styles.title, { color: c.text }]}>Publicar story</Text>
-      <Text style={[styles.subtitle, { color: c.textFaint }]}>
-        Sua leitura mais recente vira um story de 24h. Adicione um toque seu para não ficar vazio.
-      </Text>
-
-      {loading ? (
-        <ActivityIndicator color={c.green} style={{ marginTop: 30 }} />
-      ) : !preview ? (
-        <Card style={styles.note}>
-          <Text style={[styles.noteTitle, { color: c.text }]}>Nada para publicar ainda</Text>
-          <Text style={[styles.noteSub, { color: c.textFaint }]}>
-            Leia um pouco primeiro 📖 — aí sua sessão de leitura pode virar story.
-          </Text>
-        </Card>
-      ) : (
-        <>
-          {/* Prévia do que vai virar story (mesmo card do viewer). */}
-          <View style={styles.previewCard}>
-            <Text style={styles.previewKicker}>leu</Text>
-            <Text style={styles.previewBook} numberOfLines={2}>
-              {preview.book_title}
-            </Text>
-            {sticker ? <Text style={styles.previewSticker}>{sticker}</Text> : null}
-            <View style={{ marginTop: 14 }}>
-              <Paginometro pages={preview.pages} seconds={preview.seconds} />
-            </View>
-            {caption.trim() ? <Text style={styles.previewCaption}>{caption.trim()}</Text> : null}
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+        {loading ? (
+          <ActivityIndicator color={Social.green} style={{ marginTop: 60 }} />
+        ) : !preview ? (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyTitle}>Nada para publicar ainda</Text>
+            <Text style={styles.emptySub}>Leia um pouco primeiro 📖 — aí sua sessão pode virar story.</Text>
+            <Pressable onPress={() => router.back()} style={styles.emptyBtn}>
+              <Text style={styles.emptyBtnText}>‹ Voltar</Text>
+            </Pressable>
           </View>
-
-          {/* Legenda */}
-          <Text style={[styles.label, { color: c.text }]}>Legenda</Text>
-          <TextInput
-            value={caption}
-            onChangeText={(t) => setCaption(t.slice(0, CAPTION_MAX))}
-            placeholder="Escreva algo sobre essa leitura…"
-            placeholderTextColor={c.textFaint}
-            multiline
-            style={[styles.input, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-          />
-          <Text style={[styles.counter, { color: c.textFaint }]}>
-            {caption.length}/{CAPTION_MAX}
-          </Text>
-
-          {/* Sticker */}
-          <Text style={[styles.label, { color: c.text }]}>Sticker</Text>
-          <View style={styles.stickerWrap}>
-            {STICKERS.map((s) => {
-              const active = sticker === s;
-              return (
-                <Pressable
-                  key={s}
-                  onPress={() => setSticker(active ? null : s)}
-                  style={[styles.stickerChip, { borderColor: active ? c.green : c.border, backgroundColor: active ? c.card : 'transparent' }]}>
-                  <Text style={styles.stickerEmoji}>{s}</Text>
+        ) : (
+          <>
+            {/* Toolbar translúcida */}
+            <BlurView intensity={30} tint="dark" style={styles.toolbar}>
+              <Pressable onPress={() => router.back()} hitSlop={8}>
+                <Text style={styles.toolIcon}>✕</Text>
+              </Pressable>
+              <View style={styles.toolRight}>
+                <Pressable onPress={() => setTextEditing({})} hitSlop={8} style={styles.toolBtn}>
+                  <Text style={styles.toolAa}>Aa</Text>
                 </Pressable>
-              );
-            })}
-          </View>
+                <Pressable onPress={() => setShowStickers(true)} hitSlop={8} style={styles.toolBtn}>
+                  <Text style={styles.toolIcon}>😊</Text>
+                </Pressable>
+                <Pressable onPress={cycleBg} hitSlop={8} style={styles.toolBtn}>
+                  <Text style={styles.toolIcon}>✨</Text>
+                </Pressable>
+                <Pressable onPress={() => setShowMusic(true)} hitSlop={8} style={styles.toolBtn}>
+                  <Text style={styles.toolIcon}>🎵</Text>
+                </Pressable>
+              </View>
+            </BlurView>
 
-          {/* Foto/áudio — próximas fatias (Storage + moderação §4.8). */}
-          <View style={[styles.soon, { borderColor: c.border }]}>
-            <Text style={[styles.soonText, { color: c.textFaint }]}>📷 Foto e 🎙️ áudio chegam em breve</Text>
-          </View>
+            {/* Canvas 9:16 (o story). Tocar no fundo abre o editor de texto. */}
+            <View style={styles.canvasWrap}>
+              <Pressable style={styles.canvas} onPress={() => setSelectedId(null)}>
+                <StoryCanvas
+                  book={preview.book_title}
+                  seconds={preview.seconds}
+                  pages={preview.pages}
+                  composition={comp}
+                  editable
+                  selectedId={selectedId}
+                  onSelectLayer={setSelectedId}
+                  onChangeLayer={changeLayer}
+                />
+              </Pressable>
+            </View>
 
-          <Pressable
-            onPress={publicar}
-            disabled={publishing}
-            style={[styles.cta, { backgroundColor: c.green, opacity: publishing ? 0.8 : 1 }]}>
-            {publishing ? (
-              <ActivityIndicator color={c.onGreen} />
-            ) : (
-              <Text style={[styles.ctaText, { color: c.onGreen }]}>Publicar por 24h</Text>
-            )}
-          </Pressable>
-        </>
-      )}
-    </ScreenBG>
+            {/* Barra da camada selecionada */}
+            {selected ? (
+              <View style={styles.layerBar}>
+                {selected.type === 'text' ? (
+                  <Pressable onPress={() => setTextEditing({ id: selected.id })} style={styles.layerAction}>
+                    <Text style={styles.layerActionText}>✎ Editar</Text>
+                  </Pressable>
+                ) : null}
+                {selected.type === 'music' ? (
+                  <Pressable onPress={cycleMusicStyle} style={styles.layerAction}>
+                    <Text style={styles.layerActionText}>↺ Estilo</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={removeSelected} style={styles.layerAction}>
+                  <Text style={styles.layerActionText}>🗑 Remover</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {/* Publicar flutuante */}
+            <View style={styles.footer} pointerEvents="box-none">
+              <Pressable onPress={publicar} disabled={publishing} style={[styles.cta, { opacity: publishing ? 0.8 : 1 }]}>
+                {publishing ? <ActivityIndicator color={Social.dark} /> : <Text style={styles.ctaText}>Publicar por 24h</Text>}
+              </Pressable>
+            </View>
+
+            <StickerSheet visible={showStickers} onClose={() => setShowStickers(false)} onPick={pickSticker} />
+            <MusicSheet visible={showMusic} onClose={() => setShowMusic(false)} book={preview.book_title} onPick={pickTrack} />
+            <TextEditorOverlay
+              visible={!!textEditing}
+              initial={
+                textEditing?.id
+                  ? (() => {
+                      const l = comp.layers.find((x) => x.id === textEditing.id);
+                      return l && l.type === 'text' ? { text: l.text, color: l.color, bg: l.bg } : undefined;
+                    })()
+                  : undefined
+              }
+              onDone={onTextDone}
+              onCancel={() => setTextEditing(null)}
+            />
+          </>
+        )}
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { paddingVertical: 4, paddingRight: 8, alignSelf: 'flex-start' },
-  backText: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 26, fontFamily: BrandFont.extrabold, marginTop: 2 },
-  subtitle: { fontSize: 14, lineHeight: 20, marginTop: 2 },
-  note: { marginTop: 20 },
-  noteTitle: { fontSize: 16, fontWeight: '700' },
-  noteSub: { fontSize: 13, marginTop: 4, lineHeight: 19 },
-  previewCard: {
-    marginTop: 18,
-    borderRadius: 18,
-    paddingVertical: 22,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    backgroundColor: Social.card,
-    borderWidth: 1,
-    borderColor: 'rgba(124,240,184,0.28)',
-  },
-  previewKicker: { color: Social.lavender, fontSize: 14, letterSpacing: 1 },
-  previewBook: { color: Social.green, fontSize: 24, fontWeight: '900', textAlign: 'center', marginTop: 4 },
-  previewSticker: { fontSize: 40, marginTop: 8 },
-  previewCaption: { color: Social.white, fontSize: 14, textAlign: 'center', marginTop: 14, lineHeight: 20 },
-  label: { fontSize: 15, fontWeight: '800', marginTop: 22, marginBottom: 8 },
-  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, minHeight: 72, textAlignVertical: 'top' },
-  counter: { fontSize: 12, textAlign: 'right', marginTop: 4 },
-  stickerWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  stickerChip: { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  stickerEmoji: { fontSize: 22 },
-  soon: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 22 },
-  soonText: { fontSize: 13, fontWeight: '600' },
-  cta: { borderRadius: 999, paddingVertical: 16, alignItems: 'center', marginTop: 22 },
-  ctaText: { fontSize: 16, fontWeight: '800' },
+  root: { flex: 1, backgroundColor: '#000' },
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 30 },
+  emptyTitle: { color: Social.white, fontSize: 18, fontWeight: '800' },
+  emptySub: { color: Social.muted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyBtn: { marginTop: 16, borderWidth: 1.5, borderColor: Social.green, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 10 },
+  emptyBtnText: { color: Social.green, fontSize: 15, fontWeight: '800' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, marginHorizontal: 12, marginTop: 6, overflow: 'hidden' },
+  toolRight: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  toolBtn: { alignItems: 'center', justifyContent: 'center' },
+  toolIcon: { fontSize: 20, color: Social.white },
+  toolAa: { fontSize: 18, fontWeight: '900', color: Social.white },
+  canvasWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 10 },
+  canvas: { width: '100%', maxWidth: 430, aspectRatio: 9 / 16 },
+  layerBar: { flexDirection: 'row', justifyContent: 'center', gap: 10, paddingBottom: 6 },
+  layerAction: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  layerActionText: { color: Social.white, fontSize: 13, fontWeight: '800' },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 24, alignItems: 'center' },
+  cta: { backgroundColor: Social.green, borderRadius: 999, paddingVertical: 15, paddingHorizontal: 44, shadowColor: Social.green, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 0 } },
+  ctaText: { color: Social.dark, fontSize: 16, fontWeight: '900' },
 });

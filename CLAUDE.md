@@ -73,21 +73,23 @@ Nome do app: **Dromos** (+leitura) — decidido em 2026-07-03; substitui o nome 
        `expo-media-library` (salvar) e deep link de Stories do Instagram (camada sticker + fundo).
    - **Distinção importante:** o *card compartilhável* é local (só renderiza stats → imagem, **não
      precisa de backend**) e pode sair cedo. O *feed social* precisa de backend + moderação (§4.8).
-7. **Identidade visual do card de stats / gamificação — referência ROXO + VERDE** (mockup aprovado
-   pelo usuário). Direção de design para os gráficos de desempenho (§2.4) e o card compartilhável (§2.6):
-   - **Fundo:** gradiente do **roxo profundo** no topo (~`#3B2A63` / `#2E2147`) descendo para **quase
-     preto** (~`#14121C`). Clima escuro/premium, estilo "Strava noturno".
-   - **Destaques** (números grandes, logo `+leitura`): **verde neon/menta com brilho (glow)**
-     (~`#8BFFC4` / `#5EF0A0` / `#3EE89A`).
-   - **Rótulos de seção** ("Consistência", "Dedicado"): **lavanda / roxo-claro** (~`#B9A6E8`).
-   - **Texto secundário/valores** ("Média de Leitura", "Tempo Total…"): **branco/quase branco** (~`#EDEAF5`).
-   - **"Trilha do livro" (= o mapa do Strava):** **linha verde neon brilhante** com nós (pinos/hexágonos),
-     ícone de livro no início + xícara de café, rótulo tipo "Maratona do Clássico". É a "rota" = capítulos/
-     progresso lidos.
-   - Métricas do exemplo: *Livros Lidos (5 livros · 123 págs)* · *Consistência (45m/dia)* ·
-     *Tempo Total de Leitura (11h 23m 45s)*.
-   - **Regra:** usar **roxo+verde** como identidade da camada **social/stats** (perfil, gráficos, card).
-     O **leitor** em si continua **sépia/claro/escuro** (§2.5) — são duas "peles" distintas do app.
+7. **Identidade visual — CLARO + AZUL (rebrand 2026-07-06, decisão do usuário).** SUBSTITUI o
+   antigo roxo+verde neon ("Strava noturno"). Inspiração: **Fluent Design + Material 3 + Apple HIG +
+   leitores (Kindle/Apple Books/Kobo)**; meta = **máximo conforto para leitura longa**.
+   - **Fonte única = DESIGN TOKENS** em `src/theme/tokens.ts` (cores/espaçamento/raio/sombra/motion/
+     tipografia). O tema ativo (`src/theme/ui.ts` → `useUI()`) monta a `UIPalette` a partir daí, então
+     as telas adotam a identidade sem reescrita. **Migração incremental, sem breaking changes.**
+   - **Paleta (light):** Fundo `#F4F5F0` (papel/gelo) · Surface `#FFFFFF` · Border `#E5E7EB` ·
+     Texto `#2A2C33` / secundário `#6B7280` · **Accent `#3A9AD9` (azul)** · Success `#22C55E` ·
+     Warning `#F59E0B` · Danger `#EF4444` · Disabled `#D1D5DB`. Há um tema **dark** derivado (leitura noturna).
+   - **Cards:** superfície branca + **sombras suaves em múltiplas camadas** (`shadow(1|2|3)`), clima
+     "acrylic" do Fluent. **Botões:** cantos arredondados, leve profundidade, feedback de hover/press,
+     transições **150–250ms** com easing moderno.
+   - **Compat:** as chaves legadas `green`/`purple` do tema apontam para o **azul de acento** — o roxo e o
+     verde-de-marca foram aposentados (o verde só sobrevive como `success`).
+   - **Migração pendente (incremental):** as "peles" fixas escuras — `theme/social.ts` (card compartilhável,
+     story viewer), `theme/hub.ts` (hub/abas) e `theme/kids.ts` (Dromos Kids) — ainda estão no roxo/verde e
+     serão repintadas para claro+azul nos próximos incrementos. O **leitor** mantém sépia/claro/escuro (§2.5).
 
 ---
 

@@ -1078,5 +1078,8 @@ $$;
 -- =====================================================================
 alter table public.reading_activities add column if not exists story_caption text;
 alter table public.reading_activities add column if not exists story_sticker text;   -- 1 emoji
-alter table public.reading_activities add column if not exists story_photo_url text;  -- fatia 2
-alter table public.reading_activities add column if not exists story_audio_url text;  -- fatia 3
+alter table public.reading_activities add column if not exists story_photo_url text;  -- legado
+alter table public.reading_activities add column if not exists story_audio_url text;  -- legado
+-- Editor imersivo (estilo Instagram): composição completa como JSON
+-- { version, bg, layers:[texto/sticker/música posicionados], audio:{track/preview_url/...} }
+alter table public.reading_activities add column if not exists story_composition jsonb;

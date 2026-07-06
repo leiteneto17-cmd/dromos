@@ -12,6 +12,7 @@ import { Icon, type IconName } from '@/components/icon';
 import { BottomTabInset, BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import { HUB } from '@/theme/hub';
+import { shadow } from '@/theme/tokens';
 
 /**
  * Fundo + área segura + rolagem. Base de toda tela social.
@@ -76,8 +77,10 @@ export function Card({
     <View
       style={[
         s.card,
-        { backgroundColor: c.card, borderColor: glow ? c.green : c.border },
-        glow && { shadowColor: c.green, shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } },
+        { backgroundColor: c.surface, borderColor: glow ? c.accent : c.border },
+        // Sombra suave (Fluent "acrylic") só no claro; no escuro a borda já dá a separação.
+        c.mode === 'light' ? shadow(1) : null,
+        glow && { shadowColor: c.accent, shadowOpacity: 0.28, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
         style,
       ]}>
       {children}

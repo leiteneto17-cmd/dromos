@@ -4,6 +4,7 @@
  * nas últimas 24h (eu + quem sigo). A visibilidade de leitura é filtrada pela RLS que já existe.
  */
 import { supabase } from '@/services/supabase';
+import type { StoryComposition } from '@/types/story-composition';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -28,6 +29,8 @@ export type Story = {
   sticker: string | null; // 1 emoji
   photoUrl: string | null; // fatia 2
   audioUrl: string | null; // fatia 3
+  /** Composição do editor imersivo (camadas + trilha). Preferida no viewer sobre caption/sticker. */
+  composition: StoryComposition | null;
 };
 
 /** Conteúdo anexável ao publicar um story (tudo opcional). */
@@ -36,6 +39,7 @@ export type StoryContent = {
   sticker?: string | null;
   photoUrl?: string | null;
   audioUrl?: string | null;
+  composition?: StoryComposition | null;
 };
 
 async function myId(): Promise<string | null> {
@@ -78,6 +82,7 @@ export async function publishLatestAsStory(content?: StoryContent): Promise<{ ok
     story_sticker: content?.sticker || null,
     story_photo_url: content?.photoUrl || null,
     story_audio_url: content?.audioUrl || null,
+    story_composition: content?.composition ?? null,
   };
   if (act.visibility === 'private') patch.visibility = 'friends';
   const { error } = await supabase.from('reading_activities').update(patch).eq('id', act.id);
@@ -109,7 +114,7 @@ export async function getStories(): Promise<Story[]> {
   const { data } = await supabase
     .from('reading_activities')
     .select(
-      'id, user_id, book_title, seconds, pages, created_at, shared_as_story_at, story_caption, story_sticker, story_photo_url, story_audio_url',
+      'id, user_id, book_title, seconds, pages, created_at, shared_as_story_at, story_caption, story_sticker, story_photo_url, story_audio_url, story_composition',
     )
     .not('shared_as_story_at', 'is', null)
     .gte('shared_as_story_at', since)
@@ -128,6 +133,7 @@ export async function getStories(): Promise<Story[]> {
       story_sticker: string | null;
       story_photo_url: string | null;
       story_audio_url: string | null;
+      story_composition: StoryComposition | null;
     }[] | null) ?? [];
   if (rows.length === 0) return [];
 
@@ -188,6 +194,7 @@ export async function getStories(): Promise<Story[]> {
       sticker: r.story_sticker,
       photoUrl: r.story_photo_url,
       audioUrl: r.story_audio_url,
+      composition: r.story_composition ?? null,
     };
   });
   // A minha bolha primeiro.

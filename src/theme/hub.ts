@@ -37,13 +37,29 @@ export const HUB = {
  * As cores são pensadas para conteúdo DENTRO de cards brancos. Texto colocado
  * direto sobre o fundo verde deve usar `HUB.onBg` / `HUB.onBgDim` explicitamente.
  */
+// NOTA (rebrand 2026-07-06): o hub ainda usa a pele antiga (roxo+verde) — será migrado para
+// claro+azul num próximo incremento. Por ora satisfaz a UIPalette nova sem mudar o visual.
 export const hubUI: UIPalette = {
   mode: 'light',
   bg: HUB.base,
-  card: HUB.cardBg,
-  cardElevated: '#EFF1F0',
+  surface: HUB.cardBg,
+  surfaceAlt: '#EFF1F0',
   border: '#E9ECEA',
   text: HUB.cardText,
+  textSecondary: HUB.cardMuted,
+  accent: HUB.greenInk,
+  accentHover: HUB.greenInk,
+  accentPressed: HUB.greenInk,
+  accentSoft: 'rgba(15,169,104,0.12)',
+  onAccent: '#FFFFFF',
+  success: '#22C55E',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  disabled: '#D1D5DB',
+  focus: HUB.greenInk,
+  // legadas
+  card: HUB.cardBg,
+  cardElevated: '#EFF1F0',
   textDim: HUB.purple,
   textFaint: HUB.cardMuted,
   purple: HUB.purple,

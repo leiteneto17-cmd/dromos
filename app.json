@@ -76,7 +76,8 @@
       "ttsProxyFunction": "tts-proxy-",
       "revenueCatAndroidKey": "",
       "revenueCatIosKey": "",
-      "fbAppId": ""
+      "fbAppId": "",
+      "jamendoClientId": ""
     }
   }
 }

@@ -13,6 +13,8 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Paginometro } from '@/components/paginometro';
+import { StoryCanvas } from '@/components/story-editor/StoryCanvas';
+import { useAudioPreview } from '@/hooks/use-audio-preview';
 import { getStories, markStorySeen, tempoAtras, type Story } from '@/services/stories';
 import { Social, SocialGradient } from '@/theme/social';
 
@@ -27,6 +29,7 @@ export default function StoryScreen() {
   // regras de hooks; o `anim` (animação em curso) fica em ref pois só é tocado em efeitos.
   const [progress] = useState(() => new Animated.Value(0));
   const anim = useRef<Animated.CompositeAnimation | null>(null);
+  const audio = useAudioPreview();
 
   // Carrega as stories e começa na que foi tocada (id = activity_id).
   useEffect(() => {
@@ -80,6 +83,14 @@ export default function StoryScreen() {
     });
     return () => anim.current?.stop();
   }, [ready, current, index, progress, goTo]);
+
+  // Toca a trilha do story (Jamendo/Ambiente) em loop enquanto ele está aberto; troca/para
+  // ao avançar de pessoa. O hook silencia sozinho ao desmontar a tela.
+  useEffect(() => {
+    const url = current?.composition?.audio?.preview_url;
+    if (ready && url) audio.play(url, true);
+    else audio.stop();
+  }, [ready, current, audio]);
 
   const widths = useMemo(
     () => stories.map(() => progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] })),
@@ -135,23 +146,38 @@ export default function StoryScreen() {
           </Pressable>
         </View>
 
-        {/* Card central (stickers de informação + conteúdo do autor). */}
-        <View style={styles.center} pointerEvents="none">
-          <Text style={styles.kicker}>leu</Text>
-          <Text style={styles.book} numberOfLines={3}>
-            {current.book_title || 'um livro'}
-          </Text>
-          {current.sticker ? <Text style={styles.sticker}>{current.sticker}</Text> : null}
-          <View style={styles.paginometro}>
-            <Paginometro pages={current.pages} seconds={current.seconds} />
+        {current.composition ? (
+          /* Composição do editor imersivo — mesmo StoryCanvas do editor (espelho fiel). */
+          <View style={styles.canvasWrap} pointerEvents="none">
+            <View style={styles.canvas}>
+              <StoryCanvas
+                book={current.book_title}
+                seconds={current.seconds}
+                pages={current.pages}
+                composition={current.composition}
+                editable={false}
+              />
+            </View>
           </View>
-          {current.caption ? (
-            <Text style={styles.caption} numberOfLines={4}>
-              {current.caption}
+        ) : (
+          /* Legado (fatia 1 / stories antigos): card de stats + legenda/sticker. */
+          <View style={styles.center} pointerEvents="none">
+            <Text style={styles.kicker}>leu</Text>
+            <Text style={styles.book} numberOfLines={3}>
+              {current.book_title || 'um livro'}
             </Text>
-          ) : null}
-          <Text style={styles.logo}>Dromos</Text>
-        </View>
+            {current.sticker ? <Text style={styles.sticker}>{current.sticker}</Text> : null}
+            <View style={styles.paginometro}>
+              <Paginometro pages={current.pages} seconds={current.seconds} />
+            </View>
+            {current.caption ? (
+              <Text style={styles.caption} numberOfLines={4}>
+                {current.caption}
+              </Text>
+            ) : null}
+            <Text style={styles.logo}>Dromos</Text>
+          </View>
+        )}
 
         {/* Rodapé: "visto por N" na minha, dica de avanço nas outras. */}
         <Text style={styles.footer}>
@@ -186,6 +212,8 @@ const styles = StyleSheet.create({
   close: { color: Social.white, fontSize: 20, fontWeight: '800' },
   kicker: { color: Social.lavender, fontSize: 16, letterSpacing: 1 },
   book: { color: Social.green, fontSize: 32, fontWeight: '900', textAlign: 'center', textShadowColor: Social.green, textShadowRadius: 16, marginTop: 4, paddingHorizontal: 28 },
+  canvasWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 8 },
+  canvas: { width: '100%', maxWidth: 430, aspectRatio: 9 / 16 },
   sticker: { fontSize: 48, marginTop: 14 },
   paginometro: { marginTop: 22 },
   caption: { color: Social.white, fontSize: 16, textAlign: 'center', marginTop: 18, paddingHorizontal: 28, lineHeight: 22 },
