@@ -33,52 +33,65 @@ class Gutenberg(SourcePlugin):
     name = "gutenberg"
     label = "Project Gutenberg"
 
+    #: preset "infantil": subjects do Gutenberg que rendem acervo INFANTIL (o foco do Dromos Kids).
+    KIDS_TOPICS = ["children", "juvenile", "fairy tales", "fables"]
+
     def __init__(self, client, languages: str = "pt", topic: str | None = None):
         super().__init__(client)
         self.languages = languages
-        self.topic = topic
+        # `topic` aceita LISTA separada por vírgula (ex.: "children,fairy tales"); o preset
+        # especial "kids" expande para KIDS_TOPICS. Sem topic → acervo geral (sort popular).
+        if topic and topic.strip().lower() == "kids":
+            self.topics: list[str | None] = list(self.KIDS_TOPICS)
+        elif topic:
+            self.topics = [t.strip() for t in topic.split(",") if t.strip()]
+        else:
+            self.topics = [None]
 
-    def _page_url(self, page: int) -> str:
+    def _page_url(self, page: int, topic: str | None) -> str:
         params = [f"languages={self.languages}", f"page={page}", "sort=popular"]
-        if self.topic:
-            params.append(f"topic={self.topic}")
+        if topic:
+            params.append(f"topic={topic}")
         return f"{API}?{'&'.join(params)}"
 
     def discover(self, limit: int | None = None) -> Iterator[DiscoveredFile]:
         count = 0
-        for page in range(1, MAX_PAGES + 1):
-            if limit is not None and count >= limit:
-                return
-            url = self._page_url(page)
-            try:
-                resp = self.client.get(url, revalidate=False)
-            except (PermissionError, RuntimeError) as e:
-                log.warning("Gutendex falhou %s: %s", url, e)
-                return
-            try:
-                data = json.loads(resp.text)
-            except json.JSONDecodeError:
-                log.warning("resposta não-JSON da Gutendex (%s)", url)
-                return
-
-            results = data.get("results") or []
-            if not results:
-                return
-            for b in results:
-                epub = _pick_epub(b.get("formats") or {})
-                if not epub:
-                    continue
-                authors = ", ".join(a.get("name", "") for a in (b.get("authors") or []))
-                title = b.get("title") or ""
-                yield DiscoveredFile(
-                    url=epub,
-                    fmt="epub",
-                    source=self.name,
-                    title_hint=f"{title} — {authors}".strip(" —"),
-                    page_url=url,
-                )
-                count += 1
+        seen: set[str] = set()  # dedup entre subjects (um livro pode estar em vários)
+        for topic in self.topics:
+            for page in range(1, MAX_PAGES + 1):
                 if limit is not None and count >= limit:
                     return
-            if not data.get("next"):
-                return
+                url = self._page_url(page, topic)
+                try:
+                    resp = self.client.get(url, revalidate=False)
+                except (PermissionError, RuntimeError) as e:
+                    log.warning("Gutendex falhou %s: %s", url, e)
+                    break
+                try:
+                    data = json.loads(resp.text)
+                except json.JSONDecodeError:
+                    log.warning("resposta não-JSON da Gutendex (%s)", url)
+                    break
+
+                results = data.get("results") or []
+                if not results:
+                    break
+                for b in results:
+                    epub = _pick_epub(b.get("formats") or {})
+                    if not epub or epub in seen:
+                        continue
+                    seen.add(epub)
+                    authors = ", ".join(a.get("name", "") for a in (b.get("authors") or []))
+                    title = b.get("title") or ""
+                    yield DiscoveredFile(
+                        url=epub,
+                        fmt="epub",
+                        source=self.name,
+                        title_hint=f"{title} — {authors}".strip(" —"),
+                        page_url=url,
+                    )
+                    count += 1
+                    if limit is not None and count >= limit:
+                        return
+                if not data.get("next"):
+                    break

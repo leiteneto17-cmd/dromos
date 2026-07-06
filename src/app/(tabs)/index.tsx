@@ -27,7 +27,8 @@ import { useLibrary, type ImportedBook } from '@/store/library';
 import { useProfile } from '@/store/profile';
 import { HUB } from '@/theme/hub';
 
-const TILE_COLORS = ['#4C3A7A', '#3A5A78', '#6A3A5A', '#3A6A55', '#5A4A2A'];
+// Placeholders CLAROS para tiles sem capa (rebrand): azul/neutro suave, não mais roxo escuro.
+const TILE_COLORS = ['#DCE7F2', '#E5E7EB', '#E7E1F2', '#DCEAE3', '#EDE7DC'];
 
 function SearchIcon() {
   return (
@@ -524,7 +525,7 @@ const styles = StyleSheet.create({
   tileWrap: { width: 110 },
   tile: { width: 110, height: 156, borderRadius: 14, padding: 10, justifyContent: 'space-between', overflow: 'hidden', ...cardShadow },
   tileImage: { borderRadius: 14 },
-  tileBadge: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '800' },
+  tileBadge: { color: '#6B7280', fontSize: 11, fontWeight: '800' },
   // Sobre a capa real, o selo do formato ganha um fundo escuro p/ ler em qualquer imagem.
   tileBadgeOnCover: {
     alignSelf: 'flex-start',
@@ -535,7 +536,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
   },
-  tileTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  tileTitle: { color: '#2A2C33', fontSize: 14, fontWeight: '700' },
   tileCaption: { color: HUB.onBgDim, fontSize: 12, marginTop: 6 },
   tileStack: { width: 110, height: 156, justifyContent: 'space-between' },
   tileHalf: { width: 110, height: 73, borderRadius: 14, backgroundColor: HUB.cardBg, alignItems: 'center', justifyContent: 'center', ...cardShadow },
