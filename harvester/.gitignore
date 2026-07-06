@@ -1,0 +1,11 @@
+# Saída do Harvester (catalog.json versionado à parte, se quiser publicar)
+out/
+*.sqlite
+http_cache/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env

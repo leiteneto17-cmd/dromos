@@ -24,6 +24,7 @@ import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, T
 import { AdBanner } from '@/components/ad-banner';
 import { CatalogCover } from '@/components/catalog-cover';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
+import { shadow } from '@/theme/tokens';
 import { useUI } from '@/hooks/use-ui';
 import { BrandFont } from '@/constants/theme';
 import { Social } from '@/theme/social';
@@ -449,21 +450,21 @@ export default function CommunityScreen() {
                   social §2.7 + borda/acento verde neon). É a feature-vitrine da aba. */}
               <Pressable onPress={() => router.push({ pathname: '/clubes' })}>
                 <LinearGradient
-                  colors={[c.accentSoft, c.surface]}
+                  colors={[c.accent, c.accentPressed]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[styles.clubeCard, { borderColor: c.border }]}>
-                  <View style={[styles.clubeIconWrap, { backgroundColor: c.accentSoft }]}>
+                  style={[styles.clubeCard, { borderColor: 'transparent' }, c.mode === 'light' ? shadow(2) : null]}>
+                  <View style={[styles.clubeIconWrap, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
                     <Text style={styles.clubeIcon}>📖</Text>
                   </View>
                   <View style={styles.flex}>
-                    <Text style={[styles.clubeTitle, { color: c.text }]}>Clube do Livro</Text>
-                    <Text style={[styles.clubeSub, { color: c.textSecondary }]} numberOfLines={1}>
+                    <Text style={[styles.clubeTitle, { color: '#FFFFFF' }]}>Clube do Livro</Text>
+                    <Text style={[styles.clubeSub, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
                       Leia junto: cronograma semanal + discussão guiada
                     </Text>
                   </View>
-                  <View style={[styles.clubeCta, { backgroundColor: c.accent }]}>
-                    <Text style={[styles.clubeCtaText, { color: c.onAccent }]}>Entrar ›</Text>
+                  <View style={[styles.clubeCta, { backgroundColor: '#FFFFFF' }]}>
+                    <Text style={[styles.clubeCtaText, { color: c.accent }]}>Entrar ›</Text>
                   </View>
                 </LinearGradient>
               </Pressable>

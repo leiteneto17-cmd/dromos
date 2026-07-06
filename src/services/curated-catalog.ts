@@ -20,6 +20,8 @@
  *   }
  * Suba o EPUB no Storage (bucket público `acervo`) e cole a URL pública em `epubUrl`.
  */
+import Constants from 'expo-constants';
+
 import type { CatalogBook, CatalogLang } from '@/services/catalog';
 import { SUPABASE_URL, supabase } from '@/services/supabase';
 
@@ -34,10 +36,19 @@ export type CuratedEntry = {
   format?: 'epub' | 'pdf';
 };
 
-/** Manifesto no Storage (bucket público `acervo`). Vazio se o Supabase não está configurado. */
-const MANIFEST_URL = SUPABASE_URL
-  ? `${SUPABASE_URL}/storage/v1/object/public/acervo/catalog.json`
-  : '';
+/**
+ * URL do manifesto `catalog.json`. Prioridade:
+ *   1. `extra.catalogUrl` (app.json) / `EXPO_PUBLIC_CATALOG_URL` — o catálogo gerado pelo
+ *      **Dromos Harvester** e hospedado estático (ex.: raw do GitHub). Sem servidor/API (§ harvester).
+ *   2. bucket público `acervo` do Supabase (legado).
+ * Vazio se nada configurado → cai na LISTA-SEMENTE.
+ */
+const CATALOG_OVERRIDE =
+  (Constants.expoConfig?.extra?.catalogUrl as string | undefined) ||
+  process.env.EXPO_PUBLIC_CATALOG_URL ||
+  '';
+const MANIFEST_URL =
+  CATALOG_OVERRIDE || (SUPABASE_URL ? `${SUPABASE_URL}/storage/v1/object/public/acervo/catalog.json` : '');
 
 /**
  * LISTA-SEMENTE — exemplos REAIS de domínio público para o recurso já funcionar antes de

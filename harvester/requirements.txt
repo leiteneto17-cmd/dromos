@@ -1,0 +1,14 @@
+# Dromos Harvester — dependências (rodam no seu PC, não no app)
+requests>=2.31        # HTTP educado (robots, ETag, retries via urllib3)
+beautifulsoup4>=4.12  # parse de HTML na descoberta de links
+lxml>=4.9             # parser rápido para o bs4
+PyMuPDF>=1.24         # metadados + 1ª página (miniatura) de PDF  (import: fitz)
+ebooklib>=0.18        # metadados + capa de EPUB
+Pillow>=10.0          # normalizar/redimensionar capas
+python-dotenv>=1.0    # carregar .env
+
+# opcional (só se ligar OCR de PDF escaneado — pesado):
+# pytesseract>=0.3.10
+
+# dev:
+# pytest>=8.0
