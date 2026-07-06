@@ -20,7 +20,9 @@ class SourcePlugin(abc.ABC):
     #: rótulo humano.
     label: str = "Base"
 
-    def __init__(self, client: PoliteClient):
+    def __init__(self, client: PoliteClient, **_options):
+        # **_options: opções específicas de cada fonte (ex.: languages/topic no Gutenberg).
+        # A base ignora as que não conhece — assim o CLI pode passar as mesmas p/ qualquer fonte.
         self.client = client
 
     @abc.abstractmethod

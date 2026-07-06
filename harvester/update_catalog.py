@@ -27,6 +27,8 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Dromos Harvester — gera catalog.json de domínio público.")
     p.add_argument("--source", help="fonte a coletar (ex.: archive_public_domain)")
     p.add_argument("--limit", type=int, default=None, help="máximo de arquivos novos nesta rodada")
+    p.add_argument("--languages", default="pt", help="idioma (fontes que suportam, ex.: gutenberg)")
+    p.add_argument("--topic", default=None, help="assunto/bookshelf (ex.: children) — se a fonte suportar")
     p.add_argument("--base-url", default="", help="URL pública base p/ as capas (ex.: raw do GitHub)")
     p.add_argument("--kids-only", action="store_true", help="exporta só o acervo infantil")
     p.add_argument("--no-export", action="store_true", help="só coleta; não (re)gera o catalog.json")
@@ -52,7 +54,10 @@ def main(argv: list[str] | None = None) -> int:
     client = PoliteClient(cfg)
     db = Database(cfg.db_path)
     try:
-        source = source_cls(client)
+        source_kwargs: dict = {"languages": args.languages}
+        if args.topic:
+            source_kwargs["topic"] = args.topic
+        source = source_cls(client, **source_kwargs)
         run(source, cfg, client, db, limit=args.limit)
         if not args.no_export:
             n = export_catalog(

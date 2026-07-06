@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from harvester.sources.archive_public_domain import ArchivePublicDomain
 from harvester.sources.base import SourcePlugin
+from harvester.sources.gutenberg import Gutenberg
 
 _REGISTRY: dict[str, type[SourcePlugin]] = {
     ArchivePublicDomain.name: ArchivePublicDomain,
+    Gutenberg.name: Gutenberg,
 }
 
 

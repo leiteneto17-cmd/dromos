@@ -46,7 +46,11 @@ def extract_epub(path: str) -> ExtractResult:
 
     # Texto das 1ªs seções (classificação): concatena até ~4000 chars.
     try:
-        from bs4 import BeautifulSoup
+        import warnings
+
+        from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
+        warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
         chunks: list[str] = []
         for item in book.get_items_of_type(ITEM_DOCUMENT):

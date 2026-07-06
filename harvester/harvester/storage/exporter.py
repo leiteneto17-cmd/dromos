@@ -30,5 +30,5 @@ def export_catalog(db: Database, out_path: Path, base_url: str = "", kids_only: 
     entries = [b.to_catalog_entry(base_url=base_url) for b in books]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(entries, ensure_ascii=False, indent=2), "utf-8")
-    log.info("catalog.json: %d entradas → %s", len(entries), out_path)
+    log.info("catalog.json: %d entradas -> %s", len(entries), out_path)
     return len(entries)

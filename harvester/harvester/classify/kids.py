@@ -13,6 +13,9 @@ from harvester.utils.text import normalize
 # Palavras/expressões que indicam conteúdo infantil (sem acento, minúsculo).
 KEYWORDS = [
     "infantil",
+    "infantis",
+    "contos infantis",
+    "historias infantis",
     "infancia",
     "para criancas",
     "para a infancia",
