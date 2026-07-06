@@ -65,6 +65,61 @@ export function deriveStats(stats: ReadingStats): DerivedStats {
   return { totalSeconds: total, activeDays, avgMinPerDay, streak, level, levelProgress, last7, bestDayMinutes };
 }
 
+// ---------- XP / NÍVEL (gamificação do hub — hub-alvo 2026-07-06) ----------
+// XP DERIVADO do tempo de leitura (sem inventar dado, sem backend): 5 XP por minuto lido.
+// Níveis com títulos e limiares crescentes; o hub mostra "xp / próximo limiar".
+const XP_PER_MIN = 5;
+const LEVEL_FLOORS = [0, 80, 180, 320, 500, 720, 980, 1280, 1620, 2000];
+const LEVEL_TITLES = [
+  'Iniciante', 'Leitor', 'Leitor Ávido', 'Explorador', 'Estudioso',
+  'Erudito', 'Sábio', 'Mestre', 'Lenda', 'Imortal',
+];
+
+export type LevelInfo = {
+  xp: number;
+  level: number;
+  title: string;
+  levelFloor: number; // XP em que o nível atual começou
+  nextFloor: number; // XP do próximo nível (topo da barra)
+  progress: number; // 0..1 dentro do nível
+};
+
+/** XP/nível a partir do tempo total de leitura. */
+export function deriveLevel(stats: ReadingStats): LevelInfo {
+  const xp = Math.round((stats.totalSeconds / 60) * XP_PER_MIN);
+  let idx = 0;
+  for (let i = 0; i < LEVEL_FLOORS.length; i++) if (xp >= LEVEL_FLOORS[i]) idx = i;
+  const levelFloor = LEVEL_FLOORS[idx];
+  const nextFloor = LEVEL_FLOORS[idx + 1] ?? Math.round(levelFloor * 1.35 + 400);
+  const title = LEVEL_TITLES[idx] ?? 'Imortal';
+  const span = Math.max(1, nextFloor - levelFloor);
+  return { xp, level: idx + 1, title, levelFloor, nextFloor, progress: Math.min(1, (xp - levelFloor) / span) };
+}
+
+function shiftDayKey(key: string, delta: number): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Maior sequência de dias consecutivos lidos em TODO o histórico ("Melhor: N dias"). */
+export function computeBestStreak(perDay: Record<string, number>): number {
+  const active = new Set(Object.entries(perDay).filter(([, v]) => v > 0).map(([k]) => k));
+  let best = 0;
+  for (const k of active) {
+    if (active.has(shiftDayKey(k, -1))) continue; // conta só a partir do início de cada corrida
+    let len = 0;
+    let cur = k;
+    while (active.has(cur)) {
+      len++;
+      cur = shiftDayKey(cur, 1);
+    }
+    if (len > best) best = len;
+  }
+  return best;
+}
+
 export type Achievement = {
   id: string;
   icon: string;

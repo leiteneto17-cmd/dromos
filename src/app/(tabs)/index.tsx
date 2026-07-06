@@ -15,13 +15,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { AdBanner } from '@/components/ad-banner';
+import { CatalogCover } from '@/components/catalog-cover';
 import { importBookFlow } from '@/app/(tabs)/biblioteca';
 import { BottomTabInset, BrandFont } from '@/constants/theme';
 import { restoreActivities } from '@/services/activity-sync';
+import { featuredBrazilian, type CatalogBook } from '@/services/catalog';
+import { downloadCatalogBook } from '@/services/catalog-download';
 import { backfillCovers } from '@/services/cover-backfill';
 import { computeDesafios } from '@/services/desafios';
 import { getUnreadCount } from '@/services/notifications';
-import { deriveGoal, deriveStats } from '@/services/progress';
+import { computeBestStreak, deriveGoal, deriveLevel, deriveStats } from '@/services/progress';
 import { displayName, useAuth } from '@/store/auth';
 import { useLibrary, type ImportedBook } from '@/store/library';
 import { useProfile } from '@/store/profile';
@@ -48,16 +51,6 @@ function BellIcon() {
   );
 }
 
-function fmtMin(seconds: number): number {
-  return Math.max(1, Math.round(seconds / 60));
-}
-
-function fmtDay(ts: number): string {
-  const d = new Date(ts);
-  const sameDay = d.toDateString() === new Date().toDateString();
-  return sameDay ? `hoje ${d.toTimeString().slice(0, 5)}` : d.toLocaleDateString('pt-BR');
-}
-
 export default function HubScreen() {
   const books = useLibrary((s) => s.books);
   const stats = useLibrary((s) => s.stats);
@@ -73,14 +66,19 @@ export default function HubScreen() {
   const bookPages = useLibrary((s) => s.bookPages);
 
   const derived = deriveStats(stats);
+  const lvl = deriveLevel(stats);
+  const bestStreak = computeBestStreak(stats.perDay);
   const current = books.find((b) => b.id === currentBookId) ?? books[0] ?? null;
   const pct = current ? Math.round((progress[current.id] ?? 0) * 100) : 0;
   const weekMinutes = derived.last7.reduce((a, day) => a + day.minutes, 0);
-  const lastSession = sessions[0] ?? null;
+  // Missão diária: ler 15 min hoje (usa os minutos de hoje já derivados).
+  const MISSION_MIN = 15;
+  const todayMin = derived.last7[6]?.minutes ?? 0;
+  const missionPct = Math.min(1, todayMin / MISSION_MIN);
+  const missionDone = todayMin >= MISSION_MIN;
 
   // --- Home do Hábito (alma do app = Strava social + bons hábitos, 2026-07-02) ---
   // Tudo derivado do que já existe: streak/last7 (deriveStats), metas e desafios locais.
-  const readToday = (derived.last7[6]?.minutes ?? 0) > 0;
   const activeGoal = goals.find((g) => !g.doneAt) ?? null;
   const goalProg = activeGoal
     ? deriveGoal(
@@ -102,6 +100,9 @@ export default function HubScreen() {
   // Bolinha do sino: quantas notificações chegaram desde a última visita. Recarrega ao
   // focar o hub (volta de /notificacoes zera, pois a tela marca como visto ao abrir).
   const [unread, setUnread] = useState(0);
+  // Recomendações (clássicos BR do acervo) — carregadas 1× em segundo plano.
+  const [recs, setRecs] = useState<CatalogBook[]>([]);
+  const [recBusy, setRecBusy] = useState<string | null>(null);
   useFocusEffect(
     useCallback(() => {
       let alive = true;
@@ -118,7 +119,24 @@ export default function HubScreen() {
     void backfillCovers();
     // Restaura histórico/estatísticas da nuvem num install/aparelho novo (1× por usuário).
     void restoreActivities();
+    // Recomendações do acervo (clássicos BR) — falha silenciosa (some a seção).
+    featuredBrazilian()
+      .then((list) => setRecs(list.slice(0, 10)))
+      .catch(() => {});
   }, []);
+
+  async function openRec(b: CatalogBook) {
+    if (recBusy) return;
+    setRecBusy(b.id);
+    try {
+      const target = await downloadCatalogBook(b);
+      router.navigate(target);
+    } catch {
+      router.navigate('/explorar');
+    } finally {
+      setRecBusy(null);
+    }
+  }
 
   function open(book: ImportedBook) {
     openBook(book.id);
@@ -167,53 +185,61 @@ export default function HubScreen() {
           <Text style={styles.bigTitle}>Olá, {firstName}</Text>
           <Text style={styles.bigSubtitle}>Que bom ver você de volta!</Text>
 
-          {/* HÁBITO — streak-herói + semana em bolinhas + meta do dia (estilo Duolingo/Strava).
-              Toque no card → estatísticas; na linha da meta → Metas. */}
+          {/* Card de STATS (hub-alvo): Nível/XP + Sequência + XP total + Leitura na semana. */}
           <Pressable onPress={() => router.navigate('/estatisticas')}>
-            <View style={styles.feedCard}>
-              <View style={styles.habitTop}>
-                <Text style={styles.habitFlame}>🔥</Text>
-                <View style={styles.habitTitles}>
-                  <Text style={styles.habitStreak}>
-                    {derived.streak} {derived.streak === 1 ? 'dia seguido' : 'dias seguidos'}
-                  </Text>
-                  <Text style={styles.habitHint}>
-                    {readToday
-                      ? 'Chama acesa hoje! Continue assim.'
-                      : derived.streak > 0
-                        ? 'Leia hoje para manter a chama.'
-                        : 'Leia alguns minutos e acenda a chama.'}
+            <View style={styles.statsCard}>
+              <View style={styles.levelRow}>
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelBadgeIcon}>📖</Text>
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.statColLabel}>Nível atual</Text>
+                  <Text style={styles.levelTitle}>{lvl.title}</Text>
+                  <Text style={styles.levelNum}>Nível {lvl.level}</Text>
+                  <View style={styles.xpTrack}>
+                    <View style={[styles.xpFill, { width: `${Math.round(lvl.progress * 100)}%` }]} />
+                  </View>
+                  <Text style={styles.xpLabel}>
+                    {lvl.xp} / {lvl.nextFloor} XP
                   </Text>
                 </View>
               </View>
-              <View style={styles.habitWeek}>
-                {derived.last7.map((d, i) => (
-                  <View key={d.key} style={styles.habitDayCol}>
-                    <View
-                      style={[
-                        styles.habitDot,
-                        d.minutes > 0 && styles.habitDotOn,
-                        i === 6 && styles.habitDotToday,
-                      ]}>
-                      {d.minutes > 0 ? <Text style={styles.habitDotCheck}>✓</Text> : null}
-                    </View>
-                    <Text style={styles.habitDayLabel}>{d.label}</Text>
-                  </View>
-                ))}
+              <View style={styles.statCols}>
+                <StatCol label="Sequência" icon="🔥" value={String(derived.streak)} unit={derived.streak === 1 ? 'dia' : 'dias'} sub={`Melhor: ${bestStreak}`} />
+                <StatCol label="XP total" icon="⭐" value={String(lvl.xp)} unit="XP" divider />
+                <StatCol label="Na semana" icon="🕐" value={String(weekMinutes)} unit="min" divider />
               </View>
-              <Pressable
-                onPress={() => router.navigate('/conquistas')}
-                hitSlop={6}
-                style={styles.habitGoalRow}>
-                <Text style={styles.habitGoalText} numberOfLines={1}>
-                  {activeGoal && goalProg
-                    ? goalProg.done
-                      ? `🎯 ${activeGoal.title} — concluída! 🎉`
-                      : `🎯 ${activeGoal.title} · ~${goalProg.perDay} ${goalProg.unit}/dia · ${goalProg.daysLeft}d`
-                    : '🎯 Definir uma meta de leitura'}
-                </Text>
-                <Text style={styles.habitGoalArrow}>›</Text>
-              </Pressable>
+            </View>
+          </Pressable>
+
+          {/* Missão diária — ler alguns minutos hoje e ganhar XP. Toque → Metas. */}
+          <Pressable onPress={() => router.navigate('/conquistas')}>
+            <View style={styles.missionCard}>
+              <View style={styles.missionHead}>
+                <Text style={styles.missionIcon}>🎯</Text>
+                <Text style={styles.missionTitle}>Missão diária</Text>
+              </View>
+              <View style={styles.missionRow}>
+                <View style={styles.flex}>
+                  <Text style={styles.missionMain}>
+                    {missionDone ? 'Missão do dia concluída! 🎉' : `Leia por ${MISSION_MIN} minutos`}
+                  </Text>
+                  <Text style={styles.missionSub}>
+                    {activeGoal && goalProg && !goalProg.done
+                      ? `Meta: ${activeGoal.title} · ${goalProg.daysLeft}d`
+                      : 'Continue sua jornada e ganhe XP!'}
+                  </Text>
+                </View>
+                <View style={styles.xpBadge}>
+                  <Text style={styles.xpBadgeText}>+25 XP</Text>
+                </View>
+              </View>
+              <View style={styles.missionTrack}>
+                <View style={[styles.missionFill, { width: `${Math.round(missionPct * 100)}%` }]} />
+              </View>
+              <Text style={styles.missionProg}>
+                {todayMin} / {MISSION_MIN} min
+              </Text>
             </View>
           </Pressable>
 
@@ -313,8 +339,8 @@ export default function HubScreen() {
           <Pressable onPress={() => router.navigate('/estatisticas')}>
             <View style={styles.feedCard}>
               <View style={styles.weekHead}>
-                <Text style={styles.feedKicker}>Leitura na semana</Text>
-                <Text style={styles.weekTotal}>{weekMinutes} min</Text>
+                <Text style={styles.weekTitle}>Sua semana em resumo</Text>
+                <Text style={styles.feedShare}>Ver detalhes ›</Text>
               </View>
               <WeekBars data={derived.last7} />
               {/* Recap semanal ("Wrapped") → carrossel do card compartilhável */}
@@ -350,11 +376,65 @@ export default function HubScreen() {
             </Pressable>
           ) : null}
 
+          {/* Recomendações para você — clássicos do acervo (carrossel). */}
+          {recs.length > 0 ? (
+            <>
+              <View style={styles.sectionHeadRow}>
+                <Text style={styles.sectionTitle}>✨ Recomendações para você</Text>
+                <Pressable onPress={() => router.navigate('/explorar')} hitSlop={8}>
+                  <Text style={styles.link}>Ver todas ›</Text>
+                </Pressable>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelf}>
+                {recs.map((b) => (
+                  <Pressable key={b.id} style={styles.recWrap} onPress={() => openRec(b)} disabled={recBusy === b.id}>
+                    <CatalogCover uri={b.coverUrl} title={b.title} author={b.author} width={110} height={156} radius={14} />
+                    <Text style={styles.tileCaption} numberOfLines={1}>
+                      {recBusy === b.id ? 'Abrindo…' : b.title}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </>
+          ) : null}
+
           {/* Banner do tier grátis — no meio do feed (visível, fora do leitor §2.5).
               No-op p/ plano pago / Expo Go. */}
           <AdBanner style={styles.ad} />
         </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+function StatCol({
+  label,
+  icon,
+  value,
+  unit,
+  sub,
+  divider,
+}: {
+  label: string;
+  icon: string;
+  value: string;
+  unit: string;
+  sub?: string;
+  divider?: boolean;
+}) {
+  return (
+    <View style={[styles.statCol, divider ? styles.statColDivider : null]}>
+      <Text style={styles.statColLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={styles.statColIcon}>{icon}</Text>
+      <Text style={styles.statColValue}>{value}</Text>
+      <Text style={styles.statColUnit}>{unit}</Text>
+      {sub ? (
+        <Text style={styles.statColSub} numberOfLines={1}>
+          {sub}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -457,6 +537,41 @@ const styles = StyleSheet.create({
   feedAvatarText: { fontSize: 15, color: HUB.greenInk, fontWeight: '700' },
   feedMeta: { color: HUB.cardMuted, fontSize: 12 },
   feedShare: { color: HUB.greenInk, fontSize: 13, fontWeight: '700' },
+
+  // --- Card de STATS (Nível/XP + colunas) ---
+  statsCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, marginTop: 16, ...cardShadow },
+  levelRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  levelBadge: { width: 54, height: 54, borderRadius: 15, backgroundColor: '#EAF2FB', borderWidth: 1, borderColor: '#CFE4F6', alignItems: 'center', justifyContent: 'center' },
+  levelBadgeIcon: { fontSize: 26 },
+  levelTitle: { color: HUB.cardText, fontSize: 18, fontWeight: '800', marginTop: 1 },
+  levelNum: { color: HUB.greenInk, fontSize: 13, fontWeight: '800', marginTop: 1 },
+  xpTrack: { height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', marginTop: 8, overflow: 'hidden' },
+  xpFill: { height: '100%', borderRadius: 3, backgroundColor: HUB.greenInk },
+  xpLabel: { color: HUB.cardMuted, fontSize: 11, fontWeight: '700', marginTop: 4 },
+  statCols: { flexDirection: 'row', marginTop: 16, borderTopWidth: 1, borderTopColor: '#EFF1F0', paddingTop: 12 },
+  statCol: { flex: 1, alignItems: 'center' },
+  statColDivider: { borderLeftWidth: 1, borderLeftColor: '#EFF1F0' },
+  statColLabel: { color: HUB.cardMuted, fontSize: 11.5, fontWeight: '600' },
+  statColIcon: { fontSize: 16, marginTop: 3 },
+  statColValue: { color: HUB.cardText, fontSize: 18, fontWeight: '900', marginTop: 1 },
+  statColUnit: { color: HUB.greenInk, fontSize: 11, fontWeight: '700' },
+  statColSub: { color: HUB.cardMuted, fontSize: 10, marginTop: 2 },
+
+  // --- Missão diária ---
+  missionCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, marginTop: 14, ...cardShadow },
+  missionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  missionIcon: { fontSize: 16 },
+  missionTitle: { color: '#16A34A', fontSize: 14, fontWeight: '800' },
+  missionRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  missionMain: { color: HUB.cardText, fontSize: 16, fontWeight: '800' },
+  missionSub: { color: HUB.cardMuted, fontSize: 12.5, marginTop: 2 },
+  xpBadge: { backgroundColor: '#E7F6EC', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center' },
+  xpBadgeText: { color: '#16A34A', fontSize: 13, fontWeight: '900' },
+  missionTrack: { height: 7, borderRadius: 4, backgroundColor: '#E5E7EB', marginTop: 12, overflow: 'hidden' },
+  missionFill: { height: '100%', borderRadius: 4, backgroundColor: '#22C55E' },
+  missionProg: { color: HUB.cardMuted, fontSize: 11.5, fontWeight: '700', marginTop: 6, textAlign: 'right' },
+  weekTitle: { color: HUB.cardText, fontSize: 15, fontWeight: '800' },
+  recWrap: { width: 110 },
 
   // Hábito (streak-herói + bolinhas da semana + meta do dia)
   habitTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
