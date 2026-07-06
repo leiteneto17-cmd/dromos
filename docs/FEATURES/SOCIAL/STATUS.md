@@ -16,6 +16,26 @@
   (semana seg→dom), entrada na Home via "📤 Compartilhar minha semana".
 - Aba Atividades foi removida e redistribuída (commit `9eca41e`, aprovado); nav =
   `[Início, Biblioteca, (Ler), Comunidade, Perfil]`.
+- **"Em alta" agora é REAL (2026-07-06):** antes era `featuredBooks('best sellers')` no Google
+  (resultados aleatórios/estrangeiros, "fake"). Agora `trendingBooks()` (`book-catalog.ts`) usa
+  o endpoint REAL `openlibrary.org/trending/weekly.json` (engajamento de leitura da comunidade
+  OL). ⚠️ Limitação honesta: é GLOBAL (enviesa p/ inglês) — "em alta no Brasil" de verdade
+  exigiria NOSSA telemetria (downloads/tempo por região) ou fonte paga (NYT Books API). Cai p/
+  os destaques por busca se o trending falhar. "Populares na comunidade" segue = reader_count real.
+- **Capas quebradas na Comunidade:** `CatalogCover` (fallback tipográfico com o título) substitui
+  o emoji 📘 solto — ver ACERVO/STATUS.
+- **Stories estilo Instagram (2026-07-06):** anel **verde (não visto) / cinza (visto)** + tempo
+  ("há 3h") nas bolhas; viewer (`src/app/story.tsx`) reescrito — **auto-avança entre pessoas** (barra
+  segmentada ~6s), toque esquerda/direita, **stickers de info** (`src/components/paginometro.tsx`:
+  páginas/min) e **"👁 visto por N"** na própria. Backend: tabela `story_views` + RPC
+  `story_view_counts` no `schema.sql` (⚠️ **precisa deploy**). Serviço: `markStorySeen` + `seenByMe`/
+  `views` em `stories.ts`. **Só stories** (feed vertical NÃO foi reintroduzido — decisão do usuário).
+- **Conteúdo do story p/ não ficar vazio (2026-07-06) — FATIA 1 de 3:** tela de composição
+  `/publicar-story` (substitui o publish de 1 toque) com **legenda + sticker (emoji)**; o viewer
+  renderiza os dois. Colunas `story_caption/sticker/photo_url/audio_url` já criadas em
+  `reading_activities` (⚠️ **precisa deploy**). **Fatia 2 = FOTO** (bucket `story-media` + upload +
+  moderação §4.8) e **Fatia 3 = ÁUDIO** (gravação + player) — pendentes. Usuário escolheu o "completo",
+  entregue faseado (regra §8). Publish agora passa por `publishLatestAsStory(content)`.
 
 ## Decisões firmadas (ADR resumido)
 - Identidade visual social/stats = **roxo + verde neon** (CLAUDE.md §2.7); leitor continua

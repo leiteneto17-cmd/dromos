@@ -6,7 +6,8 @@
  * importação (ImportedBook), então leitor/progresso/stats funcionam igual.
  */
 import { File, Paths } from 'expo-file-system';
-import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,7 +27,6 @@ import { BrandFont } from '@/constants/theme';
 import { useUI } from '@/hooks/use-ui';
 import {
   featuredBrazilian,
-  QUICK_SEARCHES,
   resolveEpubUrl,
   searchCatalog,
   SOURCES,
@@ -43,6 +43,21 @@ const LANGS: { id: CatalogLang; label: string }[] = [
   { id: 'pt', label: '🇧🇷 Português' },
 ];
 
+/**
+ * Filtro de GÊNERO (substitui a parede de pills autores+gêneros — decisão 2026-07-06:
+ * liberar espaço vertical). Só gêneros (autores agora se acham pela busca). O `query` é em
+ * inglês porque casa melhor com o assunto no Gutenberg. `''` = limpa e volta à vitrine BR.
+ */
+const GENRES: { label: string; query: string; emoji: string }[] = [
+  { label: 'Todos', query: '', emoji: '✦' },
+  { label: 'Aventura', query: 'adventure', emoji: '🧭' },
+  { label: 'Romance', query: 'romance', emoji: '💗' },
+  { label: 'Ficção científica', query: 'science fiction', emoji: '🚀' },
+  { label: 'Terror', query: 'horror', emoji: '👻' },
+  { label: 'Poesia', query: 'poetry', emoji: '🕊️' },
+  { label: 'Contos', query: 'short stories', emoji: '📜' },
+];
+
 export default function ExplorarScreen() {
   const c = useUI();
   const addBook = useLibrary((s) => s.addBook);
@@ -54,6 +69,9 @@ export default function ExplorarScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  // Filtro de gênero colapsável (fechado por padrão — 1 linha só, anti-rolagem).
+  const [genreOpen, setGenreOpen] = useState(false);
+  const [genre, setGenre] = useState<string>('Todos');
 
   const buscar = useCallback(async (src: CatalogSource, q: string, l: CatalogLang) => {
     setLoading(true);
@@ -201,16 +219,34 @@ export default function ExplorarScreen() {
         explore os mais lidos.
       </Text>
 
-      {/* Cantinho do Estudo — atalho DISCRETO (não pode roubar o foco do Explorar) */}
-      <Pressable
-        onPress={() => router.push('/enem')}
-        style={[styles.enemRow, { backgroundColor: c.card, borderColor: c.border }]}>
-        <Text style={[styles.enemText, { color: c.textDim }]} numberOfLines={1}>
-          🎓 <Text style={{ fontWeight: '800', color: c.text }}>Clássicos de prova · ENEM</Text>
-          {'  '}obras + simulado por IA
-        </Text>
-        <Text style={[styles.enemArrow, { color: c.purple }]}>›</Text>
-      </Pressable>
+      {/* Grandes Jornadas — dois destinos temáticos lado a lado (identidade neon §2.7):
+          ENEM (capelo, verde) e Dromos Kids (estrelas, violeta mágico). */}
+      <View style={styles.journeyRow}>
+        <Pressable style={styles.journeyCell} onPress={() => router.push('/enem')}>
+          <LinearGradient
+            colors={['#2E2147', '#14121C']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.journeyCard, { borderColor: 'rgba(62,232,154,0.4)' }]}>
+            <Text style={styles.journeyIcon}>🎓</Text>
+            <Text style={styles.journeyTitle}>Clássicos de Prova</Text>
+            <Text style={[styles.journeySub, { color: '#8BFFC4' }]}>ENEM & vestibulares · IA</Text>
+          </LinearGradient>
+        </Pressable>
+
+        {/* '/infantil' é rota nova — o cast some quando o typegen do expo-router regenera. */}
+        <Pressable style={styles.journeyCell} onPress={() => router.push('/infantil' as Href)}>
+          <LinearGradient
+            colors={['#3A2168', '#160F2B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.journeyCard, { borderColor: 'rgba(185,166,232,0.5)' }]}>
+            <Text style={styles.journeyIcon}>✨📖</Text>
+            <Text style={styles.journeyTitle}>Clássicos Infantis</Text>
+            <Text style={[styles.journeySub, { color: '#C9B8F5' }]}>Dromos Kids · histórias mágicas</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
 
       {/* Fonte do acervo (só aparece quando há mais de uma) */}
       {SOURCES.length > 1 ? (
@@ -277,20 +313,41 @@ export default function ExplorarScreen() {
         </View>
       ) : null}
 
-      {/* Atalhos de descoberta */}
-      <View style={styles.quickRow}>
-        {QUICK_SEARCHES.map((q) => (
-          <Pressable
-            key={q.label}
-            onPress={() => {
-              setQuery(q.query);
-              buscar(source, q.query, lang);
-            }}
-            style={[styles.quickChip, { borderColor: c.border, backgroundColor: c.card }]}>
-            <Text style={[styles.quickText, { color: c.purple }]}>{q.label}</Text>
-          </Pressable>
-        ))}
-      </View>
+      {/* Filtro de gênero COLAPSÁVEL (substitui a parede de pills — só 1 linha quando fechado). */}
+      <Pressable
+        onPress={() => setGenreOpen((v) => !v)}
+        style={[styles.genreBar, { backgroundColor: c.card, borderColor: genreOpen ? c.green : c.border }]}>
+        <Text style={[styles.genreBarText, { color: c.textDim }]}>
+          🎭 Gênero: <Text style={{ fontWeight: '800', color: c.text }}>{genre}</Text>
+        </Text>
+        <Text style={[styles.genreCaret, { color: c.purple }]}>{genreOpen ? '▲' : '▼'}</Text>
+      </Pressable>
+
+      {genreOpen ? (
+        <View style={styles.genrePanel}>
+          {GENRES.map((g) => {
+            const active = g.label === genre;
+            return (
+              <Pressable
+                key={g.label}
+                onPress={() => {
+                  setGenre(g.label);
+                  setGenreOpen(false);
+                  setQuery(g.query);
+                  buscar(source, g.query, lang);
+                }}
+                style={[
+                  styles.genreChip,
+                  { borderColor: active ? c.green : c.border, backgroundColor: active ? c.card : 'transparent' },
+                ]}>
+                <Text style={[styles.genreChipText, { color: active ? c.green : c.purple }]}>
+                  {g.emoji} {g.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.center}>
@@ -381,18 +438,19 @@ const styles = StyleSheet.create({
   backText: { fontSize: 16, fontWeight: '600' },
   title: { fontSize: 28, fontFamily: BrandFont.extrabold },
   subtitle: { fontSize: 14, lineHeight: 20, marginTop: 2, marginBottom: 12 },
-  enemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  journeyRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  journeyCell: { flex: 1 },
+  journeyCard: {
+    borderRadius: 16,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    minHeight: 108,
+    justifyContent: 'center',
   },
-  enemText: { flex: 1, fontSize: 13 },
-  enemArrow: { fontSize: 18, fontWeight: '800' },
+  journeyIcon: { fontSize: 24 },
+  journeyTitle: { fontSize: 15, fontWeight: '900', color: '#EDEAF5', marginTop: 8 },
+  journeySub: { fontSize: 11.5, fontWeight: '700', marginTop: 3 },
   sourceRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   sourceChip: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   sourceText: { fontSize: 13, fontWeight: '700' },
@@ -404,9 +462,22 @@ const styles = StyleSheet.create({
   langRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 8 },
   langChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   langText: { fontSize: 13, fontWeight: '700' },
-  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  quickChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  quickText: { fontSize: 12, fontWeight: '700' },
+  genreBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  genreBarText: { fontSize: 14 },
+  genreCaret: { fontSize: 12, fontWeight: '800' },
+  genrePanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  genreChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  genreChipText: { fontSize: 13, fontWeight: '700' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
   errorText: { fontSize: 15, lineHeight: 22, textAlign: 'center', paddingHorizontal: 20 },
   list: { gap: 12, paddingTop: 8, paddingBottom: 24 },

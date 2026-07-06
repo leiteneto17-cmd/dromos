@@ -1018,3 +1018,65 @@ begin
    where club_id = p_club and stage_no = p_stage and perguntas_json is null;
   return found;
 end; $$;
+
+-- =====================================================================
+-- STORY VIEWS — "visto" no estilo Instagram (SOCIAL/DESIGN-STORIES.md).
+-- Uma linha por (story, quem viu). Alimenta: anel "não visto/visto" nas bolhas
+-- e "visto por N" para o AUTOR. Story = uma reading_activities com shared_as_story_at.
+-- =====================================================================
+create table if not exists public.story_views (
+  activity_id uuid not null references public.reading_activities (id) on delete cascade,
+  viewer_id uuid not null references auth.users (id) on delete cascade,
+  viewed_at timestamptz not null default now(),
+  primary key (activity_id, viewer_id)
+);
+create index if not exists story_views_activity_idx on public.story_views (activity_id);
+
+alter table public.story_views enable row level security;
+
+-- Registrar: só a MINHA visualização, e só de algo que realmente é um story (evita inflar
+-- contagem de atividades que não foram publicadas). A visibilidade de quem PODE ver o story
+-- já é garantida pela RLS de reading_activities na hora de listar as bolhas.
+drop policy if exists "registro minha visualizacao" on public.story_views;
+create policy "registro minha visualizacao" on public.story_views
+  for insert to authenticated
+  with check (
+    auth.uid() = viewer_id
+    and exists (
+      select 1 from public.reading_activities a
+      where a.id = activity_id and a.shared_as_story_at is not null
+    )
+  );
+
+-- Ler: eu vejo o que EU vi (para saber se já abri); o AUTOR vê quem viu a story dele.
+drop policy if exists "viewer ou autor le" on public.story_views;
+create policy "viewer ou autor le" on public.story_views
+  for select to authenticated
+  using (
+    auth.uid() = viewer_id
+    or exists (
+      select 1 from public.reading_activities a
+      where a.id = activity_id and a.user_id = auth.uid()
+    )
+  );
+
+-- Contagem "visto por N" — só das minhas próprias stories (security definer).
+create or replace function public.story_view_counts(p_ids uuid[])
+returns table (activity_id uuid, n bigint)
+language sql security definer set search_path = public stable as $$
+  select v.activity_id, count(*)::bigint
+  from public.story_views v
+  join public.reading_activities a on a.id = v.activity_id
+  where v.activity_id = any (p_ids) and a.user_id = auth.uid()
+  group by v.activity_id;
+$$;
+
+-- =====================================================================
+-- CONTEÚDO do story (para não ficar "vazio"): o autor pode anexar uma legenda, um
+-- sticker (emoji) e — nas fatias seguintes — uma foto/áudio (URLs no bucket `story-media`).
+-- Guardado na própria reading_activities (mesmo padrão de `shared_as_story_at`).
+-- =====================================================================
+alter table public.reading_activities add column if not exists story_caption text;
+alter table public.reading_activities add column if not exists story_sticker text;   -- 1 emoji
+alter table public.reading_activities add column if not exists story_photo_url text;  -- fatia 2
+alter table public.reading_activities add column if not exists story_audio_url text;  -- fatia 3

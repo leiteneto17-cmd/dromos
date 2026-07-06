@@ -1,9 +1,14 @@
 # MONETIZACAO — Status
-*Atualizado: 2026-07-03*
+*Atualizado: 2026-07-06*
 
 ## Estado atual
 - **Planos (decididos):** Free com ads · Premium **R$5,90/mês ou R$59,90/ano** (tudo).
   Gating pronto: `store/plan.ts` é a fonte única (`setPlan`); tela `/premium` construída.
+- **Preço de EXIBIÇÃO unificado (2026-07-06):** havia telas com R$4,90 e outras com R$5,90.
+  Agora o texto do preço vem de UMA fonte — `src/constants/pricing.ts` (`PRICE_MONTHLY_LABEL`
+  = R$5,90, `PRICE_YEARLY_LABEL` = R$59,90, sufixos prontos). Consumido por `premium.tsx`,
+  `perfil.tsx` e `premium-lock.tsx`. ⚠️ São valores de FALLBACK — o preço real localizado
+  vem da loja via RevenueCat. Mudar preço = editar só o pricing.ts.
 - **RevenueCat integrado (commit `3ec4dcb`):** react-native-purchases no dev client
   (reconstruído, módulo nativo OK), configure roda, no-op elegante sem chave.
   BILLING_UNAVAILABLE no emulador é normal (sem Play).

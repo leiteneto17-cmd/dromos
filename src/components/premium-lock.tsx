@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/social-ui';
+import { PRICE_MONTHLY_SUFFIX } from '@/constants/pricing';
 import { useUI } from '@/hooks/use-ui';
 
 export function PremiumLock({ feature, note }: { feature: string; note?: string }) {
@@ -26,7 +27,7 @@ export function PremiumLock({ feature, note }: { feature: string; note?: string 
         {note ? <Text style={[styles.note, { color: c.textFaint }]}>{note}</Text> : null}
 
         <Pressable onPress={() => router.push('/premium')} style={[styles.cta, { backgroundColor: c.green }]}>
-          <Text style={[styles.ctaText, { color: c.onGreen }]}>✨ Conhecer o Premium · R$ 4,90/mês</Text>
+          <Text style={[styles.ctaText, { color: c.onGreen }]}>✨ Conhecer o Premium · {PRICE_MONTHLY_SUFFIX}</Text>
         </Pressable>
         <Text style={[styles.sub, { color: c.textFaint }]}>
           No plano grátis você lê seus livros à vontade (com anúncios). O Premium libera áudio,

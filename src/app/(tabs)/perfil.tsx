@@ -17,6 +17,7 @@ import { SettingsSheet } from '@/components/settings-sheet';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { StatsCard } from '@/components/stats-card';
 import { Fonts } from '@/constants/theme';
+import { PRICE_MONTHLY_SUFFIX } from '@/constants/pricing';
 import { useUI } from '@/hooks/use-ui';
 import { computeAchievements, deriveStats } from '@/services/progress';
 import { approveRequest, getFollowRequests, rejectRequest, type FollowRequest } from '@/services/social';
@@ -127,7 +128,7 @@ export default function ProfileScreen() {
                 <Text style={[styles.cardSub, { color: c.textFaint }]}>
                   {isPremium
                     ? 'Tudo liberado, sem anúncios. Obrigado!'
-                    : 'Áudio, Metas, Coach de IA e mais — sem anúncios · R$ 4,90/mês'}
+                    : `Áudio, Metas, Coach de IA e mais — sem anúncios · ${PRICE_MONTHLY_SUFFIX}`}
                 </Text>
               </View>
               <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>

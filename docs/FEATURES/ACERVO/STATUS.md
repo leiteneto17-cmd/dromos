@@ -16,6 +16,19 @@
   **FALTA o passo final: os INSERT em `curated_books`** com as URLs públicas — sem isso o
   Explorar não vê os livros (SQL pronto entregue ao usuário em 2026-07-03).
 
+## Explorar redesenhado (2026-07-06)
+- **Parede de pills (autores+gêneros) → filtro de gênero COLAPSÁVEL** (1 linha fechada, painel
+  de chips ao abrir) em `src/app/explorar.tsx`. Autores agora se acham pela busca.
+- **"Grandes Jornadas":** o antigo row discreto do ENEM virou DOIS cards lado a lado (gradiente
+  neon §2.7): 🎓 Clássicos de Prova (`/enem`) + ✨📖 Clássicos Infantis (`/infantil`).
+- **Dromos Kids (`/infantil` + `src/services/infantil.ts`):** seção infantil isolada, "brilho
+  mágico" violeta, capas grandes, portão por faixa etária (3-5/6-8/9-12). v1 SEED = 5 títulos
+  de domínio público VERIFICADOS por API: Gutenberg 30510 (Grimm), 16429 (Junqueiro), 45840
+  (Pimentel) + acervo próprio `alice-pt.pdf`/`peter-pan-pt.pdf` (HTTP 200 conferido). Cresce
+  pela mesma via curada. Camadas futuras (karaokê, gamificação, tipografia disléxica) pendentes.
+- **Capas sem imagem:** novo `src/components/catalog-cover.tsx` (`CatalogCover`) desenha fallback
+  TIPOGRÁFICO (gradiente roxo + título) no lugar do emoji 📘. Usado na Comunidade e no Kids.
+
 ## Decisões firmadas (ADR resumido)
 - **Sem pirataria; sem CDL (aluguel de cópia digital = ilegal); não competir em catálogo
   licenciado** — diferencial é leitura ativa, não tamanho do acervo. NÃO REABRIR.

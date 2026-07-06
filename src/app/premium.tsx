@@ -27,6 +27,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useUI } from '@/hooks/use-ui';
 import { BrandFont } from '@/constants/theme';
+import { PRICE_FALLBACK, PRICE_YEARLY_PER_MONTH_LABEL } from '@/constants/pricing';
 import {
   getPremiumPackages,
   purchasePremium,
@@ -48,9 +49,6 @@ const BENEFITS = [
   ['📚', 'Social completo', 'Estante, coleções, feed, Logos 📜, recados e perfil público.'],
   ['☁️', 'Backup e sincronização', 'Suas atividades e estante seguras na nuvem, entre aparelhos.'],
 ] as const;
-
-/** Preços de REFERÊNCIA (fallback) — os reais vêm da loja quando o RevenueCat está ativo. */
-const PRICE_FALLBACK = { mensal: 'R$ 5,90', anual: 'R$ 59,90' } as const;
 
 type Cycle = 'mensal' | 'anual';
 
@@ -166,7 +164,7 @@ export default function PremiumScreen() {
               <Text style={[styles.cyclePrice, { color: cycle === 'anual' ? c.green : c.text }]}>
                 {price('anual')}
               </Text>
-              <Text style={[styles.cyclePer, { color: c.textFaint }]}>/ano · ≈ R$ 4,99/mês</Text>
+              <Text style={[styles.cyclePer, { color: c.textFaint }]}>/ano · ≈ {PRICE_YEARLY_PER_MONTH_LABEL}/mês</Text>
             </Pressable>
           </View>
 

@@ -16,18 +16,18 @@
  * busca ativa (padrão iOS: controles de busca são contextuais). Hierarquia: feed primeiro
  * (vertical), descoberta depois (horizontal, explorar é opcional).
  */
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AdBanner } from '@/components/ad-banner';
+import { CatalogCover } from '@/components/catalog-cover';
 import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import { BrandFont } from '@/constants/theme';
 import { Social } from '@/theme/social';
-import { featuredBooks, searchBooks, type CatalogBook, type LangFilter } from '@/services/book-catalog';
+import { searchBooks, trendingBooks, type CatalogBook, type LangFilter } from '@/services/book-catalog';
 import {
   bookKeyOf,
   getMyShelf,
@@ -37,7 +37,7 @@ import {
   type ShelfItem,
 } from '@/services/community';
 import { getFeed, searchUsers, toggleKudo, type FeedItem, type PublicProfile } from '@/services/social';
-import { getStories, publishLatestAsStory, type Story } from '@/services/stories';
+import { getStories, tempoAtras, type Story } from '@/services/stories';
 import { useAuth } from '@/store/auth';
 
 /** Quantos itens do feed "Seguindo" mostrar antes do "Ver mais" (não vira lista infinita). */
@@ -76,15 +76,20 @@ type SearchMode = 'books' | 'people';
 
 type CoverSize = 'sm' | 'shelf';
 
-function Cover({ uri, size = 'sm' }: { uri?: string | null; size?: CoverSize }) {
-  const c = useUI();
-  const dim = size === 'shelf' ? styles.shelfCover : styles.coverSm;
-  if (uri) return <Image source={{ uri }} style={[styles.cover, dim]} contentFit="cover" transition={150} />;
-  return (
-    <View style={[styles.cover, dim, { backgroundColor: c.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-      <Text style={{ fontSize: size === 'sm' ? 18 : 26 }}>📘</Text>
-    </View>
-  );
+/** Capa do catálogo com fallback tipográfico (título) — ver components/catalog-cover.tsx. */
+function Cover({
+  uri,
+  title,
+  author,
+  size = 'sm',
+}: {
+  uri?: string | null;
+  title: string;
+  author?: string | null;
+  size?: CoverSize;
+}) {
+  const dims = size === 'shelf' ? { width: 92, height: 138, radius: 6 } : { width: 44, height: 64, radius: 4 };
+  return <CatalogCover uri={uri} title={title} author={author} {...dims} />;
 }
 
 export default function CommunityScreen() {
@@ -109,10 +114,9 @@ export default function CommunityScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]); // "Seguindo" — leituras de quem sigo
   const [feedExpanded, setFeedExpanded] = useState(false); // mostra poucas e expande
   const [stories, setStories] = useState<Story[]>([]); // bolhas de story (24h, opt-in)
-  const [publishing, setPublishing] = useState(false);
 
   const load = useCallback(async () => {
-    featuredBooks(lang).then(setFeatured);
+    trendingBooks().then(setFeatured);
     if (!user) {
       setShelf([]);
       setPopular([]);
@@ -216,32 +220,12 @@ export default function CommunityScreen() {
 
   const meHasStory = stories.some((s) => s.isMine);
 
-  // Publicar minha leitura de hoje como story (opt-in — DESIGN-STORIES.md).
-  const onPublishStory = useCallback(async () => {
-    if (publishing) return;
-    setPublishing(true);
-    const r = await publishLatestAsStory();
-    setPublishing(false);
-    if (!r.ok) {
-      Alert.alert('Story', r.error ?? 'Não deu para publicar.');
-      return;
-    }
-    getStories().then(setStories);
-    Alert.alert('Publicado 📣', 'Sua leitura está no topo da Comunidade por 24h.');
-  }, [publishing]);
+  // Publicar: abre a tela de composição (legenda/sticker) — não publica mais com 1 toque.
+  const goPublish = useCallback(() => router.push('/publicar-story' as Href), []);
 
+  // O viewer carrega a lista sozinho (getStories) e começa nesta — passa só o activity_id.
   const openStory = useCallback((s: Story) => {
-    router.push({
-      pathname: '/story',
-      params: {
-        name: s.isMine ? 'Você' : s.name,
-        avatar: s.avatar ?? '',
-        book: s.book_title,
-        seconds: String(s.seconds),
-        pages: String(s.pages ?? 0),
-        founder: s.founder ? '1' : '',
-      },
-    });
+    router.push({ pathname: '/story', params: { id: s.activity_id } });
   }, []);
 
   // Abre a página do livro. Da busca/Em alta passa o livro inteiro (JSON) p/ não re-buscar.
@@ -417,7 +401,7 @@ export default function CommunityScreen() {
                         return (
                           <Pressable key={`${b.source}-${b.id}`} onPress={() => openCatalog(b)}>
                             <Card style={styles.row}>
-                              <Cover uri={b.coverUrl} />
+                              <Cover uri={b.coverUrl} title={b.title} author={b.author} />
                               <View style={styles.rowBody}>
                                 <Text style={[styles.bookTitle, { color: c.text }]} numberOfLines={2}>
                                   {b.title}
@@ -496,16 +480,12 @@ export default function CommunityScreen() {
                     onPress={() => {
                       const mine = stories.find((s) => s.isMine);
                       if (mine) openStory(mine);
-                      else onPublishStory();
+                      else goPublish();
                     }}
                     style={styles.storyItem}>
                     <View style={[styles.storyRing, { borderColor: meHasStory ? c.green : c.border }]}>
                       <View style={[styles.storyAvatar, { backgroundColor: c.cardElevated }]}>
-                        {publishing ? (
-                          <ActivityIndicator color={c.green} />
-                        ) : (
-                          <Text style={styles.storyAvatarText}>{meHasStory ? '📖' : '＋'}</Text>
-                        )}
+                        <Text style={styles.storyAvatarText}>{meHasStory ? '📖' : '＋'}</Text>
                       </View>
                     </View>
                     <Text style={[styles.storyName, { color: c.textDim }]} numberOfLines={1}>
@@ -517,13 +497,17 @@ export default function CommunityScreen() {
                     .filter((s) => !s.isMine)
                     .map((s) => (
                       <Pressable key={s.activity_id} onPress={() => openStory(s)} style={styles.storyItem}>
-                        <View style={[styles.storyRing, { borderColor: c.green }]}>
+                        {/* Anel estilo Instagram: verde neon se ainda não vi, cinza se já vi. */}
+                        <View style={[styles.storyRing, { borderColor: s.seenByMe ? c.border : c.green }]}>
                           <View style={[styles.storyAvatar, { backgroundColor: c.cardElevated }]}>
                             <Text style={styles.storyAvatarText}>{s.avatar || '🦉'}</Text>
                           </View>
                         </View>
                         <Text style={[styles.storyName, { color: c.textDim }]} numberOfLines={1}>
                           {s.name}
+                        </Text>
+                        <Text style={[styles.storyTime, { color: c.textFaint }]} numberOfLines={1}>
+                          {tempoAtras(s.shared_at)}
                         </Text>
                       </Pressable>
                     ))}
@@ -547,7 +531,7 @@ export default function CommunityScreen() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
                     {featured.map((b) => (
                       <Pressable key={`${b.source}-${b.id}`} style={styles.shelfCell} onPress={() => openCatalog(b)}>
-                        <Cover uri={b.coverUrl} size="shelf" />
+                        <Cover uri={b.coverUrl} title={b.title} author={b.author} size="shelf" />
                         <Text style={[styles.shelfTitle, { color: c.text }]} numberOfLines={2}>
                           {b.title}
                         </Text>
@@ -576,7 +560,7 @@ export default function CommunityScreen() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
                     {popular.slice(0, 10).map((p) => (
                       <Pressable key={p.book_key} style={styles.shelfCell} onPress={() => openPopular(p)}>
-                        <Cover uri={p.cover_url} size="shelf" />
+                        <Cover uri={p.cover_url} title={p.book_title} size="shelf" />
                         <Text style={[styles.shelfTitle, { color: c.text }]} numberOfLines={2}>
                           {p.book_title}
                         </Text>
@@ -667,6 +651,7 @@ const styles = StyleSheet.create({
   storyAvatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   storyAvatarText: { fontSize: 26 },
   storyName: { fontSize: 11.5, fontWeight: '600', marginTop: 4, maxWidth: 66, textAlign: 'center' },
+  storyTime: { fontSize: 10, marginTop: 1, maxWidth: 66, textAlign: 'center' },
   // Card de destaque do Clube do Livro — cores FIXAS da identidade social (§2.7):
   // gradiente roxo profundo + verde neon, independente do tema do leitor.
   clubeCard: {

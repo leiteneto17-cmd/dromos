@@ -10,7 +10,15 @@
 - Ordem de uso: BYOK → proxy gerido (se logado) → pede login/chave.
   Ver `src/services/ai/dictionary.ts` e `src/services/ai/managed.ts`.
 - Consumidores do ai-proxy hoje: dicionário contextual, **tradução em lote** (LEITOR),
-  **simulado ENEM** (ESTUDO), coach de metas.
+  **simulado ENEM** (ESTUDO), coach de metas, **Fábrica de Histórias / Dromos Kids** (2026-07-06).
+- **Fábrica de Histórias (`src/services/ai/story.ts`, 2026-07-06):** gera conto/fábula/apólogo/
+  parábola infantil (8–10 páginas curtas) a partir de "ingredientes" (tipo/herói/cenário/moral).
+  Mesmo padrão do simulado (BYOK → proxy gerido, JSON tolerante). **Guardrails de segurança**
+  no system prompt (conteúdo 3–12 anos; ignora injeção via nome do herói) + `sanitizeHeroName`
+  no cliente. **Cota MENSAL** em `store/kids-stories.ts` (grátis 2/mês, Premium 30/mês, BYOK ∞)
+  = isca do Premium. Histórias salvas LOCALMENTE ("Minhas Criações"). Telas: `/kids-criar`
+  (form lúdico) + `/kids-historia` (leitor de carrossel). Fase 2 pendente: narração TTS + capa
+  ilustrada por IA (custo de imagem).
 
 ## Decisões firmadas (ADR resumido)
 - BYOK (2026-06-19) + IA grátis via proxy (2026-06-25) — CLAUDE.md §5. Chave nossa NUNCA

@@ -197,6 +197,56 @@ export async function featuredBooks(lang: LangFilter = 'pt', signal?: AbortSigna
   return out;
 }
 
+// ---------- Open Library "trending" (dados REAIS de engajamento) ----------
+type OLTrendingWork = {
+  key?: string;
+  title?: string;
+  author_name?: string[];
+  cover_i?: number;
+  first_publish_year?: number;
+};
+
+/**
+ * "Em alta" REAL — o endpoint `trending` do Open Library ranqueia por atividade recente
+ * de leitura (reading-log) da comunidade global, não é uma busca fabricada. Substitui a
+ * antiga `featuredBooks('best sellers')`, que só devolvia resultados aleatórios do Google.
+ *
+ * ⚠️ Limitação honesta: o trending do OL é GLOBAL (sem recorte por país/idioma), então vem
+ * enviesado p/ títulos em inglês. Um "em alta no Brasil" de verdade exigiria a NOSSA própria
+ * telemetria (downloads/tempo de leitura por região) ou uma fonte paga (ex.: NYT Books API).
+ * `period` = janela do ranking (semanal por padrão — mais estável que o diário).
+ */
+export async function trendingBooks(
+  period: 'daily' | 'weekly' | 'monthly' = 'weekly',
+  signal?: AbortSignal,
+): Promise<CatalogBook[]> {
+  try {
+    const res = await fetch(`https://openlibrary.org/trending/${period}.json?limit=30`, { signal });
+    if (!res.ok) throw new Error(`trending ${res.status}`);
+    const json = (await res.json()) as { works?: OLTrendingWork[] };
+    const seen = new Set<string>();
+    const out: CatalogBook[] = [];
+    for (const w of json.works ?? []) {
+      if (!w.title) continue;
+      const k = w.title.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({
+        id: w.key ?? w.title,
+        title: w.title,
+        author: w.author_name?.[0],
+        coverUrl: w.cover_i ? `https://covers.openlibrary.org/b/id/${w.cover_i}-M.jpg` : undefined,
+        year: w.first_publish_year ? String(w.first_publish_year) : undefined,
+        source: 'openlibrary',
+      });
+    }
+    return out;
+  } catch {
+    // Trending indisponível → cai p/ os destaques por busca (não deixa a seção vazia).
+    return featuredBooks('pt', signal);
+  }
+}
+
 /** Busca regionalizada (PT por padrão). Google primeiro; Open Library de fallback. */
 export async function searchBooks(query: string, lang: LangFilter = 'pt', signal?: AbortSignal): Promise<CatalogBook[]> {
   const q = query.trim();
