@@ -9,3 +9,19 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+

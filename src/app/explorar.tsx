@@ -231,10 +231,10 @@ export default function ExplorarScreen() {
                 onPress={() => setSource(s.id)}
                 style={[
                   styles.sourceChip,
-                  { backgroundColor: c.card, borderColor: active ? c.green : c.border },
-                  active && { borderWidth: 2 },
+                  // Chip ativo = fundo accentSoft + texto accentPressed; inativo = neutro (guia §6.3).
+                  { backgroundColor: active ? c.accentSoft : c.card, borderColor: active ? c.accent : c.border },
                 ]}>
-                <Text style={[styles.sourceText, { color: active ? c.green : c.textDim }]}>
+                <Text style={[styles.sourceText, { color: active ? c.accentPressed : c.textSecondary }]}>
                   {s.label}
                 </Text>
               </Pressable>
@@ -259,8 +259,8 @@ export default function ExplorarScreen() {
         />
         <Pressable
           onPress={() => buscar(source, query, lang)}
-          style={[styles.searchBtn, { backgroundColor: c.green }]}>
-          <Text style={[styles.searchBtnText, { color: c.onGreen }]}>Buscar</Text>
+          style={[styles.searchBtn, { backgroundColor: c.accent }]}>
+          <Text style={[styles.searchBtnText, { color: c.onAccent }]}>Buscar</Text>
         </Pressable>
       </View>
 
@@ -275,10 +275,9 @@ export default function ExplorarScreen() {
                 onPress={() => setLang(l.id)}
                 style={[
                   styles.langChip,
-                  { borderColor: active ? c.green : c.border },
-                  active && { borderWidth: 2 },
+                  { backgroundColor: active ? c.accentSoft : 'transparent', borderColor: active ? c.accent : c.border },
                 ]}>
-                <Text style={[styles.langText, { color: active ? c.green : c.textDim }]}>{l.label}</Text>
+                <Text style={[styles.langText, { color: active ? c.accentPressed : c.textSecondary }]}>{l.label}</Text>
               </Pressable>
             );
           })}
@@ -288,11 +287,11 @@ export default function ExplorarScreen() {
       {/* Filtro de gênero COLAPSÁVEL (substitui a parede de pills — só 1 linha quando fechado). */}
       <Pressable
         onPress={() => setGenreOpen((v) => !v)}
-        style={[styles.genreBar, { backgroundColor: c.card, borderColor: genreOpen ? c.green : c.border }]}>
+        style={[styles.genreBar, { backgroundColor: c.card, borderColor: genreOpen ? c.accent : c.border }]}>
         <Text style={[styles.genreBarText, { color: c.textDim }]}>
           🎭 Gênero: <Text style={{ fontWeight: '800', color: c.text }}>{genre}</Text>
         </Text>
-        <Text style={[styles.genreCaret, { color: c.purple }]}>{genreOpen ? '▲' : '▼'}</Text>
+        <Text style={[styles.genreCaret, { color: c.textSecondary }]}>{genreOpen ? '▲' : '▼'}</Text>
       </Pressable>
 
       {genreOpen ? (
@@ -310,9 +309,9 @@ export default function ExplorarScreen() {
                 }}
                 style={[
                   styles.genreChip,
-                  { borderColor: active ? c.green : c.border, backgroundColor: active ? c.card : 'transparent' },
+                  { borderColor: active ? c.accent : c.border, backgroundColor: active ? c.accentSoft : 'transparent' },
                 ]}>
-                <Text style={[styles.genreChipText, { color: active ? c.green : c.purple }]}>
+                <Text style={[styles.genreChipText, { color: active ? c.accentPressed : c.textSecondary }]}>
                   {g.emoji} {g.label}
                 </Text>
               </Pressable>
@@ -323,7 +322,7 @@ export default function ExplorarScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={c.green} />
+          <ActivityIndicator color={c.accent} />
         </View>
       ) : error ? (
         <View style={styles.center}>
@@ -338,7 +337,7 @@ export default function ExplorarScreen() {
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             results.length > 0 ? (
-              <Text style={[styles.sectionLabel, { color: c.purple }]}>
+              <Text style={[styles.sectionLabel, { color: c.textSecondary }]}>
                 {query.trim()
                   ? '🔎 Resultados'
                   : lang === 'pt'
@@ -370,7 +369,7 @@ export default function ExplorarScreen() {
                       {item.language ? ` · ${item.language.toUpperCase()}` : ''}
                     </Text>
                     {item.source === 'curated' ? (
-                      <Text style={[styles.srcTag, { color: c.green }]}>★ Acervo +leitura</Text>
+                      <Text style={[styles.srcTag, { color: c.accentPressed }]}>★ Acervo +leitura</Text>
                     ) : (
                       <Text style={[styles.srcTag, { color: c.textFaint }]}>
                         {item.source === 'google'
@@ -381,14 +380,14 @@ export default function ExplorarScreen() {
                       </Text>
                     )}
                     {item.language && item.language !== 'pt' ? (
-                      <Text style={[styles.ptHint, { color: c.purple }]}>🌐 Leia em português no app</Text>
+                      <Text style={[styles.ptHint, { color: c.textSecondary }]}>🌐 Leia em português no app</Text>
                     ) : null}
                   </View>
                   {busy ? (
-                    <ActivityIndicator color={c.green} style={styles.dl} />
+                    <ActivityIndicator color={c.accent} style={styles.dl} />
                   ) : (
-                    <View style={[styles.dlBtn, { borderColor: c.green }]}>
-                      <Text style={[styles.dlText, { color: c.green }]}>Baixar</Text>
+                    <View style={[styles.dlBtn, { borderColor: c.accent }]}>
+                      <Text style={[styles.dlText, { color: c.accentPressed }]}>Baixar</Text>
                     </View>
                   )}
                 </Card>

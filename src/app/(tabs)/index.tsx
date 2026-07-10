@@ -1,10 +1,8 @@
 /**
- * HUB (aba Leitura) — "Feed" estilo referência 2026 (image_75a1a1.jpg): fundo VERDE
- * vibrante (clean), header avatar + busca/sino, card "Lendo agora" roxo (progresso real),
- * cards BRANCOS de atividade (dados reais de sessão) e gráfico semanal, biblioteca + estante.
- *
- * Esta tela tem cores próprias (verde + branco) para bater com a imagem aprovada — não
- * segue o claro/escuro do app (é a "pele" do feed). O leitor continua sépia/claro/escuro.
+ * HUB (aba Leitura) — feed claro+azul (GUIA-DE-MARCA v2): fundo papel/gelo, header avatar +
+ * busca/sino, card "Lendo agora" (progresso real), cards BRANCOS de atividade e gráfico
+ * semanal, biblioteca + estante. Dose de cor pela regra 90-9-1: azul pleno só em CTA, links
+ * "›" e progresso ativo; verde só em estado concluído. O leitor continua sépia/claro/escuro.
  */
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -221,7 +219,14 @@ export default function HubScreen() {
                   </View>
                 </View>
                 <View style={styles.missionTrack}>
-                  <View style={[styles.missionFill, { width: `${Math.round(topDesafio.pct * 100)}%` }]} />
+                  {/* Progresso em andamento = azul; concluído = verde (success). */}
+                  <View
+                    style={[
+                      styles.missionFill,
+                      topDesafio.done && { backgroundColor: HUB.success },
+                      { width: `${Math.round(topDesafio.pct * 100)}%` },
+                    ]}
+                  />
                 </View>
                 <Text style={styles.missionProg}>
                   {topDesafio.done
@@ -232,7 +237,7 @@ export default function HubScreen() {
             </Pressable>
           ) : null}
 
-          {/* Lendo agora — card hero roxo (progresso real) */}
+          {/* Lendo agora — card hero em accentSoft (progresso real) */}
           <Pressable onPress={continueReading}>
             <View style={styles.hero}>
               {current?.coverUrl ? (
@@ -313,18 +318,18 @@ export default function HubScreen() {
                 <Pressable
                   onPress={() => importBookFlow(addBook, () => router.navigate('/reader'))}
                   style={styles.tileHalf}>
-                  <Text style={[styles.tileHalfIcon, { color: HUB.greenInk }]}>＋</Text>
-                  <Text style={[styles.tileHalfLabel, { color: HUB.greenInk }]}>Importar</Text>
+                  <Text style={[styles.tileHalfIcon, { color: HUB.accentDeep }]}>＋</Text>
+                  <Text style={[styles.tileHalfLabel, { color: HUB.accentDeep }]}>Importar</Text>
                 </Pressable>
                 <Pressable onPress={() => router.navigate('/explorar')} style={styles.tileHalf}>
                   <Text style={styles.tileHalfIcon}>🔎</Text>
-                  <Text style={[styles.tileHalfLabel, { color: HUB.purple }]}>Explorar</Text>
+                  <Text style={[styles.tileHalfLabel, { color: HUB.accentDeep }]}>Explorar</Text>
                 </Pressable>
               </View>
             </ScrollView>
           )}
 
-          {/* Gráfico semanal estilo Strava — card branco, barras verdes. Toque → /estatisticas. */}
+          {/* Gráfico semanal estilo Strava — card branco, barras azuis. Toque → /estatisticas. */}
           <Pressable onPress={() => router.navigate('/estatisticas')}>
             <View style={styles.feedCard}>
               <View style={styles.weekHead}>
@@ -448,7 +453,7 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 18, color: HUB.onBg, fontWeight: '700' },
   appName: { color: HUB.onBg, fontSize: 17, fontFamily: BrandFont.bold },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 18 },
-  // Sino + bolinha de não lidas (vermelha p/ saltar sobre o verde do hub).
+  // Sino + bolinha de não lidas (vermelha p/ saltar sobre o fundo claro).
   bellWrap: { position: 'relative' },
   badge: {
     position: 'absolute',
@@ -466,54 +471,45 @@ const styles = StyleSheet.create({
   bigTitle: { color: HUB.onBg, fontSize: 30, fontFamily: BrandFont.extrabold, marginTop: 14, marginBottom: 2 },
   bigSubtitle: { color: HUB.onBgDim, fontSize: 15, marginBottom: 14 },
 
-  // Hero "Lendo agora" (roxo)
-  // Hero "Lendo agora" = CTA principal. Borda verde da marca p/ destacar sobre o fundo roxo
-  // (antes o card roxo sumia no fundo roxo) + respiro em cima/baixo.
-  hero: { flexDirection: 'row', gap: 14, borderRadius: 24, padding: 16, marginTop: 16, marginBottom: 2, alignItems: 'center', backgroundColor: HUB.hero, borderWidth: 1.5, borderColor: HUB.green, ...cardShadow },
+  // Hero "Lendo agora" = destaque principal: superfície accentSoft + borda suave (90-9-1:
+  // o destaque vem da CAMADA suave, não de mais azul pleno) + respiro em cima/baixo.
+  hero: { flexDirection: 'row', gap: 14, borderRadius: 24, padding: 16, marginTop: 16, marginBottom: 2, alignItems: 'center', backgroundColor: HUB.hero, borderWidth: 1.5, borderColor: HUB.heroBorder, ...cardShadow },
   heroCover: { width: 60, height: 84, borderRadius: 10, backgroundColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', gap: 4 },
   heroCoverText: { color: HUB.cardMuted, fontSize: 10, fontWeight: '800' },
   heroCoverIcon: { fontSize: 24 },
   heroBody: { flex: 1, minWidth: 0 },
-  heroKicker: { color: HUB.greenInk, fontSize: 13, fontWeight: '700' },
+  heroKicker: { color: HUB.cardMuted, fontSize: 13, fontWeight: '700' },
   heroTitle: { color: HUB.cardText, fontSize: 21, fontWeight: '800', marginTop: 2 },
   heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 12 },
   heroSub: { color: HUB.cardMuted, fontSize: 13 },
   heroPct: { color: HUB.cardText, fontSize: 14, fontWeight: '800' },
   heroTrack: { height: 7, borderRadius: 4, backgroundColor: '#DCE6EF', marginTop: 6 },
-  heroFill: {
-    height: '100%',
-    borderRadius: 4,
-    backgroundColor: HUB.neon,
-    shadowColor: HUB.neon,
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
-  },
-  heroChapter: { color: HUB.greenInk, fontSize: 13, fontWeight: '700', marginTop: 12 },
+  // Barra de progresso = azul pleno, SEM glow (sombra colorida é a marca antiga).
+  heroFill: { height: '100%', borderRadius: 4, backgroundColor: HUB.accent },
+  heroChapter: { color: HUB.accentDeep, fontSize: 13, fontWeight: '700', marginTop: 12 },
 
   // Cards de feed BRANCOS
   feedCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, marginTop: 14, ...cardShadow },
-  feedKicker: { color: HUB.purple, fontSize: 12, fontWeight: '700' },
+  feedKicker: { color: HUB.cardMuted, fontSize: 12, fontWeight: '700' },
   feedText: { color: HUB.cardText, fontSize: 17, fontWeight: '600', marginTop: 6, lineHeight: 23 },
   feedStrong: { fontWeight: '800' },
   feedFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
   feedWho: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  feedAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(15,169,104,0.14)', alignItems: 'center', justifyContent: 'center' },
-  feedAvatarText: { fontSize: 15, color: HUB.greenInk, fontWeight: '700' },
+  feedAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: HUB.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  feedAvatarText: { fontSize: 15, color: HUB.cardText, fontWeight: '700' },
   feedMeta: { color: HUB.cardMuted, fontSize: 12 },
-  feedShare: { color: HUB.greenInk, fontSize: 13, fontWeight: '700' },
+  feedShare: { color: HUB.accentDeep, fontSize: 13, fontWeight: '700' },
 
   // --- Card de STATS (Nível/XP + colunas) ---
   statsCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 14, marginTop: 16, ...cardShadow },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  levelBadge: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#EAF2FB', borderWidth: 1, borderColor: '#CFE4F6', alignItems: 'center', justifyContent: 'center' },
+  levelBadge: { width: 44, height: 44, borderRadius: 13, backgroundColor: HUB.hero, borderWidth: 1, borderColor: HUB.heroBorder, alignItems: 'center', justifyContent: 'center' },
   levelBadgeIcon: { fontSize: 22 },
   levelTitleRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
   levelTitle: { color: HUB.cardText, fontSize: 17, fontWeight: '800', flexShrink: 1 },
-  levelNum: { color: HUB.greenInk, fontSize: 12.5, fontWeight: '800' },
+  levelNum: { color: HUB.cardMuted, fontSize: 12.5, fontWeight: '800' },
   xpTrack: { height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', marginTop: 7, overflow: 'hidden' },
-  xpFill: { height: '100%', borderRadius: 3, backgroundColor: HUB.greenInk },
+  xpFill: { height: '100%', borderRadius: 3, backgroundColor: HUB.accent },
   xpLabel: { color: HUB.cardMuted, fontSize: 11, fontWeight: '700', marginTop: 4 },
   statCols: { flexDirection: 'row', marginTop: 12, borderTopWidth: 1, borderTopColor: '#EFF1F0', paddingTop: 10 },
   statCol: { flex: 1, alignItems: 'center' },
@@ -521,23 +517,24 @@ const styles = StyleSheet.create({
   statColLabel: { color: HUB.cardMuted, fontSize: 11.5, fontWeight: '600' },
   statColIcon: { fontSize: 16, marginTop: 3 },
   statColValue: { color: HUB.cardText, fontSize: 18, fontWeight: '900', marginTop: 1 },
-  statColUnit: { color: HUB.greenInk, fontSize: 11, fontWeight: '700' },
+  statColUnit: { color: HUB.cardMuted, fontSize: 11, fontWeight: '700' },
   statColSub: { color: HUB.cardMuted, fontSize: 10, marginTop: 2 },
 
   // --- Missão diária ---
   missionCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, marginTop: 14, ...cardShadow },
   missionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   missionIcon: { fontSize: 16 },
-  missionTitle: { color: '#16A34A', fontSize: 14, fontWeight: '800' },
+  missionTitle: { color: HUB.cardMuted, fontSize: 14, fontWeight: '800' },
   missionRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   missionMain: { color: HUB.cardText, fontSize: 16, fontWeight: '800' },
   missionSub: { color: HUB.cardMuted, fontSize: 12.5, marginTop: 2 },
-  xpBadge: { backgroundColor: '#E7F6EC', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center' },
-  xpBadgeText: { color: '#16A34A', fontSize: 13, fontWeight: '900' },
-  periodBadge: { backgroundColor: '#EAF2FB', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  periodBadgeText: { color: HUB.greenInk, fontSize: 12, fontWeight: '800' },
+  // Recompensa (+XP) é estado POSITIVO → tons de success (verde só aqui e no concluído).
+  xpBadge: { backgroundColor: HUB.successSoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center' },
+  xpBadgeText: { color: HUB.successDeep, fontSize: 13, fontWeight: '900' },
+  periodBadge: { backgroundColor: HUB.accentSoft, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  periodBadgeText: { color: HUB.accentDeep, fontSize: 12, fontWeight: '800' },
   missionTrack: { height: 7, borderRadius: 4, backgroundColor: '#E5E7EB', marginTop: 12, overflow: 'hidden' },
-  missionFill: { height: '100%', borderRadius: 4, backgroundColor: '#22C55E' },
+  missionFill: { height: '100%', borderRadius: 4, backgroundColor: HUB.accent },
   missionProg: { color: HUB.cardMuted, fontSize: 11.5, fontWeight: '700', marginTop: 6, textAlign: 'right' },
   weekTitle: { color: HUB.cardText, fontSize: 15, fontWeight: '800' },
   recWrap: { width: 110 },
@@ -559,8 +556,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  habitDotOn: { backgroundColor: HUB.greenInk, borderColor: HUB.greenInk },
-  habitDotToday: { borderColor: HUB.purple },
+  // Dia lido = estado CONCLUÍDO → verde success (guia §6.2); hoje = contorno azul.
+  habitDotOn: { backgroundColor: HUB.success, borderColor: HUB.success },
+  habitDotToday: { borderColor: HUB.accent },
   habitDotCheck: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
   habitDayLabel: { color: HUB.cardMuted, fontSize: 10.5 },
   habitGoalRow: {
@@ -574,19 +572,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   habitGoalText: { flex: 1, color: HUB.cardText, fontSize: 13.5, fontWeight: '700' },
-  habitGoalArrow: { color: HUB.purple, fontSize: 18, fontWeight: '800' },
+  habitGoalArrow: { color: HUB.cardMuted, fontSize: 18, fontWeight: '800' },
 
   recapRow: { alignItems: 'flex-end', marginTop: 12 },
 
   // Desafios (faixa na Home)
   desafioTitle: { color: HUB.cardText, fontSize: 16, fontWeight: '800', marginBottom: 10 },
   desafioTrack: { height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: '#EFF1F0' },
-  desafioFill: { height: '100%', borderRadius: 4, backgroundColor: HUB.greenInk },
+  desafioFill: { height: '100%', borderRadius: 4, backgroundColor: HUB.accent },
   desafioMeta: { color: HUB.cardMuted, fontSize: 12.5, fontWeight: '700', marginTop: 8 },
 
   // Semana
   weekHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 },
-  weekTotal: { color: HUB.greenInk, fontSize: 16, fontWeight: '800' },
+  weekTotal: { color: HUB.cardText, fontSize: 16, fontWeight: '800' },
   bars: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 96, gap: 7 },
   barCol: { flex: 1, alignItems: 'center' },
   barTrack: { width: '100%', height: 76, justifyContent: 'flex-end', borderRadius: 7, overflow: 'hidden', backgroundColor: '#EFF1F0' },
@@ -595,16 +593,16 @@ const styles = StyleSheet.create({
 
   ad: { marginTop: 14 },
 
-  // Biblioteca (sobre o fundo verde)
+  // Biblioteca (sobre o fundo claro)
   sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 12 },
   sectionTitle: { color: HUB.onBg, fontSize: 18, fontWeight: '800' },
-  link: { color: HUB.greenInk, fontSize: 14, fontWeight: '700' },
+  link: { color: HUB.accentDeep, fontSize: 14, fontWeight: '700' },
   emptyCard: { backgroundColor: HUB.cardBg, borderRadius: 20, padding: 16, ...cardShadow },
   emptyText: { color: HUB.cardMuted, fontSize: 14, lineHeight: 21 },
-  cta: { marginTop: 16, borderRadius: 999, paddingVertical: 12, alignItems: 'center', backgroundColor: HUB.greenInk },
-  ctaText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
-  ctaSecondary: { marginTop: 10, borderRadius: 999, paddingVertical: 11, alignItems: 'center', borderWidth: 1.5, borderColor: HUB.greenInk },
-  ctaSecondaryText: { fontSize: 15, fontWeight: '800', color: HUB.greenInk },
+  cta: { marginTop: 16, borderRadius: 999, paddingVertical: 12, alignItems: 'center', backgroundColor: HUB.accent },
+  ctaText: { fontSize: 15, fontWeight: '800', color: HUB.onAccent },
+  ctaSecondary: { marginTop: 10, borderRadius: 999, paddingVertical: 11, alignItems: 'center', borderWidth: 1.5, borderColor: HUB.heroBorder },
+  ctaSecondaryText: { fontSize: 15, fontWeight: '800', color: HUB.accentDeep },
   shelf: { gap: 14, paddingVertical: 4, paddingRight: 8 },
   tileWrap: { width: 110 },
   tile: { width: 110, height: 156, borderRadius: 14, padding: 10, justifyContent: 'space-between', overflow: 'hidden', ...cardShadow },

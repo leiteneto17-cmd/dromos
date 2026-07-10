@@ -1,0 +1,14 @@
+{
+  "_comment": "CURADORIA SEMANAL de 'Em alta no Brasil' (editar À MÃO toda semana). Fontes para consultar: PublishNews (ranking oficial de vendas), lista Veja, #BookTokBrasil. Rode `python update_trending.py` para validar/enriquecer (capa via Google Books) e gerar out/trending.json — o app lê o arquivo hospedado (raw do GitHub / Supabase Storage) SEM precisar de release. Campos: title/author obrigatórios; source = de onde veio a tendência; buyUrl opcional (sem ela o app usa busca na Amazon BR).",
+  "updated": "2026-07-10",
+  "items": [
+    { "title": "Hábitos Atômicos", "author": "James Clear", "source": "PublishNews" },
+    { "title": "A Biblioteca da Meia-Noite", "author": "Matt Haig", "source": "PublishNews" },
+    { "title": "É Assim que Acaba", "author": "Colleen Hoover", "source": "BookTokBrasil" },
+    { "title": "Verity", "author": "Colleen Hoover", "source": "BookTokBrasil" },
+    { "title": "O Homem Mais Rico da Babilônia", "author": "George S. Clason", "source": "PublishNews" },
+    { "title": "A Coragem de Ser Imperfeito", "author": "Brené Brown", "source": "PublishNews" },
+    { "title": "Torto Arado", "author": "Itamar Vieira Junior", "source": "Veja" },
+    { "title": "Tudo é Rio", "author": "Carla Madeira", "source": "Veja" }
+  ]
+}

@@ -49,3 +49,28 @@ example
 
 # datasets locais (PDFs de treino/tradução) — não versionar binários grandes
 docs/datasets-livros-traducao/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+
+# SQLite local
+*.db
+*.sqlite
+*.sqlite3
+
+# Harvester temporário
+harvester/output/
+harvester/cache/
+harvester/tmp/

@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   linkPrimary: {
     lineHeight: 30,
     fontSize: 14,
-    color: '#6E4FB0', // roxo da marca (era azul #3c87f7, fora da paleta — GUIA-DE-MARCA §3)
+    color: '#2675AE', // azul da marca p/ texto pequeno (accentPressed, AA — GUIA-DE-MARCA v2 §3c)
   },
   code: {
     fontFamily: Fonts.mono,

@@ -37,9 +37,10 @@ export type IconName =
   | 'logout';
 
 /** Cores da marca (Dromos) — usadas só no gradiente de destaque dos ícones.
- *  Alinhadas ao GUIA-DE-MARCA §3 (era #7C3AED/#00FF66, fora da paleta). */
-const BRAND_PURPLE = '#6E4FB0';
-const BRAND_NEON = '#5EF0A0';
+ *  Rebrand claro+azul (GUIA-DE-MARCA v2 §3): azul-escuro → azul do acento
+ *  (Tokens.color.light accentPressed → accent). Roxo/verde neon aposentados. */
+const BRAND_DEEP = '#2675AE';
+const BRAND_ACCENT = '#3A9AD9';
 
 type ShapeOpts = {
   stroke: string;
@@ -207,17 +208,18 @@ export function Icon({ name, size = 18, color = '#000', strokeWidth = 2 }: { nam
 }
 
 /**
- * Ícone de DESTAQUE com o gradiente da marca + glow neon.
- *  - `active` (padrão true): traço com gradiente roxo→verde e halo neon.
- *    `false`: cai na cor do tema (`color`), sem glow.
- *  - Glow = traços largos translúcidos empilhados (não usa `<filter>`).
+ * Ícone de DESTAQUE com o gradiente da marca.
+ *  - `active` (padrão true): traço com gradiente azul-escuro→azul.
+ *    `false`: cai na cor do tema (`color`).
+ *  - `glow` foi aposentado no rebrand (guia v2 §6.4) — a prop segue aceita
+ *    (compat), mas não desenha halo.
  */
 export function BrandIcon({
   name,
   size = 28,
   active = true,
-  color = '#8A968F',
-  glow = true,
+  color = '#9CA3AF',
+  glow: _glow = true,
   strokeWidth = 2.2,
 }: {
   name: IconName;
@@ -235,17 +237,11 @@ export function BrandIcon({
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <Defs>
         <LinearGradient id={gid} x1="0" y1="1" x2="1" y2="0">
-          <Stop offset="0" stopColor={BRAND_PURPLE} />
-          <Stop offset="1" stopColor={BRAND_NEON} />
+          <Stop offset="0" stopColor={BRAND_DEEP} />
+          <Stop offset="1" stopColor={BRAND_ACCENT} />
         </LinearGradient>
       </Defs>
-      {active && glow ? (
-        <>
-          {shapes(name, { stroke: BRAND_NEON, strokeWidth: strokeWidth + 5, strokeOpacity: 0.1, dotFill: 'transparent' })}
-          {shapes(name, { stroke: BRAND_NEON, strokeWidth: strokeWidth + 2.5, strokeOpacity: 0.22, dotFill: 'transparent' })}
-        </>
-      ) : null}
-      {shapes(name, { stroke, strokeWidth, dotFill: active ? BRAND_NEON : color })}
+      {shapes(name, { stroke, strokeWidth, dotFill: active ? BRAND_ACCENT : color })}
     </Svg>
   );
 }

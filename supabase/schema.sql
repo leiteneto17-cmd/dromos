@@ -1083,3 +1083,67 @@ alter table public.reading_activities add column if not exists story_audio_url t
 -- Editor imersivo (estilo Instagram): composição completa como JSON
 -- { version, bg, layers:[texto/sticker/música posicionados], audio:{track/preview_url/...} }
 alter table public.reading_activities add column if not exists story_composition jsonb;
+
+-- ---------- COMUNIDADE v3: POSTS (2026-07-10) ----------
+-- Publicação estilo X: texto do autor + livro OPCIONAL (a leitura mais recente, um livro
+-- do "Em alta" ou o livro de um clube). Substitui o post-carona nas reading_activities
+-- (que sobrescrevia o anterior a cada publicação, por ser sempre a mesma linha).
+create table if not exists public.community_posts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  caption text,
+  -- Livro anexado (opcional — tudo nulo = post só de texto):
+  book_title text,
+  book_author text,
+  book_cover_url text,
+  -- De onde veio o anexo: 'leitura' (minha sessão), 'tendencia' (Em alta), 'clube'.
+  book_kind text check (book_kind in ('leitura', 'tendencia', 'clube')),
+  -- Métricas da sessão (só quando book_kind = 'leitura').
+  seconds integer,
+  pages integer,
+  created_at timestamptz not null default now(),
+  -- Post vazio não existe: precisa de texto OU de livro anexado.
+  constraint post_tem_conteudo check (coalesce(nullif(trim(caption), ''), book_title) is not null)
+);
+create index if not exists community_posts_created_idx on public.community_posts (created_at desc);
+
+alter table public.community_posts enable row level security;
+
+drop policy if exists "dono publica post" on public.community_posts;
+create policy "dono publica post" on public.community_posts for insert to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "dono apaga post" on public.community_posts;
+create policy "dono apaga post" on public.community_posts for delete to authenticated
+  using (auth.uid() = user_id);
+
+-- Feed: o dono vê os seus; seguidores ACEITOS veem os de quem seguem (espelha o feed
+-- de atividades — privado por padrão, §4.8).
+drop policy if exists "ver posts (dono ou seguidor aceito)" on public.community_posts;
+create policy "ver posts (dono ou seguidor aceito)" on public.community_posts for select to authenticated
+  using (
+    auth.uid() = user_id
+    or exists (select 1 from public.follows f
+               where f.follower_id = auth.uid() and f.followee_id = user_id and f.status = 'accepted')
+  );
+
+-- Logos 📜 dos posts (mesmo modelo do activity_kudos).
+create table if not exists public.post_logos (
+  post_id uuid not null references public.community_posts (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+
+alter table public.post_logos enable row level security;
+
+drop policy if exists "logos de post legíveis" on public.post_logos;
+create policy "logos de post legíveis" on public.post_logos for select to authenticated using (true);
+
+drop policy if exists "dono dá logos em post" on public.post_logos;
+create policy "dono dá logos em post" on public.post_logos for insert to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "dono tira logos de post" on public.post_logos;
+create policy "dono tira logos de post" on public.post_logos for delete to authenticated
+  using (auth.uid() = user_id);

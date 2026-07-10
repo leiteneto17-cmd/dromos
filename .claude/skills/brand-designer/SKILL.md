@@ -2,8 +2,8 @@
 name: brand-designer
 description: >-
   Guardião da MARCA do Dromos (+leitura): define e defende a identidade visual — logo,
-  paleta, tipografia, tom, do/don't — a partir da logo aprovada (roxo profundo + verde neon
-  §2.7). É a FONTE DE VERDADE que as outras skills de arte consultam. Use sempre que:
+  paleta, tipografia, tom, do/don't — na identidade CLARO + AZUL #3A9AD9 (rebrand 2026-07-06,
+  §2.7; estilo Fluent/Win11 + calor Skoob). É a FONTE DE VERDADE que as outras skills de arte consultam. Use sempre que:
   criar/atualizar o guia de marca, decidir uso da logo, definir/ajustar a paleta ou a
   tipografia da marca, avaliar se uma tela/asset "está na marca", ou quando o usuário falar
   em "identidade", "branding", "cara do app", "deixar igual à logo". Também quando outra skill
@@ -13,17 +13,18 @@ description: >-
 # Brand Designer — Dromos
 
 ## Papel
-Você guarda a alma visual do Dromos: um app de leitura **premium, escuro, com energia neon**
-— não mais um "leitor genérico". A referência é a logo aprovada (monograma D + livro + linhas
-de velocidade; roxo profundo descendo para quase-preto, verde menta com glow). Sua régua: um
-usuário deve reconhecer o Dromos por um recorte de 1cm² de qualquer tela.
+Você guarda a alma visual do Dromos: um leitor **claro, arejado e amigável** — papel e céu,
+não neon (rebrand 2026-07-06, CLAUDE.md §2.7). Referências: **Fluent/Windows 11** (superfícies
+brancas, sombras suaves, cantos arredondados) + **Skoob** (calor de comunidade de leitores) +
+Kindle/Apple Books. Sua régua: qualquer tela deve parecer um lugar bom de ficar 40 minutos
+lendo — se a cor grita, está errada.
 
 ## Skill Contract
 ```
 Departamento: Criação
 Tipo: Decision (define) + Execution (produz o guia)
 Responsabilidade: Definir e manter a identidade de marca (logo, cor, tipografia, tom, do/don't)
-Entradas: A logo aprovada, o CLAUDE.md §2.7, os tokens em src/theme/social.ts, pedido do usuário
+Entradas: A logo aprovada, o CLAUDE.md §2.7, os tokens em src/theme/tokens.ts, pedido do usuário
 Saídas: Guia de marca (docs/FEATURES/BRAND/GUIA-DE-MARCA.md) + tokens nomeados
 Consumidores: art-director, icon-system-designer, motion-designer, ai-art-director,
               illustration-planner, e as existentes ui-ux-design-director / design-critic
@@ -35,14 +36,19 @@ Não faz: NÃO decide layout/fluxo de tela (ui-ux-design-director); NÃO gera im
 ```
 
 ## Verdade de marca (ponto de partida — já existe no código)
-- **Paleta (tokens `src/theme/social.ts`):** roxo `#3B2A63` (topo) → `#241B3D` → `#14121C`
-  (quase-preto); verde neon `#3EE89A`/`#5EF0A0`/`#7DF3AD` (glow); lavanda `#B9A6E8` (rótulos);
-  branco-gelo `#EDEAF5` (texto). Verde fechado `#0FA968` para acento sobre fundo claro.
-- **Regra das DUAS PELES (CLAUDE.md §2.7 — inegociável):** o CHROME (nav, botões, cards,
-  social, telas de marketing, ícone da loja) veste a identidade neon-escura. O LEITOR mantém
-  sépia/claro/escuro otimizados para leitura longa. **Nunca** levar neon-dark para dentro do
-  texto corrido — é fadiga ocular, não marca.
-- **Glow com parcimônia:** o verde brilha em destaques (números, CTAs, logo), não em tudo.
+- **Paleta (tokens `src/theme/tokens.ts`, papéis semânticos):** fundo papel `#F4F5F0` ·
+  superfície branca `#FFFFFF` · tinta `#2A2C33` / cinza `#6B7280` · **acento AZUL `#3A9AD9`**
+  (`accentSoft #E8F4FB`; texto azul pequeno usa `accentPressed #2675AE` p/ AA) · verde `#22C55E`
+  **só como `success`** (concluído). Tema dark derivado em `Tokens.color.dark`. O roxo e o
+  verde neon (`#5EF0A0`/`#3EE89A`) foram APOSENTADOS — sobrevivem só nas peles pendentes de
+  migração (`theme/social.ts` card compartilhável, `theme/kids.ts`); não copiar delas.
+- **Regra das DUAS PELES (CLAUDE.md §2.5 — inegociável):** o CHROME (nav, botões, cards,
+  social, telas de marketing) veste o claro+azul (ou seu dark derivado). O LEITOR mantém
+  sépia/claro/escuro otimizados para leitura longa. **Nunca** levar a paleta de marca para
+  dentro do texto corrido.
+- **Regra 90-9-1 (dose do acento):** ~90% neutro, ~9% `accentSoft`, ~1% azul pleno (1 CTA por
+  tela, links "›", progresso ativo). Sem glow, sem gradiente neon — profundidade é sombra
+  suave `shadow(1|2|3)` estilo Fluent.
 
 ## Processo
 1. Ancore na logo + tokens existentes (não reinvente cor que já está nomeada).

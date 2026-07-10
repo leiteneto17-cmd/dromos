@@ -127,3 +127,41 @@ impacto emocional: o **pai/mãe clona a própria voz** (Chatterbox, ~15s de áud
 filho ouve o livro na voz do responsável. Encaixa no motor de voz pré-renderizado (voz-tts-estrategia)
 e no público família. Validar: qualidade pt-BR do clone, consentimento/LGPD de voz de menor, UX do
 upload de voz. Ver docs/FEATURES/TTS/PARECER-CPO-AUDIO-2026-07-04.md.
+
+## Social sem arquivo — parecer CPO 2026-07-10 (empréstimo digital MORTO; alternativas aprovadas)
+Contexto: o "empréstimo de EPUB entre usuários" (estilo CDL/Open Library) foi **descartado em
+definitivo** — o Internet Archive PERDEU o caso Hachette (CDL ≠ fair use, confirmado em apelação
+2024), "só ler no app" exige DRM (§4.3) e a LDA brasileira não tem exceção. **Nunca transitar
+arquivo importado pelo usuário entre contas.** O valor social vem SEM arquivo:
+
+1. **📚 Passar o bastão (CONSTRUIR, 1ª pós-polish, ~2 sessões):** ao terminar um livro →
+   "Quem você recomenda ler agora?" → escolhe um seguido → notificação com dedicatória →
+   aceito = livro na estante do outro (acervo DP entra na hora; com copyright é só a
+   recomendação, sem arquivo) + item de feed "1984 passou de Paulo → Ana". Gatilho no fim
+   do livro (Zeigarnik), funciona com N=2, reusa follows/notificações/estante/feed. Absorve
+   o "Presentear um clássico". RICE ≈ 1.8.
+2. **📖 Linha do tempo do livro (subproduto do bastão, ~1 sessão):** página do livro mostra a
+   cadeia de quem passou/leu/resenhou (reader_count + reviews já existem).
+3. **🏆 Desafio em dupla (REFORMULADO, ~3 sessões):** estilo Duolingo Friend Quests — "você e
+   Ana: 60 min juntos até domingo". NÃO fazer desafio de multidão (precisa densidade).
+4. **🤝 Biblioteca física por proximidade (ADIADO):** Dromos só conecta pessoas, livro é papel —
+   legalmente limpo, mas marketplace com cold-start² (mesma cidade + mesmo livro) e peso de
+   confiança/segurança. Gatilho de revisão: ~500 usuários ativos numa mesma cidade.
+5. **🗺️ Mapa de leitores (MORTO):** localização + hábito de leitura = dado duplamente sensível
+   (§4.8, lição do heatmap do Strava). Não construir.
+
+## Trilhas de leitura (Jamendo/ambientes) — código removido, decisão preservada (2026-07-10)
+O serviço `src/services/music.ts` foi DELETADO junto com o editor de story (posts estilo X o
+substituíram). A DECISÃO LEGAL continua valendo se a ideia voltar como "som ambiente no leitor":
+**Jamendo API** (CC, grátis, `client_id` em `extra.jamendoClientId`) + **sons ambientes CC0**
+(chuva/cafeteria/lareira). NADA de Spotify/iTunes (sem licença comercial). Recuperar o código no
+git history (commit anterior a 2026-07-10) se for reconstruir.
+
+## Tendências REAIS de leitura no Brasil (acompanhamento — 2026-07-10)
+A seção "Em alta" da Comunidade usa o trending global do Open Library (única fonte com API legal
+hoje) — foi rotulada honestamente como **"Em alta no mundo 🌍"**. Para "Em alta no BRASIL" de
+verdade, criar **curadoria semanal via harvester** (pipeline PC→catalog.json que já existe):
+monitorar manualmente/scraper leve: **PublishNews** (ranking oficial de vendas BR), **lista Veja**,
+**#BookTokBrasil / #Bookstagram** (viral), **Skoob** (sem API — inspiração, não fonte). Saída:
+campo `trending: true` (+ posição) nos itens do catalog.json → o app troca a fonte da seção sem
+release. Quando houver usuários, somar a NOSSA telemetria (Populares na comunidade já é real).

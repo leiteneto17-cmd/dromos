@@ -1,7 +1,61 @@
 # SOCIAL — Status
-*Atualizado: 2026-07-03 · branch `checkpoint/redesign-social-2026`*
+*Atualizado: 2026-07-10 · branch `checkpoint/redesign-social-2026`*
 
 ## Estado atual
+- **Posts v2 = tabela PRÓPRIA `community_posts` (2026-07-10, mesmo dia da v3):** o post
+  deixou de pegar carona nas `reading_activities` (aquela linha era SOBRESCRITA a cada
+  publicação). **⚠️ RODAR o schema.sql atualizado no Supabase** (novas tabelas
+  `community_posts` + `post_logos`, RLS privado-por-padrão espelhando o feed; posts-story
+  antigos não migram — pré-lançamento, sem usuários). Livro anexado agora é **OPCIONAL** e
+  pode ser: 📖 minha última leitura (págs/min) · 🔥 um livro do "Em alta" (trending.json) ·
+  📚 o livro de um clube (meusClubes) — seletor na tela `/publicar` (pré-anexa a leitura,
+  removível no ✕; banco recusa post 100% vazio). Serviço: `createPost`/`getPosts`/
+  `togglePostLogo` em social.ts; `stories.ts` reduzido a tempoAtras + prévia da leitura.
+- **Comunidade v3 = POSTS estilo X (2026-07-10, decisão do usuário, referência BooKal):**
+  as bolhas de STORY e o feed "Atividades recentes" (sessões cruas) foram **MORTOS na UI**.
+  O feed agora é de **Publicações permanentes**: texto do autor (`story_caption`) + chip da
+  leitura anexada ("📖 título · N págs · M min") + Logos 📜. **Zero migração:** `getPosts()`
+  (`services/social.ts`) lê as mesmas `reading_activities` publicadas (`shared_as_story_at`),
+  só SEM o corte de 24h; kudos pelo mesmo `activity_id`. Composer "O que você leu hoje?" →
+  `/publicar` (tela NOVA em formato post: texto livre 400 chars + chip "sua leitura vai junto";
+  `publishLatestAsPost` em stories.ts). **Demolição concluída (decisão do usuário):** viewer
+  `/story`, editor `publicar-story` + `components/story-editor/`, `paginometro`,
+  `types/story-composition` e `services/music.ts` (trilhas Jamendo) foram DELETADOS —
+  `stories.ts` enxugado (só publish/preview/tempoAtras; colunas story_* extras são limpas ao
+  publicar; tabela `story_views` ficou sem uso no app). Decisões legais do Jamendo preservadas
+  em IDEIAS-FUTURAS. "Tendências" renomeada honestamente p/ **"Em alta no mundo 🌍"** (Open
+  Library global). **"Em alta no Brasil 🇧🇷" CONSTRUÍDO (mesmo dia):** curadoria semanal manual
+  em `harvester/trending.json` → `python update_trending.py` (valida + capa via Google
+  Books/Open Library + rank) → `out/trending.json` hospedado → `src/services/trending.ts` no
+  app; a seção usa a curadoria quando o manifesto existe (com "via PublishNews/BookTok") e cai
+  no mundial sem ele. Toque no livro → `/livro` com **"🛒 Onde comprar"** (buyUrl da curadoria
+  ou busca Amazon BR via `buySearchUrl`; abre navegador — sem IAP §4.2). ⚠️ Falta HOSPEDAR o
+  trending.json (raw GitHub ou Storage) e setar `extra.trendingUrl`/derivar do catalogUrl.
+  Regra listas-de-3 aplicada (3 posts + "Ver mais" até 12).
+- **Aba Comunidade = FEED SOCIAL (2026-07-10, hierarquia aprovada pelo usuário — "pessoas
+  primeiro, livros como descoberta"):** ordem nova = busca → Clube do Livro → **composer
+  estilo Threads** ("O que você leu hoje?" → /publicar-story; a bolha "Você" das stories só
+  aparece quando já há story) → bolhas de story → **🔥 "O que está acontecendo"** (o feed
+  "Seguindo" de `getFeed` foi REATIVADO como coração da aba: 3 atividades + "Ver mais" até
+  12, com Logos 📜 otimista) → 📈 Tendências (ex-"Em alta") → atalhos 👥 Clubes · 🎯 Desafios
+  → 📚 Descubra livros (ex-"Populares na comunidade"). `SectionTitle` global agora é TINTA
+  (era azul). **Polish do mockup (mesmo dia):** header título+🔔 (unread real), busca em campo
+  ÚNICO com 🔎 (sem botão — a busca já era ao vivo), card do clube CLARO com pill azul + livro
+  REAL de `meusClubes()` com capa (sem clube = convite → /clubes), composer com botão pílula
+  "✏️ Publicar", feed num card único com divisórias + "Ver mais ▾", Tendências com ranking 1–8
+  e cabeçalhos "Ver todas". SEM dado inventado: participantes do clube/clubes populares com
+  membros ficaram de fora (não há contagem agregada). ⚠️ Validar no emulador.
+- **Aba Perfil REFORMADA (2026-07-10, referência visual aprovada pelo usuário — "retrato do
+  leitor" sério/clássico, claro+azul do guia v2):** header identidade (avatar 84 + selo de
+  nível + "Leitor desde") → linha de 4 stats (livros lidos da estante, páginas das sessões,
+  dias, sequência) → card META com anel de progresso (`components/progress-ring.tsx`, meta
+  ativa de `deriveGoal`) → card RESUMO com gráfico mensal (`components/month-line-chart.tsx`,
+  12 meses de `stats.perDay`) → abas ATIVIDADES (sessões)/LEITURAS (MyShelf)/RESENHAS (notas)/
+  METAS/LISTAS (coleções) → utilitários compactos (vocabulário, perfil público, premium).
+  SettingsSheet/ProfileEditor/modal vocabulário inalterados. A tira de emblemas coloridos saiu
+  do topo (emblemas seguem em /conquistas). Gêneros favoritos ficou FORA (sem dado de gênero
+  na estante — v2). ⚠️ Falta o usuário validar visual no emulador. `ProfileHeader`/`EmblemStrip`
+  seguem usados pelo HUB — não apagar.
 - **Posicionamento (reafirmado 2× pelo usuário em 2026-07-02): a ALMA do app é o "Strava
   da leitura"** — hábito social, leitura e bons hábitos. Estudo/ENEM é vertical que
   monetiza, não a identidade. Não inverter.

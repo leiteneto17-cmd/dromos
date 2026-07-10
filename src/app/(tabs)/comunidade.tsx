@@ -16,18 +16,15 @@
  * busca ativa (padrão iOS: controles de busca são contextuais). Hierarquia: feed primeiro
  * (vertical), descoberta depois (horizontal, explorar é opcional).
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AdBanner } from '@/components/ad-banner';
 import { CatalogCover } from '@/components/catalog-cover';
-import { Card, ScreenBG, SectionTitle } from '@/components/social-ui';
-import { shadow } from '@/theme/tokens';
+import { Card, ScreenBG } from '@/components/social-ui';
 import { useUI } from '@/hooks/use-ui';
 import { BrandFont } from '@/constants/theme';
-import { Social } from '@/theme/social';
 import { searchBooks, trendingBooks, type CatalogBook, type LangFilter } from '@/services/book-catalog';
 import {
   bookKeyOf,
@@ -37,12 +34,17 @@ import {
   type PopularBook,
   type ShelfItem,
 } from '@/services/community';
-import { getFeed, searchUsers, toggleKudo, type FeedItem, type PublicProfile } from '@/services/social';
-import { getStories, tempoAtras, type Story } from '@/services/stories';
+import { getPosts, searchUsers, togglePostLogo, type Post, type PublicProfile } from '@/services/social';
+import { meusClubes, type Clube } from '@/services/clube';
+import { getUnreadCount } from '@/services/notifications';
+import { tempoAtras } from '@/services/stories';
+import { buySearchUrl, getTrendingBR, type TrendingBook } from '@/services/trending';
 import { useAuth } from '@/store/auth';
+import { useProfile } from '@/store/profile';
 
-/** Quantos itens do feed "Seguindo" mostrar antes do "Ver mais" (não vira lista infinita). */
-const FEED_PREVIEW = 5;
+/** Regra "listas de 3": o feed mostra 3 atividades e expande até este teto no "Ver mais". */
+const FEED_PREVIEW = 3;
+const FEED_MAX = 12;
 
 /** Sugestões de busca (chips) — aparecem com a busca aberta e vazia, como os
  * QUICK_SEARCHES do Explorar, mas adaptadas ao catálogo (Google Books/Open Library):
@@ -57,21 +59,6 @@ const SEARCH_SUGGESTIONS = [
   'Harry Potter',
   'Sherlock Holmes',
 ];
-
-/** Data amigável da atividade: "hoje 14:30", "ontem 09:10" ou "12/06/2026". Usa data
- * LOCAL (não UTC) para casar com a hora local exibida — senão erra "hoje/ontem" perto
- * da meia-noite. */
-function fmtFeedDate(ts: number): string {
-  const d = new Date(ts);
-  const localKey = (x: Date) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const hhmm = d.toTimeString().slice(0, 5);
-  if (localKey(d) === localKey(today)) return `hoje ${hhmm}`;
-  if (localKey(d) === localKey(yesterday)) return `ontem ${hhmm}`;
-  return d.toLocaleDateString('pt-BR');
-}
 
 type SearchMode = 'books' | 'people';
 
@@ -97,6 +84,7 @@ export default function CommunityScreen() {
   const c = useUI();
   const configured = useAuth((s) => s.configured);
   const user = useAuth((s) => s.user);
+  const profile = useProfile((s) => s.profile);
 
   const [mode, setMode] = useState<SearchMode>('books');
   const [query, setQuery] = useState('');
@@ -112,20 +100,24 @@ export default function CommunityScreen() {
   const [featured, setFeatured] = useState<CatalogBook[]>([]);
   const [shelf, setShelf] = useState<ShelfItem[]>([]); // só p/ o indicador "✓ / status"
   const [popular, setPopular] = useState<PopularBook[]>([]);
-  const [feed, setFeed] = useState<FeedItem[]>([]); // "Seguindo" — leituras de quem sigo
+  const [posts, setPosts] = useState<Post[]>([]); // publicações (feed estilo X)
   const [feedExpanded, setFeedExpanded] = useState(false); // mostra poucas e expande
-  const [stories, setStories] = useState<Story[]>([]); // bolhas de story (24h, opt-in)
+  const [meuClube, setMeuClube] = useState<Clube | null>(null); // card "Clube do Livro"
+  const [unread, setUnread] = useState(0); // bolinha do sino
+  const [trendingBR, setTrendingBR] = useState<TrendingBook[]>([]); // curadoria semanal
 
   const load = useCallback(async () => {
     trendingBooks().then(setFeatured);
+    getTrendingBR().then(setTrendingBR); // curadoria BR (harvester); [] → fallback mundial
     if (!user) {
       setShelf([]);
       setPopular([]);
-      setFeed([]);
-      setStories([]);
+      setPosts([]);
       return;
     }
-    getStories().then(setStories);
+    getPosts().then(setPosts); // publicações (minhas + de quem sigo) — coração da aba
+    getUnreadCount().then(setUnread);
+    meusClubes().then((l) => setMeuClube(l[0] ?? null));
     const [sh, pop] = await Promise.all([getMyShelf(), getPopularBooks()]);
     setShelf(sh);
     setPopular(pop);
@@ -205,29 +197,22 @@ export default function CommunityScreen() {
     router.push({ pathname: '/usuario', params: { id: p.id, name: p.name ?? '' } });
   }, []);
 
-  // Logos 📜 (kudo): otimista — atualiza na hora e reverte se der erro.
-  const onKudo = useCallback(async (item: FeedItem) => {
+  // Logos 📜 (kudo) no post: otimista — atualiza na hora e reverte se der erro.
+  const onKudo = useCallback(async (item: Post) => {
     const on = !item.iKudoed;
-    setFeed((prev) =>
+    setPosts((prev) =>
       prev.map((f) => (f.id === item.id ? { ...f, iKudoed: on, kudos: f.kudos + (on ? 1 : -1) } : f)),
     );
-    const err = await toggleKudo(item.id, on);
+    const err = await togglePostLogo(item.id, on);
     if (err) {
-      setFeed((prev) =>
+      setPosts((prev) =>
         prev.map((f) => (f.id === item.id ? { ...f, iKudoed: !on, kudos: f.kudos + (on ? -1 : 1) } : f)),
       );
     }
   }, []);
 
-  const meHasStory = stories.some((s) => s.isMine);
-
-  // Publicar: abre a tela de composição (legenda/sticker) — não publica mais com 1 toque.
-  const goPublish = useCallback(() => router.push('/publicar-story' as Href), []);
-
-  // O viewer carrega a lista sozinho (getStories) e começa nesta — passa só o activity_id.
-  const openStory = useCallback((s: Story) => {
-    router.push({ pathname: '/story', params: { id: s.activity_id } });
-  }, []);
+  // Publicar: abre a tela de nova publicação (post estilo X).
+  const goPublish = useCallback(() => router.push('/publicar' as Href), []);
 
   // Abre a página do livro. Da busca/Em alta passa o livro inteiro (JSON) p/ não re-buscar.
   const openCatalog = useCallback((b: CatalogBook) => {
@@ -252,10 +237,18 @@ export default function CommunityScreen() {
 
   return (
     <ScreenBG>
-      <Text style={[styles.title, { color: c.text }]}>Comunidade</Text>
-      <Text style={[styles.subtitle, { color: c.textFaint }]}>
-        Descubra livros e veja o que a comunidade está lendo.
-      </Text>
+      {/* Header: título + sino (referência aprovada 2026-07-10) — sem subtítulo. */}
+      <View style={styles.headRow}>
+        <Text style={[styles.title, { color: c.text }]}>Comunidade</Text>
+        <Pressable
+          onPress={() => router.push({ pathname: '/notificacoes' })}
+          hitSlop={10}
+          accessibilityLabel={unread > 0 ? `Notificações, ${unread} não lidas` : 'Notificações'}
+          style={styles.bellWrap}>
+          <Text style={styles.bell}>🔔</Text>
+          {unread > 0 ? <View style={styles.bellDot} /> : null}
+        </Pressable>
+      </View>
 
       {!configured ? (
         <Card style={styles.note}>
@@ -266,37 +259,30 @@ export default function CommunityScreen() {
         </Card>
       ) : (
         <>
-          {/* Campo de busca (livros no catálogo / pessoas por nome). Focar abre os chips. */}
-          <View style={styles.searchRow}>
-            <View style={[styles.inputWrap, { backgroundColor: c.card, borderColor: c.border }]}>
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                onFocus={() => setSearchOpen(true)}
-                onSubmitEditing={() => Keyboard.dismiss()}
-                placeholder={mode === 'people' ? 'Buscar leitor pelo nome…' : 'Buscar livro ou autor…'}
-                placeholderTextColor={c.textFaint}
-                returnKeyType="search"
-                style={[styles.input, { color: c.text }]}
-              />
-              {query.length > 0 ? (
-                <Pressable onPress={clearSearch} hitSlop={8} style={styles.clearX}>
-                  <Text style={{ color: c.textFaint, fontSize: 17 }}>✕</Text>
-                </Pressable>
-              ) : null}
-            </View>
-            {/* Sem texto, o botão fecha a busca (chips somem); com texto, é o "Buscar". */}
-            <Pressable
-              onPress={() => (query.trim() ? Keyboard.dismiss() : searchOpen ? closeSearch() : setSearchOpen(true))}
-              style={[styles.searchBtn, { backgroundColor: c.green }]}>
-              {searching ? (
-                <ActivityIndicator size="small" color={c.onGreen} />
-              ) : (
-                <Text style={[styles.searchBtnText, { color: c.onGreen }]}>
-                  {searchOpen && !query.trim() ? 'Fechar' : 'Buscar'}
-                </Text>
-              )}
-            </Pressable>
+          {/* Campo de busca ÚNICO (a busca já é ao vivo — botão "Buscar" era redundante).
+              Focar abre os chips; o ✕ limpa (com texto) ou fecha (sem texto). */}
+          <View style={[styles.inputWrap, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.searchGlyph, { color: c.textFaint }]}>🔎</Text>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              onFocus={() => setSearchOpen(true)}
+              onSubmitEditing={() => Keyboard.dismiss()}
+              placeholder="Buscar leitores, livros ou clubes…"
+              placeholderTextColor={c.textFaint}
+              returnKeyType="search"
+              style={[styles.input, { color: c.text }]}
+            />
+            {searching ? <ActivityIndicator size="small" color={c.accent} /> : null}
+            {searchOpen || query.length > 0 ? (
+              <Pressable
+                onPress={() => (query.length > 0 ? clearSearch() : closeSearch())}
+                hitSlop={8}
+                style={styles.clearX}
+                accessibilityLabel={query.length > 0 ? 'Limpar busca' : 'Fechar busca'}>
+                <Text style={{ color: c.textFaint, fontSize: 17 }}>✕</Text>
+              </Pressable>
+            ) : null}
           </View>
 
           {/* Controles CONTEXTUAIS da busca (anti-rolagem: só aparecem com a busca aberta) */}
@@ -315,9 +301,10 @@ export default function CommunityScreen() {
                       onPress={() => switchMode(m)}
                       style={[
                         styles.modeChip,
-                        { borderColor: active ? c.green : c.border, backgroundColor: active ? c.green : 'transparent' },
+                        // Chip ativo = accentSoft + texto accentPressed; inativo = neutro (guia §6.3).
+                        { borderColor: active ? c.accent : c.border, backgroundColor: active ? c.accentSoft : 'transparent' },
                       ]}>
-                      <Text style={[styles.modeText, { color: active ? c.onGreen : c.textDim }]}>{label}</Text>
+                      <Text style={[styles.modeText, { color: active ? c.accentPressed : c.textDim }]}>{label}</Text>
                     </Pressable>
                   );
                 })}
@@ -348,11 +335,11 @@ export default function CommunityScreen() {
             /* ---- Modo de busca (resultados ao vivo: livros ou pessoas) ---- */
             <>
               <View style={styles.resultsHead}>
-                <Text style={[styles.resultsTitle, { color: c.purple }]}>
+                <Text style={[styles.resultsTitle, { color: c.textSecondary }]}>
                   {mode === 'people' ? '🔎 Pessoas' : '🔎 Resultados'}
                 </Text>
                 <Pressable onPress={closeSearch} hitSlop={8}>
-                  <Text style={[styles.clearLink, { color: c.green }]}>‹ Voltar</Text>
+                  <Text style={[styles.clearLink, { color: c.accentPressed }]}>‹ Voltar</Text>
                 </Pressable>
               </View>
 
@@ -371,7 +358,7 @@ export default function CommunityScreen() {
               ) : (
                 <>
                   {searching && (mode === 'people' ? people.length === 0 : results.length === 0) ? (
-                    <ActivityIndicator color={c.green} style={{ marginTop: 24 }} />
+                    <ActivityIndicator color={c.accent} style={{ marginTop: 24 }} />
                   ) : (mode === 'people' ? people.length === 0 : results.length === 0) && searched ? (
                     <Text style={[styles.hint, { color: c.textFaint, marginTop: 8 }]}>
                       {mode === 'people'
@@ -393,7 +380,7 @@ export default function CommunityScreen() {
                               </Text>
                               <Text style={[styles.author, { color: c.textFaint }]}>Perfil público</Text>
                             </View>
-                            <Text style={[styles.addChip, { color: c.purple }]}>Ver ›</Text>
+                            <Text style={[styles.addChip, { color: c.accentPressed }]}>Ver ›</Text>
                           </Card>
                         </Pressable>
                       ))
@@ -414,7 +401,8 @@ export default function CommunityScreen() {
                                   </Text>
                                 ) : null}
                               </View>
-                              <Text style={[styles.addChip, { color: mine ? c.green : c.purple }]}>
+                              {/* Já na estante = estado CONCLUÍDO → verde success; ação → azul. */}
+                              <Text style={[styles.addChip, { color: mine ? c.success : c.accentPressed }]}>
                                 {mine ? SHELF_LABEL[mine.status] + ' ✓' : '+ Estante'}
                               </Text>
                             </Card>
@@ -444,95 +432,203 @@ export default function CommunityScreen() {
               </Text>
             )
           ) : (
-            /* ---- Tela inicial (livros): Seguindo + Em alta + Populares ---- */
+            /* ---- Tela inicial: FEED SOCIAL (reforma 2026-07-10 — pessoas primeiro,
+                    livros como descoberta; hierarquia aprovada pelo usuário) ---- */
             <>
-              {/* Clube do Livro guiado — card de destaque (gradiente roxo da identidade
-                  social §2.7 + borda/acento verde neon). É a feature-vitrine da aba. */}
-              <Pressable onPress={() => router.push({ pathname: '/clubes' })}>
-                <LinearGradient
-                  colors={[c.accent, c.accentPressed]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.clubeCard, { borderColor: 'transparent' }, c.mode === 'light' ? shadow(2) : null]}>
-                  <View style={[styles.clubeIconWrap, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
-                    <Text style={styles.clubeIcon}>📖</Text>
-                  </View>
+              {/* Clube do Livro — card CLARO (referência 2026-07-10): pill azul + livro real
+                  do SEU clube (meusClubes) com capa; sem clube, vira convite p/ /clubes. */}
+              <Pressable
+                onPress={() =>
+                  meuClube
+                    ? router.push({ pathname: '/clube', params: { id: meuClube.id } })
+                    : router.push({ pathname: '/clubes' })
+                }>
+                <Card style={styles.clubeCard}>
                   <View style={styles.flex}>
-                    <Text style={[styles.clubeTitle, { color: '#FFFFFF' }]}>Clube do Livro</Text>
-                    <Text style={[styles.clubeSub, { color: 'rgba(255,255,255,0.85)' }]} numberOfLines={1}>
-                      Leia junto: cronograma semanal + discussão guiada
+                    <View style={[styles.clubePill, { backgroundColor: c.accentSoft }]}>
+                      <Text style={[styles.clubePillText, { color: c.accentPressed }]}>
+                        {meuClube ? 'SEU CLUBE DO LIVRO' : 'CLUBE DO LIVRO'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.clubeTitle, { color: c.text }]} numberOfLines={2}>
+                      {meuClube ? meuClube.book_title : 'Leia junto com outros leitores'}
                     </Text>
+                    <Text style={[styles.clubeSub, { color: c.textDim }]} numberOfLines={1}>
+                      {meuClube
+                        ? meuClube.book_author ?? meuClube.name
+                        : 'Cronograma semanal + discussão guiada'}
+                    </Text>
+                    <View style={[styles.clubeCta, { backgroundColor: c.accent }]}>
+                      <Text style={[styles.clubeCtaText, { color: c.onAccent }]}>
+                        {meuClube ? 'Continuar ›' : 'Entrar ›'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={[styles.clubeCta, { backgroundColor: '#FFFFFF' }]}>
-                    <Text style={[styles.clubeCtaText, { color: c.accent }]}>Entrar ›</Text>
-                  </View>
-                </LinearGradient>
+                  <CatalogCover
+                    uri={meuClube?.book_cover_url}
+                    title={meuClube?.book_title ?? 'Clube do Livro'}
+                    author={meuClube?.book_author}
+                    width={64}
+                    height={92}
+                    radius={8}
+                  />
+                </Card>
               </Pressable>
 
-              {/* Stories — bolhas no topo (DESIGN-STORIES.md): quem publicou nas últimas 24h.
-                  A 1ª é sempre "Você" (publica/vê a sua). Substitui a poluição do feed vertical. */}
+              {/* Composer estilo Threads — substitui o botão "Publicar" gordo. */}
               {user ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.storiesRow}>
-                  {/* Sua bolha: publicar OU ver a sua */}
-                  <Pressable
-                    onPress={() => {
-                      const mine = stories.find((s) => s.isMine);
-                      if (mine) openStory(mine);
-                      else goPublish();
-                    }}
-                    style={styles.storyItem}>
-                    <View style={[styles.storyRing, { borderColor: meHasStory ? c.green : c.border }]}>
-                      <View style={[styles.storyAvatar, { backgroundColor: c.cardElevated }]}>
-                        <Text style={styles.storyAvatarText}>{meHasStory ? '📖' : '＋'}</Text>
-                      </View>
+                <Pressable onPress={goPublish} accessibilityLabel="Nova publicação">
+                  <Card style={styles.composer}>
+                    <View style={[styles.composerAvatar, { backgroundColor: c.accentSoft }]}>
+                      <Text style={styles.composerAvatarText}>
+                        {profile?.avatar_url || (profile?.name?.trim().charAt(0).toUpperCase() ?? '🦉')}
+                      </Text>
                     </View>
-                    <Text style={[styles.storyName, { color: c.textDim }]} numberOfLines={1}>
-                      {meHasStory ? 'Sua leitura' : 'Publicar'}
-                    </Text>
-                  </Pressable>
+                    <Text style={[styles.composerHint, { color: c.textFaint }]}>O que você leu hoje?</Text>
+                    <View style={[styles.composerBtn, { backgroundColor: c.accent }]}>
+                      <Text style={[styles.composerCta, { color: c.onAccent }]}>✏️ Publicar</Text>
+                    </View>
+                  </Card>
+                </Pressable>
+              ) : null}
 
-                  {stories
-                    .filter((s) => !s.isMine)
-                    .map((s) => (
-                      <Pressable key={s.activity_id} onPress={() => openStory(s)} style={styles.storyItem}>
-                        {/* Anel estilo Instagram: verde neon se ainda não vi, cinza se já vi. */}
-                        <View style={[styles.storyRing, { borderColor: s.seenByMe ? c.border : c.green }]}>
-                          <View style={[styles.storyAvatar, { backgroundColor: c.cardElevated }]}>
-                            <Text style={styles.storyAvatarText}>{s.avatar || '🦉'}</Text>
-                          </View>
-                        </View>
-                        <Text style={[styles.storyName, { color: c.textDim }]} numberOfLines={1}>
-                          {s.name}
-                        </Text>
-                        <Text style={[styles.storyTime, { color: c.textFaint }]} numberOfLines={1}>
-                          {tempoAtras(s.shared_at)}
+              {/* PUBLICAÇÕES (reforma 2026-07-10, referência BooKal/X): stories e "atividades
+                  recentes" foram MORTOS — o feed agora é de POSTS permanentes (texto do autor
+                  + o que ele estava lendo), reusando reading_activities publicadas (getPosts). */}
+              {user ? (
+                <>
+                  <View style={styles.sectionHead}>
+                    <Text style={[styles.sectionHeadTitle, { color: c.text }]}>Publicações</Text>
+                    {posts.length > FEED_PREVIEW ? (
+                      <Pressable onPress={() => setFeedExpanded((v) => !v)} hitSlop={8}>
+                        <Text style={[styles.sectionHeadLink, { color: c.accentPressed }]}>
+                          {feedExpanded ? 'Ver menos' : 'Ver todas'}
                         </Text>
                       </Pressable>
-                    ))}
-                </ScrollView>
+                    ) : null}
+                  </View>
+                  {posts.length === 0 ? (
+                    <Text style={[styles.hint, { color: c.textFaint, marginBottom: 6 }]}>
+                      Nenhuma publicação ainda. Escreva a primeira no “O que você leu hoje?” —
+                      e siga leitores (busque 👥 Pessoas acima) para ver as deles.
+                    </Text>
+                  ) : (
+                    posts.slice(0, feedExpanded ? FEED_MAX : FEED_PREVIEW).map((p) => (
+                      <Card key={p.id} style={styles.postCard}>
+                        {/* Cabeçalho: avatar + nome + tempo */}
+                        <View style={styles.postHead}>
+                          <Text style={styles.postAvatar}>{p.author_avatar || '🦉'}</Text>
+                          <View style={styles.flex}>
+                            <Text style={[styles.postName, { color: c.text }]} numberOfLines={1}>
+                              {p.author_name}
+                            </Text>
+                            <Text style={[styles.postWhen, { color: c.textFaint }]}>{tempoAtras(p.created_at)}</Text>
+                          </View>
+                          {/* Logos 📜 (nosso "kudos") — otimista via onKudo */}
+                          <Pressable
+                            onPress={() => onKudo(p)}
+                            hitSlop={8}
+                            accessibilityLabel={p.iKudoed ? 'Remover Logos' : 'Dar Logos'}
+                            style={[
+                              styles.kudoBtn,
+                              { borderColor: p.iKudoed ? c.accent : c.border, backgroundColor: p.iKudoed ? c.accentSoft : 'transparent' },
+                            ]}>
+                            <Text style={[styles.kudoText, { color: p.iKudoed ? c.accentPressed : c.textDim }]}>
+                              📜 {p.kudos}
+                            </Text>
+                          </Pressable>
+                        </View>
+                        {/* Texto do post (quando o autor escreveu algo) */}
+                        {p.caption ? (
+                          <Text style={[styles.postText, { color: c.text }]}>{p.caption}</Text>
+                        ) : null}
+                        {/* Chip do livro anexado (OPCIONAL): leitura, Em alta ou clube */}
+                        {p.book ? (
+                          <View style={[styles.postBookChip, { backgroundColor: c.surfaceAlt, borderColor: c.border }]}>
+                            <Text style={[styles.postBookText, { color: c.textDim }]} numberOfLines={1}>
+                              {p.book.kind === 'tendencia' ? '🔥' : p.book.kind === 'clube' ? '📚' : '📖'}{' '}
+                              <Text style={{ fontWeight: '800', color: c.text }}>{p.book.title}</Text>
+                              {p.book.kind === 'leitura'
+                                ? `  ·  ${p.book.pages ? `${p.book.pages} págs · ` : ''}${Math.max(1, Math.round((p.book.seconds ?? 60) / 60))} min`
+                                : p.book.author
+                                  ? `  ·  ${p.book.author}`
+                                  : ''}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </Card>
+                    ))
+                  )}
+                  {posts.length > FEED_PREVIEW ? (
+                    <Pressable onPress={() => setFeedExpanded((v) => !v)} hitSlop={8} style={styles.feedMore}>
+                      <Text style={[styles.feedMoreText, { color: c.accentPressed }]}>
+                        {feedExpanded ? 'Mostrar menos ▴' : 'Ver mais publicações ▾'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </>
               ) : null}
 
-              {/* Feed vertical "Seguindo" APOSENTADO (2026-07-04) — as bolhas de story acima o
-                  substituem (DESIGN-STORIES.md): menos poluição, o autor escolhe o que publicar.
-                  Dica p/ o estado vazio das bolhas: quando só houver a "Você". */}
-              {user && stories.length === 0 ? (
-                <Text style={[styles.hint, { color: c.textFaint, marginBottom: 6 }]}>
-                  Toque em <Text style={{ fontWeight: '800', color: c.green }}>Publicar</Text> para
-                  compartilhar sua leitura de hoje como story (24h) — e siga leitores para ver os deles aqui.
-                </Text>
-              ) : null}
-
-              {featured.length > 0 ? (
+              {/* Em alta: CURADORIA BR do harvester quando existir (PublishNews/Veja/BookTok,
+                  trending.json semanal — só metadados + onde comprar, §4.3); senão o fallback
+                  HONESTO "no mundo" (Open Library global). */}
+              {trendingBR.length > 0 ? (
                 <>
-                  <SectionTitle name="trendingUp">Em alta</SectionTitle>
-                  {/* Prateleira horizontal (anti-rolagem): explorar é deslizar pro lado. */}
+                  <View style={styles.sectionHead}>
+                    <Text style={[styles.sectionHeadTitle, { color: c.text }]}>Em alta no Brasil 🇧🇷</Text>
+                  </View>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
-                    {featured.map((b) => (
+                    {trendingBR.map((t) => (
+                      <Pressable
+                        key={`br-${t.rank}`}
+                        style={styles.shelfCell}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/livro',
+                            params: {
+                              title: t.title,
+                              author: t.author,
+                              ...(t.coverUrl ? { cover: t.coverUrl } : {}),
+                              buy: t.buyUrl ?? buySearchUrl(t.title, t.author),
+                            },
+                          })
+                        }>
+                        <View>
+                          <Cover uri={t.coverUrl} title={t.title} author={t.author} size="shelf" />
+                          <View style={[styles.rankBadge, { backgroundColor: c.text }]}>
+                            <Text style={[styles.rankBadgeText, { color: c.bg }]}>{t.rank}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.shelfTitle, { color: c.text }]} numberOfLines={2}>
+                          {t.title}
+                        </Text>
+                        {t.source ? (
+                          <Text style={[styles.shelfMeta, { color: c.textFaint }]} numberOfLines={1}>
+                            via {t.source}
+                          </Text>
+                        ) : null}
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </>
+              ) : featured.length > 0 ? (
+                <>
+                  <View style={styles.sectionHead}>
+                    <Text style={[styles.sectionHeadTitle, { color: c.text }]}>Em alta no mundo 🌍</Text>
+                    <Pressable onPress={() => router.push({ pathname: '/explorar' })} hitSlop={8}>
+                      <Text style={[styles.sectionHeadLink, { color: c.accentPressed }]}>Ver todas</Text>
+                    </Pressable>
+                  </View>
+                  {/* Prateleira horizontal com RANKING (1–5, referência) — deslizar pro lado. */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
+                    {featured.slice(0, 8).map((b, i) => (
                       <Pressable key={`${b.source}-${b.id}`} style={styles.shelfCell} onPress={() => openCatalog(b)}>
-                        <Cover uri={b.coverUrl} title={b.title} author={b.author} size="shelf" />
+                        <View>
+                          <Cover uri={b.coverUrl} title={b.title} author={b.author} size="shelf" />
+                          <View style={[styles.rankBadge, { backgroundColor: c.text }]}>
+                            <Text style={[styles.rankBadgeText, { color: c.bg }]}>{i + 1}</Text>
+                          </View>
+                        </View>
                         <Text style={[styles.shelfTitle, { color: c.text }]} numberOfLines={2}>
                           {b.title}
                         </Text>
@@ -556,8 +652,31 @@ export default function CommunityScreen() {
                 </Pressable>
               ) : popular.length > 0 ? (
                 <>
-                  <SectionTitle name="flame">Populares na comunidade</SectionTitle>
-                  {/* Mesma prateleira horizontal do "Em alta" (✓ = já está na sua estante). */}
+                  {/* Atalhos de navegação: Clubes e Desafios (cada seção com 1 propósito). */}
+                  <View style={styles.navRow}>
+                    <Pressable onPress={() => router.push({ pathname: '/clubes' })} style={styles.navHalf}>
+                      <Card style={styles.navCard}>
+                        <Text style={styles.navIcon}>👥</Text>
+                        <Text style={[styles.navLabel, { color: c.text }]}>Clubes</Text>
+                        <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
+                      </Card>
+                    </Pressable>
+                    <Pressable onPress={() => router.push({ pathname: '/desafios' })} style={styles.navHalf}>
+                      <Card style={styles.navCard}>
+                        <Text style={styles.navIcon}>🎯</Text>
+                        <Text style={[styles.navLabel, { color: c.text }]}>Desafios</Text>
+                        <Text style={[styles.chev, { color: c.textFaint }]}>›</Text>
+                      </Card>
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.sectionHead}>
+                    <Text style={[styles.sectionHeadTitle, { color: c.text }]}>Descubra livros</Text>
+                    <Pressable onPress={() => router.push({ pathname: '/explorar' })} hitSlop={8}>
+                      <Text style={[styles.sectionHeadLink, { color: c.accentPressed }]}>Ver todos</Text>
+                    </Pressable>
+                  </View>
+                  {/* "Populares na comunidade" (✓ = já está na sua estante) — reader_count real. */}
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelfRow}>
                     {popular.slice(0, 10).map((p) => (
                       <Pressable key={p.book_key} style={styles.shelfCell} onPress={() => openPopular(p)}>
@@ -565,7 +684,7 @@ export default function CommunityScreen() {
                         <Text style={[styles.shelfTitle, { color: c.text }]} numberOfLines={2}>
                           {p.book_title}
                         </Text>
-                        <Text style={[styles.shelfMeta, { color: shelfByKey.has(p.book_key) ? c.green : c.textFaint }]}>
+                        <Text style={[styles.shelfMeta, { color: shelfByKey.has(p.book_key) ? c.success : c.textFaint }]}>
                           👥 {p.reader_count}
                           {shelfByKey.has(p.book_key) ? ' · ✓' : ''}
                         </Text>
@@ -601,16 +720,52 @@ const styles = StyleSheet.create({
   noteSub: { fontSize: 13, marginTop: 3 },
   acctRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chev: { fontSize: 22 },
+  // Header com sino
+  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  bellWrap: { position: 'relative', padding: 2 },
+  bell: { fontSize: 22 },
+  bellDot: { position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: 5, backgroundColor: '#EF4444' },
+  searchGlyph: { fontSize: 15, marginRight: 8 },
+  // Cabeçalho de seção: título tinta + link "Ver todas" (padrão da referência)
+  sectionHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 22, marginBottom: 10 },
+  sectionHeadTitle: { fontSize: 18, fontFamily: BrandFont.semibold, letterSpacing: 0.2 },
+  sectionHeadLink: { fontSize: 13.5, fontWeight: '700' },
+  // Ranking das Tendências
+  rankBadge: { position: 'absolute', top: -6, left: -6, minWidth: 24, height: 24, borderRadius: 7, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  rankBadgeText: { fontSize: 12.5, fontWeight: '900' },
+  // Posts (feed estilo X — reforma 2026-07-10)
+  postCard: { marginBottom: 10, paddingVertical: 13 },
+  postHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  postAvatar: { fontSize: 26, width: 34, textAlign: 'center' },
+  postName: { fontSize: 15, fontWeight: '800' },
+  postWhen: { fontSize: 12, marginTop: 1 },
+  postText: { fontSize: 14.5, lineHeight: 21, marginTop: 10 },
+  postBookChip: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, marginTop: 10 },
+  postBookText: { fontSize: 13 },
+  // Composer "O que você leu hoje?" (estilo Threads)
+  composer: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, marginBottom: 12 },
+  composerAvatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  composerAvatarText: { fontSize: 18 },
+  composerHint: { flex: 1, fontSize: 14.5 },
+  composerBtn: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  composerCta: { fontSize: 13.5, fontWeight: '800' },
+  kudoBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  kudoText: { fontSize: 13, fontWeight: '700' },
+  feedMore: { alignItems: 'center', paddingVertical: 11 },
+  feedMoreText: { fontSize: 14, fontWeight: '700' },
+  // Atalhos Clubes/Desafios
+  navRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  navHalf: { flex: 1 },
+  navCard: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 13 },
+  navIcon: { fontSize: 18 },
+  navLabel: { flex: 1, fontSize: 15, fontWeight: '800' },
   modeRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
   modeChip: { flex: 1, borderWidth: 1, borderRadius: 999, paddingVertical: 9, alignItems: 'center' },
   modeText: { fontSize: 14, fontWeight: '800' },
   personAvatar: { fontSize: 30, width: 44, textAlign: 'center' },
-  searchRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14 },
-  input: { flex: 1, paddingVertical: 10, fontSize: 15 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, marginTop: 14, marginBottom: 14 },
+  input: { flex: 1, paddingVertical: 11, fontSize: 15 },
   clearX: { paddingLeft: 8 },
-  searchBtn: { borderRadius: 12, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minWidth: 84 },
-  searchBtnText: { fontSize: 14, fontWeight: '800' },
   langRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   langChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   langText: { fontSize: 13, fontWeight: '700' },
@@ -636,53 +791,14 @@ const styles = StyleSheet.create({
   privacy: { marginTop: 18 },
   privacyText: { fontSize: 13, lineHeight: 20 },
   ad: { marginTop: 16 },
-  feedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  feedAvatar: { fontSize: 30 },
-  feedWho: { fontSize: 14 },
-  feedBook: { fontSize: 14, fontWeight: '700', marginTop: 1 },
-  feedMeta: { fontSize: 12, marginTop: 3 },
-  kudoBtn: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, minWidth: 36 },
-  kudoIcon: { fontSize: 22 },
-  kudoCount: { fontSize: 12, fontWeight: '800', marginTop: 2 },
-  moreBtn: { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
-  // Bolhas de story
-  storiesRow: { flexDirection: 'row', gap: 14, paddingVertical: 4, paddingRight: 8, marginBottom: 8 },
-  storyItem: { alignItems: 'center', width: 68 },
-  storyRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  storyAvatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  storyAvatarText: { fontSize: 26 },
-  storyName: { fontSize: 11.5, fontWeight: '600', marginTop: 4, maxWidth: 66, textAlign: 'center' },
-  storyTime: { fontSize: 10, marginTop: 1, maxWidth: 66, textAlign: 'center' },
-  // Card de destaque do Clube do Livro — cores FIXAS da identidade social (§2.7):
-  // gradiente roxo profundo + verde neon, independente do tema do leitor.
-  clubeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(62,232,154,0.35)',
-  },
-  clubeIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(62,232,154,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clubeIcon: { fontSize: 22 },
-  clubeTitle: { fontSize: 16, fontWeight: '900', color: '#EDEAF5' },
-  clubeSub: { fontSize: 12.5, color: '#B9A6E8', marginTop: 1 },
-  clubeCta: {
-    backgroundColor: '#3EE89A',
-    borderRadius: 999,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-  },
-  clubeCtaText: { fontSize: 13, fontWeight: '900', color: Social.dark },
+  // Card do Clube do Livro — superfície CLARA (referência 2026-07-10): pill azul +
+  // livro real do clube com capa à direita; cores do tema via inline.
+  clubeCard: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 },
+  clubePill: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  clubePillText: { fontSize: 10.5, fontWeight: '900', letterSpacing: 0.8 },
+  clubeTitle: { fontSize: 19, fontWeight: '900', marginTop: 8 },
+  clubeSub: { fontSize: 13, marginTop: 2 },
+  clubeCta: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, marginTop: 10 },
+  clubeCtaText: { fontSize: 13, fontWeight: '900' },
   moreText: { fontSize: 14, fontWeight: '700' },
 });

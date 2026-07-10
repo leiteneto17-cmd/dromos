@@ -12,7 +12,7 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BookReviews } from '@/components/book-reviews';
@@ -31,6 +31,7 @@ import {
   type PublicReader,
   type ShelfStatus,
 } from '@/services/community';
+import { buySearchUrl } from '@/services/trending';
 import { useAuth } from '@/store/auth';
 
 type Params = {
@@ -40,6 +41,8 @@ type Params = {
   isbn?: string;
   /** Livro completo do catálogo (JSON) quando a origem já tinha o metadado (busca/Em alta). */
   data?: string;
+  /** Link de "onde comprar" (Em alta no Brasil — best-sellers sem arquivo, §4.3). */
+  buy?: string;
 };
 
 const STATUS_EMOJI: Record<ShelfStatus, string> = {
@@ -357,6 +360,20 @@ export default function BookScreen() {
                 </>
               ) : null}
 
+              {/* Onde comprar — link externo (buy da curadoria "Em alta no Brasil", ou
+                  busca na Amazon BR). Não vende no app: abre o navegador (§4.2 — compra
+                  de bem físico/ebook de terceiro fora do IAP é permitida via browser). */}
+              <Pressable
+                onPress={() => Linking.openURL(String(p.buy || buySearchUrl(title, p.author)))}
+                accessibilityLabel="Onde comprar este livro">
+                <Card style={styles.buyRow}>
+                  <Text style={[styles.buyText, { color: c.text }]}>🛒 Onde comprar</Text>
+                  <Text style={[styles.buyHint, { color: c.textFaint }]}>
+                    {p.buy ? 'abrir loja ›' : 'buscar na Amazon ›'}
+                  </Text>
+                </Card>
+              </Pressable>
+
               {details && (details.pages || details.language || genres.length) ? (
                 <>
                   <SectionTitle name="info">Ficha</SectionTitle>
@@ -459,6 +476,9 @@ const styles = StyleSheet.create({
   meta: { fontSize: 13, marginTop: 4 },
   readers: { fontSize: 13, fontWeight: '700', marginTop: 10 },
   hint: { fontSize: 13, lineHeight: 19, marginBottom: 10 },
+  buyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 13, marginTop: 16 },
+  buyText: { fontSize: 15, fontWeight: '700' },
+  buyHint: { fontSize: 13, fontWeight: '600' },
   statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statusChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
   statusChipText: { fontSize: 14, fontWeight: '700' },

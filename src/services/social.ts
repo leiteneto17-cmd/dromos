@@ -325,6 +325,145 @@ export async function getFeed(limit = 30): Promise<FeedItem[]> {
   }));
 }
 
+// ---------- POSTS (Comunidade v3 — tabela própria community_posts, 2026-07-10) ----------
+// Post estilo X: texto do autor + livro OPCIONAL ('leitura' = minha sessão, 'tendencia' =
+// Em alta, 'clube'). Tabela própria (não mais carona nas reading_activities — aquela linha
+// era sobrescrita a cada publicação). Logos em post_logos.
+
+export type PostBookKind = 'leitura' | 'tendencia' | 'clube';
+
+export type PostBook = {
+  title: string;
+  author?: string | null;
+  coverUrl?: string | null;
+  kind: PostBookKind;
+  /** Métricas da sessão (só kind='leitura'). */
+  seconds?: number | null;
+  pages?: number | null;
+};
+
+export type Post = {
+  id: string;
+  user_id: string;
+  author_name: string;
+  author_avatar: string | null;
+  author_founder: boolean;
+  caption: string | null;
+  /** Livro anexado (null = post só de texto). */
+  book: PostBook | null;
+  created_at: string;
+  kudos: number;
+  iKudoed: boolean;
+};
+
+/** Publica um post (texto e/ou livro anexado — o banco recusa post vazio). */
+export async function createPost(input: {
+  caption?: string | null;
+  book?: PostBook | null;
+}): Promise<string | null> {
+  if (!supabase) return 'Backend não configurado (Supabase).';
+  const me = await uid();
+  if (!me) return 'Entre na sua conta.';
+  const caption = input.caption?.trim() || null;
+  const b = input.book ?? null;
+  if (!caption && !b) return 'Escreva algo ou anexe um livro.';
+  const { error } = await supabase.from('community_posts').insert({
+    user_id: me,
+    caption,
+    book_title: b?.title ?? null,
+    book_author: b?.author ?? null,
+    book_cover_url: b?.coverUrl ?? null,
+    book_kind: b ? b.kind : null,
+    seconds: b?.kind === 'leitura' ? b.seconds ?? null : null,
+    pages: b?.kind === 'leitura' ? b.pages ?? null : null,
+  });
+  return error ? error.message : null;
+}
+
+/** Feed de publicações: minhas + de quem sigo (a RLS já filtra), mais novas primeiro. */
+export async function getPosts(limit = 30): Promise<Post[]> {
+  if (!supabase) return [];
+  const me = await uid();
+  if (!me) return [];
+  const { data, error } = await supabase
+    .from('community_posts')
+    .select('id, user_id, caption, book_title, book_author, book_cover_url, book_kind, seconds, pages, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  const rows = data as {
+    id: string;
+    user_id: string;
+    caption: string | null;
+    book_title: string | null;
+    book_author: string | null;
+    book_cover_url: string | null;
+    book_kind: PostBookKind | null;
+    seconds: number | null;
+    pages: number | null;
+    created_at: string;
+  }[];
+  if (rows.length === 0) return [];
+
+  // Nome/avatar dos autores (mesmo padrão do getFeed).
+  const authorIds = [...new Set(rows.map((r) => r.user_id))];
+  const profs = new Map<string, { name: string | null; avatar: string | null; founder: boolean }>();
+  const { data: pData } = await supabase
+    .from('profiles')
+    .select('id, name, avatar_url, is_founder, founder_flair')
+    .in('id', authorIds);
+  (pData as { id: string; name: string | null; avatar_url: string | null; is_founder: boolean; founder_flair: boolean }[] | null)?.forEach((p) =>
+    profs.set(p.id, { name: p.name, avatar: p.avatar_url, founder: !!p.is_founder && p.founder_flair !== false }),
+  );
+
+  // Logos (contagem + se EU curti).
+  const ids = rows.map((r) => r.id);
+  const logosCount = new Map<string, number>();
+  const myLogos = new Set<string>();
+  const { data: kData } = await supabase.from('post_logos').select('post_id, user_id').in('post_id', ids);
+  (kData as { post_id: string; user_id: string }[] | null)?.forEach((k) => {
+    logosCount.set(k.post_id, (logosCount.get(k.post_id) ?? 0) + 1);
+    if (k.user_id === me) myLogos.add(k.post_id);
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    user_id: r.user_id,
+    author_name: profs.get(r.user_id)?.name?.trim() || 'Leitor',
+    author_avatar: profs.get(r.user_id)?.avatar ?? null,
+    author_founder: profs.get(r.user_id)?.founder ?? false,
+    caption: r.caption,
+    book: r.book_title
+      ? {
+          title: r.book_title,
+          author: r.book_author,
+          coverUrl: r.book_cover_url,
+          kind: r.book_kind ?? 'leitura',
+          seconds: r.seconds,
+          pages: r.pages,
+        }
+      : null,
+    created_at: r.created_at,
+    kudos: logosCount.get(r.id) ?? 0,
+    iKudoed: myLogos.has(r.id),
+  }));
+}
+
+/** Curtir / descurtir um POST. Retorna null em sucesso ou a mensagem de erro. */
+export async function togglePostLogo(postId: string, on: boolean): Promise<string | null> {
+  if (!supabase) return 'Backend não configurado (Supabase).';
+  const me = await uid();
+  if (!me) return 'Entre na sua conta.';
+  if (on) {
+    const { error } = await supabase
+      .from('post_logos')
+      .upsert({ post_id: postId, user_id: me }, { onConflict: 'post_id,user_id' });
+    return error ? error.message : null;
+  }
+  const { error } = await supabase.from('post_logos').delete().eq('post_id', postId).eq('user_id', me);
+  return error ? error.message : null;
+}
+
 /** Curtir / descurtir uma atividade do feed. Retorna null em sucesso ou a mensagem de erro. */
 export async function toggleKudo(activityId: string, on: boolean): Promise<string | null> {
   if (!supabase) return 'Backend não configurado (Supabase).';

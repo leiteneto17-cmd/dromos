@@ -12,7 +12,7 @@
 
 /** Paleta bruta (não usar direto na UI — use os papéis semânticos abaixo). */
 const raw = {
-  ice: '#F4F5F0', // fundo papel (light)
+  ice: '#F7F6F2', // fundo papel (light) — tom QUENTE (refino 2026-07-10, era #F4F5F0 mais frio)
   white: '#FFFFFF',
   gray50: '#F8F9FA',
   gray100: '#F1F2F4',

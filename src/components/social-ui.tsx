@@ -105,7 +105,8 @@ export function SectionTitle({
   hub?: boolean;
 }) {
   const c = useUI();
-  const color = hub ? HUB.onBg : c.purple;
+  // Título de seção em TINTA (guia v2 §4: rótulo não é azul) — sério/clássico.
+  const color = hub ? HUB.onBg : c.text;
   return (
     <View style={s.sectionRow}>
       {name ? (
@@ -132,17 +133,19 @@ export function Pill({ children, tone = 'purple' }: { children: string; tone?: '
 const s = StyleSheet.create({
   flex: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: BottomTabInset + 32 },
-  card: { borderRadius: 18, borderWidth: 1, padding: 16 },
+  // Cantos 22 + sombra bem suave (refino 2026-07-10, referência do Perfil).
+  card: { borderRadius: 22, borderWidth: 1, padding: 16 },
   cardHub: {
     backgroundColor: HUB.cardBg,
     borderWidth: 0,
     shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    elevation: 3,
   },
-  cardHubGlow: { shadowColor: HUB.greenInk, shadowOpacity: 0.3, shadowRadius: 14 },
+  // "Glow" aposentado no rebrand (guia §6.4): destaque agora é só elevação maior, sombra NEUTRA.
+  cardHubGlow: { shadowColor: '#0B1220', shadowOpacity: 0.16, shadowRadius: 16 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22, marginBottom: 10 },
   sectionIcon: { fontSize: 18 },
   sectionTitle: { fontSize: 18, fontFamily: BrandFont.semibold, letterSpacing: 0.3 },

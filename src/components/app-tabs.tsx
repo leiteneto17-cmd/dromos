@@ -150,7 +150,8 @@ function FloatingTabBar({ state, navigation }: TabBarProps) {
 
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 10) }]} pointerEvents="box-none">
-      <View style={[styles.bar, { borderColor: c.border, backgroundColor: c.surface }, !dark ? shadow(2) : null]}>
+      {/* Sombra leve (refino 2026-07-10): pílula mais "iOS", menos flutuação dramática. */}
+      <View style={[styles.bar, { borderColor: c.border, backgroundColor: c.surface }, !dark ? shadow(1) : null]}>
         {/* iOS: desfoque nativo real. Android: frost translúcido (o blur real exigiria blurTarget
             + snapshot que não atualiza ao rolar e pesa — não vale p/ a nav). */}
         <BlurView intensity={dark ? 64 : 24} tint={dark ? 'dark' : 'light'} style={[styles.barBlur, { backgroundColor: nav.veil }]} />
@@ -210,9 +211,9 @@ const styles = StyleSheet.create({
     marginTop: -28,
     borderWidth: 2,
     // borderColor + shadowColor definidos inline (seguem o tema).
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 14,
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 8,
   },
 });
