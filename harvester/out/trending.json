@@ -1,0 +1,69 @@
+{
+  "updated": "2026-07-10",
+  "items": [
+    {
+      "rank": 1,
+      "title": "Hábitos Atômicos",
+      "author": "James Clear",
+      "source": "PublishNews",
+      "coverUrl": null,
+      "buyUrl": null
+    },
+    {
+      "rank": 2,
+      "title": "A Biblioteca da Meia-Noite",
+      "author": "Matt Haig",
+      "source": "PublishNews",
+      "coverUrl": "https://covers.openlibrary.org/b/id/13510704-M.jpg",
+      "buyUrl": null
+    },
+    {
+      "rank": 3,
+      "title": "É Assim que Acaba",
+      "author": "Colleen Hoover",
+      "source": "BookTokBrasil",
+      "coverUrl": null,
+      "buyUrl": null
+    },
+    {
+      "rank": 4,
+      "title": "Verity",
+      "author": "Colleen Hoover",
+      "source": "BookTokBrasil",
+      "coverUrl": "https://covers.openlibrary.org/b/id/8747160-M.jpg",
+      "buyUrl": null
+    },
+    {
+      "rank": 5,
+      "title": "O Homem Mais Rico da Babilônia",
+      "author": "George S. Clason",
+      "source": "PublishNews",
+      "coverUrl": null,
+      "buyUrl": null
+    },
+    {
+      "rank": 6,
+      "title": "A Coragem de Ser Imperfeito",
+      "author": "Brené Brown",
+      "source": "PublishNews",
+      "coverUrl": null,
+      "buyUrl": null
+    },
+    {
+      "rank": 7,
+      "title": "Torto Arado",
+      "author": "Itamar Vieira Junior",
+      "source": "Veja",
+      "coverUrl": "https://covers.openlibrary.org/b/id/12369648-M.jpg",
+      "buyUrl": null
+    },
+    {
+      "rank": 8,
+      "title": "Tudo é Rio",
+      "author": "Carla Madeira",
+      "source": "Veja",
+      "coverUrl": "https://covers.openlibrary.org/b/id/14631316-M.jpg",
+      "buyUrl": null
+    }
+  ]
+}

@@ -1,5 +1,9 @@
-# Saída do Harvester (catalog.json versionado à parte, se quiser publicar)
-out/
+# Saída do Harvester (artefatos gerados — sqlite, capas, catalog.json grande).
+# Ignora o CONTEÚDO (out/*, não a pasta) p/ poder abrir exceção abaixo.
+out/*
+# EXCEÇÃO: o trending.json é curadoria manual semanal, pequena → versionado e publicado
+# via raw do GitHub (o app o lê por extra.trendingUrl). Ver services/trending.ts.
+!out/trending.json
 *.sqlite
 http_cache/
 
