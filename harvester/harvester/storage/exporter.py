@@ -16,10 +16,18 @@ from harvester.utils.logging import get_logger
 log = get_logger("harvester.export")
 
 
-def export_catalog(db: Database, out_path: Path, base_url: str = "", kids_only: Optional[bool] = None) -> int:
+def export_catalog(
+    db: Database,
+    out_path: Path,
+    base_url: str = "",
+    kids_only: Optional[bool] = None,
+    cover_mode: str = "local",
+) -> int:
     """Escreve o catalog.json e devolve quantas entradas exportou.
 
     `kids_only=True` gera um catálogo só do acervo infantil (útil para o Dromos Kids).
+    `cover_mode='source'` deriva a capa direto da fonte (Gutenberg), sem depender das
+    capas locais/base_url — não pesa no repo.
     """
     books = db.all_books()
     if kids_only is True:
@@ -27,7 +35,7 @@ def export_catalog(db: Database, out_path: Path, base_url: str = "", kids_only: 
     elif kids_only is False:
         books = [b for b in books if not b.is_kids]
 
-    entries = [b.to_catalog_entry(base_url=base_url) for b in books]
+    entries = [b.to_catalog_entry(base_url=base_url, cover_mode=cover_mode) for b in books]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(entries, ensure_ascii=False, indent=2), "utf-8")
     log.info("catalog.json: %d entradas -> %s", len(entries), out_path)

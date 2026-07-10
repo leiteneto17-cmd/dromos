@@ -1,9 +1,12 @@
 # Saída do Harvester (artefatos gerados — sqlite, capas, catalog.json grande).
 # Ignora o CONTEÚDO (out/*, não a pasta) p/ poder abrir exceção abaixo.
 out/*
-# EXCEÇÃO: o trending.json é curadoria manual semanal, pequena → versionado e publicado
-# via raw do GitHub (o app o lê por extra.trendingUrl). Ver services/trending.ts.
+# EXCEÇÕES publicadas via raw do GitHub (o app lê por extra.trendingUrl / extra.catalogUrl):
+#  - trending.json: curadoria manual semanal ("Em alta no Brasil"). Ver services/trending.ts.
+#  - catalog.json: acervo de domínio público (capas em cover-mode=source → sem imagens no repo).
+#    Ver services/curated-catalog.ts. As IMAGENS em out/covers/ seguem ignoradas (usamos a URL do Gutenberg).
 !out/trending.json
+!out/catalog.json
 *.sqlite
 http_cache/
 

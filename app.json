@@ -78,7 +78,7 @@
       "revenueCatIosKey": "",
       "fbAppId": "",
       "jamendoClientId": "",
-      "catalogUrl": "",
+      "catalogUrl": "https://raw.githubusercontent.com/leiteneto17-cmd/dromos/main/harvester/out/catalog.json",
       "trendingUrl": "https://raw.githubusercontent.com/leiteneto17-cmd/dromos/main/harvester/out/trending.json"
     }
   }

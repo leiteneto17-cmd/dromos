@@ -29,7 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int, default=None, help="máximo de arquivos novos nesta rodada")
     p.add_argument("--languages", default="pt", help="idioma (fontes que suportam, ex.: gutenberg)")
     p.add_argument("--topic", default=None, help="assunto/bookshelf (ex.: children) — se a fonte suportar")
-    p.add_argument("--base-url", default="", help="URL pública base p/ as capas (ex.: raw do GitHub)")
+    p.add_argument("--base-url", default="", help="URL pública base p/ as capas locais (ex.: raw do GitHub)")
+    p.add_argument("--cover-mode", choices=["local", "source"], default="local",
+                   help="'source' deriva a capa da fonte (Gutenberg), sem baixar/hospedar (não pesa no repo)")
     p.add_argument("--kids-only", action="store_true", help="exporta só o acervo infantil")
     p.add_argument("--no-export", action="store_true", help="só coleta; não (re)gera o catalog.json")
     p.add_argument("--list-sources", action="store_true", help="lista as fontes disponíveis e sai")
@@ -65,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
                 cfg.catalog_path,
                 base_url=args.base_url,
                 kids_only=True if args.kids_only else None,
+                cover_mode=args.cover_mode,
             )
             log.info("total no catálogo: %d (banco: %d livros)", n, db.count())
     finally:
